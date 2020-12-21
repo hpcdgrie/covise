@@ -3935,7 +3935,7 @@ bool CTRLHandler::vrbUpdate() {
             tb >> id;
             if (id != m_client.ID())
             {
-                std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const auto& cl) {return cl.first == id; });
+                std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const std::pair<int, std::string>& cl) {return cl.first == id; });
                 retval = true;
             }
         }

@@ -589,9 +589,7 @@ Process::Process(const char *n, int arc, char *arv[], sender_type st)
     auto crbExec = covise::getExecFromCmdArgs(arc, arv);
     if (crbExec.displayIp)
     {
-        std::string env = "DISPLAY=";
-        env += crbExec.displayIp;
-        putenv(env.c_str());
+        setenv("DISPLAY", crbExec.displayIp, true);
     }
 
     id = crbExec.moduleCount;
