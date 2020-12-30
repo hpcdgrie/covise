@@ -3890,10 +3890,13 @@ bool CTRLHandler::recreate(string content, readMode mode)
     return true;
 }
 
-const std::string &covise::CTRLHandler::vrbSessionName() const
+int covise::CTRLHandler::vrbClientID() 
 {
-    m_sessionName = "covise_" + std::to_string(m_client.ID());
-    return m_sessionName;
+    if (m_client.isConnected())
+    {
+        return m_client.ID();
+    }
+    return 0;
 }
 bool CTRLHandler::checkModule(const string &modname, const string &modhost)
 {

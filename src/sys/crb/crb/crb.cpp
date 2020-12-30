@@ -568,8 +568,8 @@ int main(int argc, char* argv[])
             }
             else
             {
-                std::string portDummy, moduleCountDummy;
-                auto args = getCmdArgs(crbExec, portDummy, moduleCountDummy);
+                auto a = getCmdArgs(crbExec);
+                auto args = cmdArgsToCharVec(a);
                 const char* appName = crbExec.name;
                 std::string execpath;
                 const char* covisedir = getenv("COVISEDIR");
@@ -592,7 +592,7 @@ int main(int argc, char* argv[])
 #endif
                 execpath += appName;
                 args[0] = execpath.c_str();
-                spawnProgram(args[0], args); //spawnProgram uses execvp instead of execv which should have the same effect since execpath is absolute
+                spawnProgram(args[0], args); 
             }
         }
         break;

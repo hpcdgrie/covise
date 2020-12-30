@@ -53,7 +53,7 @@ public:
 
     vector<string> splitString(string text, const string &sep);
     bool recreate(string buffer, readMode mode);
-    const std::string &vrbSessionName() const;
+    int vrbClientID();
 private:
     static CTRLHandler *singleton;
     FILE *fp;
@@ -69,7 +69,6 @@ private:
     int m_SSLDaemonPort;
     SSLClient *m_SSLClient;
     vrb::VRBClient m_client;
-    mutable std::string m_sessionName;
     int parseCommandLine(int argc, char **argv);
     void startCrbUiDm();
     void loadNetworkFile();
