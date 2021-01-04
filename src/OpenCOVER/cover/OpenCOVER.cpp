@@ -725,7 +725,7 @@ bool OpenCOVER::init()
         {
             auto cmdExec = getExecFromCmdArgs(coCommandLine::instance()->argc(), coCommandLine::instance()->argv());
             std::stringstream ss;
-            ss << "covise" << cmdExec.vrbClientIdOfController << "_" << cmdExec.moduleCount;
+            ss << "covise" << cmdExec.vrbClientIdOfController << "_" << cmdExec.moduleId;
             startSession = ss.str();
         }
         std::cerr << "startSession: " << startSession << std::endl;
