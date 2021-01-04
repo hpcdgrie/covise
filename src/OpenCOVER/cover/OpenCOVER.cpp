@@ -40,6 +40,7 @@
 
 #include <net/message.h>
 #include <net/covise_socket.h>
+#include <net/concrete_messages.h>
 
 #include "coVRPluginSupport.h"
 #include "coVRConfig.h"
@@ -677,7 +678,6 @@ bool OpenCOVER::init()
         }
     }
 
-
     haveWindows = coVRMSController::instance()->allReduceOr(haveWindows);
     if (!haveWindows)
         return false;
@@ -723,9 +723,10 @@ bool OpenCOVER::init()
         
         if (loadCovisePlugin)//use covise session
         {
-            std::string coviseModuleID = coCommandLine::argv(4);
-		    std::string coviseVrbClientID = coCommandLine::argv(coCommandLine::argc() - 1);
-            startSession = coviseVrbClientID + "_" + coviseModuleID;
+            auto cmdExec = getExecFromCmdArgs(coCommandLine::instance()->argc(), coCommandLine::instance()->argv());
+            std::stringstream ss;
+            ss << "covise" << cmdExec.vrbClientIdOfController << "_" << cmdExec.moduleId;
+            startSession = ss.str();
         }
         std::cerr << "startSession: " << startSession << std::endl;
         coVRMSController::instance()->setStartSession(startSession);
