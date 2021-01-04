@@ -725,7 +725,7 @@ bool OpenCOVER::init()
         {
             auto cmdExec = getExecFromCmdArgs(coCommandLine::instance()->argc(), coCommandLine::instance()->argv());
             std::stringstream ss;
-            ss << "covise" << cmdExec.vrbClientIdOfController << "_" << cmdExec.moduleId;
+            ss << "covise" << cmdExec.vrbClientIdOfController << "_" << cmdExec.moduleCount;
             startSession = ss.str();
         }
         std::cerr << "startSession: " << startSession << std::endl;
@@ -1448,21 +1448,7 @@ void OpenCOVER::setExitFlag(bool flag)
         {
             fprintf(stderr, "OpenCOVER::setExitFlag\n");
         }
-
-        if (flag && vrbc && vrbc->isConnected())
-        {
-            // do not quit, if we are connected to a vr Broker
-            // but close connection to Covise
-            //CoviseRender::appmod->getConnectionList()->remove(vrbc->getConnection());
-#if 0
-            if (m_visPlugin)
-                coVRPluginList::instance()->unload(m_visPlugin);
-#endif
-            m_visPlugin = NULL;
-            exitFlag = false;
-        }
-        else
-            exitFlag = flag;
+        exitFlag = flag;
     }
 }
 
