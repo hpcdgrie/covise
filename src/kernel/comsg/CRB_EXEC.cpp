@@ -6,8 +6,6 @@
 #include <net/tokenbuffer_util.h>
 #include <net/tokenbuffer_serializer.h>
 
-#include <vrb/client/VrbCredentials.h>
-
 #include <cassert>
 #include <iostream>
 #include <algorithm>
@@ -43,10 +41,13 @@ IMPL_MESSAGE_CLASS(CRB_EXEC,
 	char*, displayIp,
 	char*, category,
 	int, vrbClientIdOfController,
+    vrb::VrbCredentials, vrbCredentials,
 	std::vector<std::string>, params)
 
+constexpr size_t numMembers = 13;
 
-std::string charToString(const char* c) {
+std::string charToString(const char *c)
+{
 	if (c && !c[0] == '\0')
 	{
 		return std::string{ c };
@@ -60,7 +61,7 @@ const char* adoptedChar(const char* c) {
 
 std::vector<std::string> getCmdArgs(const CRB_EXEC& exec) {
 
-	size_t l = 10;
+	size_t l = numMembers;
 	l += exec.params.size();
 	std::vector<std::string> args(l);
 	size_t pos = 0;
@@ -73,6 +74,9 @@ std::vector<std::string> getCmdArgs(const CRB_EXEC& exec) {
 	args[pos++] = charToString(exec.moduleHostName);
 	args[pos++] = charToString(exec.displayIp);
 	args[pos++] = std::to_string(exec.vrbClientIdOfController);
+	args[pos++] = exec.vrbCredentials.ipAddress;
+	args[pos++] = std::to_string(exec.vrbCredentials.tcpPort);
+	args[pos++] = std::to_string(exec.vrbCredentials.udpPort);
 	args[pos++] = std::to_string(exec.params.size());
 	for (auto& arg : exec.params)
 	{
@@ -98,17 +102,17 @@ void invalidArgsError(int argC, int expected, std::function<bool(int, int)> comp
 CRB_EXEC getExecFromCmdArgs(int argC, char* argV[]) {
 
 
-	invalidArgsError(argC, 10, 
+	invalidArgsError(argC, numMembers, 
 					[](int a, int b){ return a >= b; },
 	 				argV);
-	int numExtraArgs = std::stoi(argV[9]);
-	invalidArgsError(argC, numExtraArgs + 10, 
+	int numExtraArgs = std::stoi(argV[numMembers-1]);
+	invalidArgsError(argC, numExtraArgs + numMembers, 
 					[](int a, int b){ return a == b; },
 	 				argV);
 	std::vector<std::string> extraArgs(numExtraArgs);
 	for (size_t i = 0; i < numExtraArgs; i++)
 	{
-		extraArgs[i] = argV[i + 10];
+		extraArgs[i] = argV[i + numMembers];
 	}
 	CRB_EXEC exec(ExecFlag::Normal,
 		adoptedChar(argV[0]), //name
@@ -121,6 +125,7 @@ CRB_EXEC getExecFromCmdArgs(int argC, char* argV[]) {
 		adoptedChar(argV[7]), //displayIp
 		nullptr, //category
 		atoi(argV[8]), //vrbClientIdOfController
+		vrb::VrbCredentials{argV[9], static_cast<unsigned int>(atoi(argV[10])), static_cast<unsigned int>(atoi(argV[11]))},
 		extraArgs); //params
 	return exec;
 }

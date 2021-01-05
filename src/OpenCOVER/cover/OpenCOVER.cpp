@@ -727,6 +727,7 @@ bool OpenCOVER::init()
             std::stringstream ss;
             ss << "covise" << cmdExec.vrbClientIdOfController << "_" << cmdExec.moduleId;
             startSession = ss.str();
+            m_vrbCredentials.reset(new vrb::VrbCredentials{cmdExec.vrbCredentials});
         }
         std::cerr << "startSession: " << startSession << std::endl;
         coVRMSController::instance()->setStartSession(startSession);

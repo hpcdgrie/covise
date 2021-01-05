@@ -7,9 +7,7 @@
 #include <vector>
 #include <string>
 
-namespace vrb{
-    struct VrbCredentials;
-}
+#include <vrb/client/VrbCredentials.h>
 
 namespace covise{
     class TokenBuffer;
@@ -37,6 +35,7 @@ namespace covise{
      char *, displayIp,
      char *, category,
      int, vrbClientIdOfController,
+     vrb::VrbCredentials, vrbCredentials,
      std::vector<std::string>, params)
      
     COMSGEXPORT std::vector<std::string> getCmdArgs(const CRB_EXEC &exec);

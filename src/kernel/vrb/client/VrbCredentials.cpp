@@ -18,3 +18,8 @@ VrbCredentials::VrbCredentials()
     , udpPort(coCoviseConfig::getInt("udpPort", "System.VRB.Server", 31801))
 {
 }
+
+covise::TokenBuffer &vrb::operator<<(covise::TokenBuffer &tb, const VrbCredentials &cred){
+    tb << cred.ipAddress << static_cast<int>(cred.tcpPort) << static_cast<int>(cred.udpPort);
+    return tb;
+}
