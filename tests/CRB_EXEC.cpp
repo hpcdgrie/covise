@@ -8,7 +8,7 @@ void test_crbExec() {
 	params.push_back("test8");
 	params.push_back("test9");
 
-	covise::CRB_EXEC crbExec1{ covise::ExecFlag::Memcheck, "test1", 31000, "test2", 5, "test3", "test4", "test5", nullptr, nullptr, 13, params };
+	covise::CRB_EXEC crbExec1{ covise::ExecFlag::Memcheck, "test1", 31000, "test2", 5, "test3", "test4", "test5", nullptr, nullptr, 13, vrb::VrbCredentials{"test", 83211, 934782}, params };
 
 	//std::cerr << crbExec1 << std::endl << std::endl;
 	auto a = covise::getCmdArgs(crbExec1);
@@ -24,6 +24,9 @@ void test_crbExec() {
 	assert(!crbExec2.category);
 	assert(crbExec1.params[0] == crbExec2.params[0]);
 	assert(crbExec1.params[1] == crbExec2.params[1]);
+	assert(crbExec1.vrbCredentials.ipAddress == crbExec2.vrbCredentials.ipAddress);
+	assert(crbExec1.vrbCredentials.tcpPort == crbExec2.vrbCredentials.tcpPort);
+	assert(crbExec1.vrbCredentials.udpPort == crbExec2.vrbCredentials.udpPort);
 }
 
 
