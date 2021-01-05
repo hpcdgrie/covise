@@ -1,10 +1,12 @@
-#include "concrete_messages.h"
-#include "message.h"
-#include "message_sender_interface.h"
-#include "message_types.h"
-#include "tokenbuffer.h"
-#include "tokenbuffer_util.h"
-#include "tokenbuffer_serializer.h"
+#include "CRB_EXEC.h"
+#include <net/message.h>
+#include <net/message_sender_interface.h>
+#include <net/message_types.h>
+#include <net/tokenbuffer.h>
+#include <net/tokenbuffer_util.h>
+#include <net/tokenbuffer_serializer.h>
+
+#include <vrb/client/VrbCredentials.h>
 
 #include <cassert>
 #include <iostream>

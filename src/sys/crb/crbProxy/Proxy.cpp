@@ -22,7 +22,7 @@
 #endif
 
 #include "CRBConnection.h"
-#include <net/concrete_messages.h>
+#include <comsg/CRB_EXEC.h>
 using namespace covise;
 
 Proxy::Proxy(const CRB_EXEC& messageData, CRBConnection *crbC)
