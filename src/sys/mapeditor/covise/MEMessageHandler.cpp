@@ -1087,6 +1087,18 @@ void MEMessageHandler::receiveUIMessage(Message *msg)
     //
     // message not yet supported
     //
+    else if (list[0] == "AVAILABLE_PARTNERS"){
+        std::vector < std::pair<int, std::string>> p;
+        for (size_t i = 1; i < list.size() - 1; i+= 2)
+        {
+            p.emplace_back(std::pair<int, string>{list[i].toInt(), list[i + 1].toStdString()});
+        }
+        std::cerr << "vrb remote launchers received:" << std::endl;
+        for(const auto &cl : p){
+            std::cerr << cl.first << ": " << cl.second << std::endl;
+        }
+        MEMainHandler::instance()->updateRemotePartners(p);
+    }
     else
     {
         if (MEMainHandler::instance()->isMaster())

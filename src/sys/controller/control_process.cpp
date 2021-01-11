@@ -44,7 +44,7 @@ extern "C" int rexec(char **ahost, int inport, char *user, char *passwd,
 #endif
 
 // LOCAL .....
-AppModule *Controller::start_datamanager(const string &name)
+AppModule *Controller::start_datamanager(int clientID, const string &name)
 {
     char chport[10];
     char chid[16];
@@ -158,7 +158,7 @@ void Controller::addConnection(Connection *conn)
 }
 
 // REXEC......
-AppModule *Controller::start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name)
+AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *user, const char *passwd, const char *name)
 {
     char remote_command[100];
     int port, ret;
@@ -226,7 +226,7 @@ AppModule *Controller::start_datamanager(Host *rhost, const char *user, const ch
     return mod;
 }
 
-AppModule *Controller::start_datamanager(Host *rhost, const char *user, const char *name,
+AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *user, const char *name,
                                          int exec_type, const char *script_name)
 {
     //std::cerr << "Controller::start_datamanager: name=" << name << ", rhost name=" <<  rhost->getName() << ", v4=" << rhost->get_ipv4() << std::endl;

@@ -11,22 +11,26 @@
 #include <iostream>
 #include <signal.h>
 #include <string>
+#include <functional>
 
 #include <appl/CoviseBase.h>
+#include <comsg/CRB_EXEC.h>
+#include <comsg/coviseLaunchOptions.h>
 #include <config/CoviseConfig.h>
 #include <config/coConfig.h>
 #include <covise/covise.h>
 #include <covise/covise_msg.h>
-#include <comsg/CRB_EXEC.h>
 #include <net/covise_connect.h>
 #include <net/covise_host.h>
 #include <net/tokenbuffer.h>
+#include <net/tokenbuffer_serializer.h>
 #include <util/coFileUtil.h>
 #include <util/coTimer.h>
 #include <util/covise_version.h>
 #include <util/unixcompat.h>
-#include <vrb/client/VRBClient.h>
 #include <vrb/VrbSetUserInfoMessage.h>
+#include <vrb/client/LaunchRequest.h>
+#include <vrb/client/VRBClient.h>
 
 #include "AccessGridDaemon.h"
 #include "CTRLGlobal.h"
@@ -269,7 +273,6 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
         }
 
         handleAndDeleteMsg(msg);
-
     } //  while
 
     delete m_accessGridDaemon;
@@ -1528,9 +1531,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
                 buffer << name_list[i]<<"\n";
                 buffer << val_list[i] << "\n";
             }
-            Message *tmpmsg = new Message(COVISE_MESSAGE_PARAMDESC, buffer.str());
-            CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-            delete tmpmsg;
+            Message tmpmsg{COVISE_MESSAGE_PARAMDESC, buffer.str()};
+            CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
         }
         else
         {
@@ -1773,9 +1775,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
 
         string buffer = writeClipboard("SETCLIPBOARD", moduleList);
 
-        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, buffer);
-        CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-        delete tmpmsg;
+        Message tmpmsg{COVISE_MESSAGE_UI, buffer};
+        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
     }
 
     //             UI::GETCLIPBOARD
@@ -1876,9 +1877,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         }
 
         // send message to UI that loading of a map will be started
-        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, "START_READING\n");
-        CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-        delete tmpmsg;
+        Message tmpmsg{COVISE_MESSAGE_UI, "START_READING\n"};
+        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
 
         //  2.
         //  start new modules and tell it to the uifs
@@ -1982,9 +1982,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             change = false;
         }
 
-        tmpmsg = new Message(COVISE_MESSAGE_UI, "END_READING\nfalse");
-        CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-        delete tmpmsg;
+        tmpmsg = Message(COVISE_MESSAGE_UI, "END_READING\nfalse");
+        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
     }
 
     //       UI::MASTER-REQUEST
@@ -2009,9 +2008,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         else
         {
             string buffer = "MASTER-REQ FAILED: Bad Hostname (" + string(hostname) + ")\n";
-            Message *tmpmsg = new Message(COVISE_MESSAGE_UI, buffer);
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-            delete tmpmsg;
+            Message tmpmsg{COVISE_MESSAGE_UI, buffer};
+            CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
         }
     }
 
@@ -2559,9 +2557,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
 
             ostringstream buffer;
             buffer << "MODULE_TITLE\n" << from_name << "\n" << from_nr << "\n" << from_host << "\n" << title;
-            Message *tmpmsg = new Message(COVISE_MESSAGE_UI, buffer.str());
-            CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-            delete tmpmsg;
+            Message tmpmsg{COVISE_MESSAGE_UI, buffer.str()};
+            CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
         }
         else
         {
@@ -2786,9 +2783,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             ostringstream buffer;
             buffer << "HOSTINFO\n" << exectype << "\n" << timeout << "\n" << hostname;
 
-            Message *tmpmsg = new Message(COVISE_MESSAGE_UI, buffer.str());
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-            delete tmpmsg;
+            Message tmpmsg{COVISE_MESSAGE_UI, buffer.str()};
+            CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
         }
 
         else
@@ -2797,121 +2793,51 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
 
     //       UI::ADD_HOST
     // ----------------------------------------------------------
-
-    else if (key == "ADD_HOST")
+    else if(key == "HANDLE_PARTNERS")
     {
+        using namespace std;
+        LaunchStyle launchStyle = static_cast<LaunchStyle>(stoi(list[iel++]));
+        function<void(int, const string&, const string&, const string&)> action;
+        switch (launchStyle)
+        {
+            case LaunchStyle::Host:
+            {
+                action = addHost;
+            }
+            break;
+            case LaunchStyle::Partner:
+            {
+                action = addPartner;
+            }
+            break;
+            case LaunchStyle::Disconnect:
+            {
+                action = removeClient;
+            }
+            break;
+
+            default:
+                break;
+        }
+        
         bool completed = false;
 
-        string hname = list[iel];
-        iel++;
-        string user_id = list[iel];
-        iel++;
-        string passwd = list[iel];
-        iel++;
-        string exectype = list[iel];
-        iel++;
-        string timeout = list[iel];
-        iel++;
-        string display;
-        if (list.size() < iel)
-            display = list[iel];
-        iel++;
-
-        string hostname = hname;
-        if (!hostname.empty())
+        string display = list[iel++];
+        string passwd = list[iel++];
+        string timeout = list[iel++];
+        int numPartners = std::stoi(list[iel++]);
+        
+        
+        for (size_t i = 0; i < numPartners; i++)
         {
-            Config->set_exectype(hostname.c_str(), exectype.c_str());
-
-            if (!timeout.empty())
-                Config->set_timeout(hostname.c_str(), timeout.c_str());
-
-            if (!display.empty())
-                Config->set_display(hostname.c_str(), display.c_str());
-
-            if (m_readConfig == false)
-            {
-                int ret = CTRLGlobal::getInstance()->userinterfaceList->config_action("", hostname, user_id, passwd);
-                if (ret)
-                {
-                    m_readConfig = CTRLGlobal::getInstance()->userinterfaceList->add_config(m_filename, NULL);
-                    if (m_readConfig == true)
-                        completed = true;
-
-                    if (m_readConfig && m_isLoaded)
-                    {
-                        m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_netfile);
-                        m_isLoaded = false;
-                    }
-                }
-            }
-
-            else
-            {
-                coHostType htype(CO_HOST);
-                if (CTRLGlobal::getInstance()->hostList->add_host(hostname, user_id, passwd, "", htype))
-                {
-                    completed = 1;
-                    if (!m_globalLoadReady)
-                        m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
-
-                    if (!m_clipboardReady)
-                        m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
-
-                    // send infos about hosttype & ui status
-                    sendCollaborativeState();
-                }
-
-                else
-                {
-                    string text = "ADDHOST_FAILED\n" + hostname + "\n" + user_id + "\nPassword\n";
-                    Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
-                    CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-
-                    completed = false;
-                } //  add_host
-            }
-
-            //  m_readConfig
-            if (m_globalLoadReady && completed)
-            {
-                if (m_iconify)
-                {
-                    Message *tmpmsg = new Message(COVISE_MESSAGE_UI, "ICONIFY");
-                    CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-                    delete tmpmsg;
-                }
-
-                if (m_maximize)
-                {
-                    Message *tmpmsg;
-                    tmpmsg = new Message(COVISE_MESSAGE_UI, "MAXIMIZE");
-                    CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-                    delete tmpmsg;
-                }
-
-                if (m_executeOnLoad)
-                {
-                    m_executeOnLoad = false;
-                    CTRLGlobal::getInstance()->netList->reset();
-                    net_module *netmod;
-                    while ((netmod = CTRLGlobal::getInstance()->netList->next()) != NULL)
-                    {
-                        if (netmod->is_on_top())
-                            netmod->exec_module(CTRLGlobal::getInstance()->userinterfaceList);
-                    }
-                }
-            }
-        } // hostname
-
-        else
-        {
-            string text = "ADDHOST_FAILED\nBad Hostname\n" + user_id + "\nPassword\n";
-            Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-            delete tmpmsg;
+            int clID = std::stoi(list[iel++]);
+            action(clID, display, passwd, timeout);
         }
     }
-
+    else if (key == "ADD_HOST")
+    {
+        addHost();
+    }
     //       UI::ADD_PARTNER
     // ----------------------------------------------------------
 
@@ -2919,7 +2845,24 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
     {
         if (m_addPartner)
             m_addPartner = false;
-
+/*
+        int id = std::stoi(list[iel++]);
+        CRB_EXEC exec{ ExecFlag::Normal,
+            "crb",
+     int, port,
+     char *, localIp,
+     int, moduleCount,
+     char *, moduleId,
+     char *, moduleIp,
+     char *, moduleHostName,
+     char *, displayIp,
+     char *, category,
+     int, vrbClientIdOfController,
+     vrb::VrbCredentials, vrbCredentials,
+     std::vector<std::string>, params)}
+        std::vector<std::string> args;
+        vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{vrb::Program::Controller, id, args}, &m_client);
+*/
         string hname = list[iel];
         iel++;
         string user_id = list[iel];
@@ -2961,10 +2904,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             else
             {
                 string text = "ADDPARTNER_FAILED\n" + hostname + "\n" + user_id + "\nPassword\n";
-                Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
-                CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-
-                delete tmpmsg;
+                Message tmpmsg{COVISE_MESSAGE_UI, text};
+                CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
             }
 
             m_addPartner = false;
@@ -2973,9 +2914,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         else
         {
             string text = "ADDPARTNER_FAILED\nBad Hostname\n" + user_id + "\nPassword\n";
-            Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-            delete tmpmsg;
+            Message tmpmsg{COVISE_MESSAGE_UI, text};
+            CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
         }
     }
 
@@ -3136,9 +3076,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         {
             if (m_iconify)
             {
-                Message *tmpmsg = new Message(COVISE_MESSAGE_UI, "ICONIFY");
-                CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-                delete tmpmsg;
+                Message tmpmsg{COVISE_MESSAGE_UI, "ICONIFY"};
+                CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
             }
 
             if (m_executeOnLoad)
@@ -3154,6 +3093,22 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             }
         }
     }
+    else if(key == "REQUEST_AVAILABLE_PARTNERS"){
+        vrbUpdate();
+        std::cerr << "vrb remote launchers requested:" << std::endl;
+        for(const auto &cl : m_remoteLauncher){
+            std::cerr << cl.first << ": " << cl.second << std::endl;
+        }
+        std::stringstream ss;
+        ss << "AVAILABLE_PARTNERS";
+        for(const auto &partner : m_remoteLauncher){
+            ss << "\n" << partner.first << "\n" << partner.second;
+        }
+        ss << "\n";
+        Message tmpmsg{COVISE_MESSAGE_UI, ss.str()};
+        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
+        
+    }
 
     //       UI::DEFAULT
     // ----------------------------------------------------------
@@ -3164,6 +3119,120 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
     }
 }
 
+void CTRLHandler::addHost(int clID, const std::string& display, const std::string& password, const std::string&timeout){
+    bool completed = false;
+    auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
+        return cl.ID() == clID;
+    });
+    if (client != m_remoteLauncher.end())
+    {
+        const char *hostname = client->userInfo().hostName.c_str();
+        if (!timeout.empty())
+            Config->set_timeout(hostname, timeout.c_str());
+
+        if (!display.empty())
+            Config->set_display(hostname, display.c_str());
+
+        if (m_readConfig == false)
+        {
+            int ret = CTRLGlobal::getInstance()->userinterfaceList->config_action("", hostname, client->userInfo().name, password);
+            if (ret)
+            {
+                m_readConfig = CTRLGlobal::getInstance()->userinterfaceList->add_config(m_filename, NULL);
+                if (m_readConfig == true)
+                    completed = true;
+
+                if (m_readConfig && m_isLoaded)
+                {
+                    m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_netfile);
+                    m_isLoaded = false;
+                }
+            }
+        }
+        else
+        {
+            coHostType htype(CO_HOST);
+            if (CTRLGlobal::getInstance()->hostList->add_host(*client, password, "", htype))
+            {
+                completed = 1;
+                if (!m_globalLoadReady)
+                    m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
+
+                if (!m_clipboardReady)
+                    m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
+                vrb::Program p = vrb::Program::Controller;
+                if (CTRLHandler::instance()->Config->getshminfo(hostname) == COVISE_PROXIE)
+                    p = vrb::Program::ControllerProxy;
+                std::vector<std::string> args;
+                args.emplace_back()
+                vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{p, clID, args}, &m_client);
+
+                // send infos about hosttype & ui status
+                sendCollaborativeState();
+            }
+        }
+
+//  m_readConfig
+    if (m_globalLoadReady && completed)
+    {
+        if (m_iconify)
+        {
+            Message *tmpmsg = new Message(COVISE_MESSAGE_UI, "ICONIFY");
+            CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
+            delete tmpmsg;
+        }
+
+        if (m_maximize)
+        {
+            Message *tmpmsg;
+            tmpmsg = new Message(COVISE_MESSAGE_UI, "MAXIMIZE");
+            CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
+            delete tmpmsg;
+        }
+
+        if (m_executeOnLoad)
+        {
+            m_executeOnLoad = false;
+            CTRLGlobal::getInstance()->netList->reset();
+            net_module *netmod;
+            while ((netmod = CTRLGlobal::getInstance()->netList->next()) != NULL)
+            {
+                if (netmod->is_on_top())
+                    netmod->exec_module(CTRLGlobal::getInstance()->userinterfaceList);
+            }
+        }
+    }
+
+    }
+    else
+    {
+        string text = "ADDHOST_FAILED\n" + hostname + "\n" + user_id + "\nPassword\n";
+        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
+        CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
+
+        completed = false;
+    } //  add_host
+}
+
+    
+
+    else
+    {
+        string text = "ADDHOST_FAILED\nBad Hostname\n" + user_id + "\nPassword\n";
+        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
+        CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
+        delete tmpmsg;
+    }
+
+}
+
+void CTRLHandler::addPartner(int clID, const std::string& display, const std::string& password, const std::string&timeout){
+
+}
+
+void CTRLHandler::removeClient(int clID, const std::string& display, const std::string& password, const std::string&timeout){
+
+}
 //!
 //! reset lists when NEW or OPEN was received
 //!
@@ -3602,13 +3671,12 @@ vector<string> CTRLHandler::splitString(string text, const string &sep)
 bool CTRLHandler::recreate(string content, readMode mode)
 {
     // send message to UI that loading of a map has been started
-    Message *tmpmsg;
+    Message tmpmsg;
     if (mode == NETWORKMAP)
-        tmpmsg = new Message(COVISE_MESSAGE_UI, "START_READING\n" + m_globalFilename);
+        tmpmsg = Message(COVISE_MESSAGE_UI, "START_READING\n" + m_globalFilename);
     else
-        tmpmsg = new Message(COVISE_MESSAGE_UI, "START_READING\n");
-    CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-    delete tmpmsg;
+        tmpmsg = Message(COVISE_MESSAGE_UI, "START_READING\n");
+    CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
 
     m_writeUndoBuffer = false;
 
@@ -3670,9 +3738,8 @@ bool CTRLHandler::recreate(string content, readMode mode)
 
     if (!allhosts)
     {
-        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, "END_READING\nfalse");
-        CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-        delete tmpmsg;
+        Message tmpmsg{COVISE_MESSAGE_UI, "END_READING\nfalse"};
+        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
         return false;
     }
 
@@ -3808,9 +3875,8 @@ bool CTRLHandler::recreate(string content, readMode mode)
         ostringstream os;
         os << ready;
         selectionBuffer = "SELECT_CLIPBOARD\n" + os.str() + "\n" + selectionBuffer;
-        tmpmsg = new Message(COVISE_MESSAGE_UI, selectionBuffer);
-        CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-        delete tmpmsg;
+        tmpmsg = Message(COVISE_MESSAGE_UI, selectionBuffer);
+        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
     }
 
     //  no of connections
@@ -3878,11 +3944,10 @@ bool CTRLHandler::recreate(string content, readMode mode)
     }
 
     if (mode == NETWORKMAP)
-        tmpmsg = new Message(COVISE_MESSAGE_UI, "END_READING\ntrue");
+        tmpmsg = Message(COVISE_MESSAGE_UI, "END_READING\ntrue");
     else
-        tmpmsg = new Message(COVISE_MESSAGE_UI, "END_READING\nfalse");
-    CTRLGlobal::getInstance()->userinterfaceList->send_all(tmpmsg);
-    delete tmpmsg;
+        tmpmsg = Message(COVISE_MESSAGE_UI, "END_READING\nfalse");
+    CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
 
     mmodList.clear();
     m_writeUndoBuffer = true;
@@ -3897,6 +3962,17 @@ int CTRLHandler::vrbClientID()
         return m_client.ID();
     }
     return 0;
+}
+
+void CTRLHandler::sendLaunchRequest(int clientID, const std::vector<std::string> &args, bool proxy = false)
+{
+    vrb::Program p = vrb::Program::Controller;
+    if (proxy)
+    {
+        p = vrb::Program::ControllerProxy;
+    }
+
+    vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{p, clientID, args}, &m_client);
 }
 
 bool CTRLHandler::waitForVrbRegistration() {
@@ -3918,6 +3994,10 @@ bool CTRLHandler::waitForVrbRegistration() {
 }
 
 bool CTRLHandler::vrbUpdate() {
+    if (!m_clientRegistered && !waitForVrbRegistration())
+    {
+        return false;
+    }
     Message msg;
     bool retval = false;
     while (m_client.poll(&msg)) {
@@ -3935,15 +4015,15 @@ bool CTRLHandler::vrbUpdate() {
             tb >> id;
             if (id != m_client.ID())
             {
-                std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const std::pair<int, std::string>& cl) {return cl.first == id; });
+                std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const vrb::RemoteClient& cl) {return cl.ID() == id; });
                 retval = true;
             }
         }
         break;
         default:
+            std::cerr << "received vrb message" << std::endl;
             break;
         } 
-
     }
     return retval;
 }
@@ -3956,11 +4036,11 @@ void CTRLHandler::vrbClientsUpdate(const Message &userInfoMessage) {
         m_client.setSession(uim.mySession);
         m_client.setID(uim.myClientID);
     }
-    for (const auto& cl : uim.otherClients)
+    for (auto& cl : uim.otherClients)
     {
         if (cl.userInfo().userType == vrb::Program::VrbRemoteLauncher)
         {
-            m_remoteLauncher.emplace_back(std::make_pair(cl.ID(), cl.userInfo().hostName));
+            m_remoteLauncher.emplace_back(std::move(cl));
         }
     }
 }

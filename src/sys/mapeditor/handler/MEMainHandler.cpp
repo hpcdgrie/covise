@@ -34,28 +34,31 @@
 #include <covise/covise_appproc.h>
 #include <util/covise_version.h>
 
+#include "MEFavoriteListHandler.h"
+#include "MEFileBrowser.h"
+#include "MEFileBrowserListHandler.h"
+#include "MEHostListHandler.h"
+#include "MELinkListHandler.h"
 #include "MEMainHandler.h"
 #include "MEMessageHandler.h"
 #include "MENodeListHandler.h"
-#include "MEHostListHandler.h"
-#include "MELinkListHandler.h"
-#include "MEFavoriteListHandler.h"
-#include "MEFileBrowserListHandler.h"
-#include "MECSCW.h"
-#include "widgets/MEGraphicsView.h"
-#include "widgets/MEUserInterface.h"
-#include "widgets/MESessionSettings.h"
-#include "widgets/MEHelpViewer.h"
-#include "widgets/MEFavorites.h"
-#include "widgets/MEDialogTools.h"
-#include "nodes/MENode.h"
-#include "nodes/MECategory.h"
-#include "ports/MEParameterPort.h"
-#include "ports/MEDataPort.h"
-#include "ports/METimer.h"
+#include "MERemotePartner.h"
 #include "modulePanel/MEModulePanel.h"
-#include "MEFileBrowser.h"
+#include "nodes/MECategory.h"
+#include "nodes/MENode.h"
+#include "ports/MEDataPort.h"
+#include "ports/MEParameterPort.h"
+#include "ports/METimer.h"
 #include "ui_MEAboutDialog.h"
+#include "widgets/MEDialogTools.h"
+#include "widgets/MEFavorites.h"
+#include "widgets/MEGraphicsView.h"
+#include "widgets/MEHelpViewer.h"
+#include "widgets/MESessionSettings.h"
+#include "widgets/MEUserInterface.h"
+
+#include <chrono>
+#include <thread>
 
 QColor MEMainHandler::s_highlightColor;
 QColor MEMainHandler::s_paramColor, MEMainHandler::s_reqMultiColor, MEMainHandler::s_reqDataColor;
@@ -146,7 +149,6 @@ MEMainHandler::MEMainHandler(int argc, char *argv[])
     , cfg_NetworkHistoryLength(10)
     , m_deleteAutosaved_a(NULL)
     , m_copyMode(NORMAL)
-    , m_hostMode(ADDPARTNER)
     , m_helpExist(false)
     , m_masterUI(true)
     , force(false)
@@ -163,7 +165,6 @@ MEMainHandler::MEMainHandler(int argc, char *argv[])
     , m_newNode(NULL)
     , m_settings(NULL)
     , m_addHostBox(NULL)
-    , m_CSCWParam(NULL)
     , m_deleteHostBox(NULL)
     , m_mirrorBox(NULL)
     , m_requestingMaster(false)
@@ -371,6 +372,7 @@ MEMainHandler *MEMainHandler::instance()
 MEMainHandler::~MEMainHandler()
 //!
 {
+    delete m_addHostBox;
     delete messageHandler;
 }
 
@@ -1005,50 +1007,66 @@ void MEMainHandler::execNet()
 }
 
 //!
-//! add a new partner (CSCW)
+//! add a new partner
 //!
-void MEMainHandler::addPartner()
+void MEMainHandler::handlePartner()
 {
-    m_hostMode = ADDPARTNER;
-    if (m_addHostBox == NULL)
-        m_addHostBox = new MECSCW(0);
+    m_remotePartnersUpdated = false;
+    messageHandler->sendMessage(covise::COVISE_MESSAGE_UI, "REQUEST_AVAILABLE_PARTNERS\n");
+    std::chrono::milliseconds timeout{0};
+    while (timeout <= std::chrono::milliseconds{10000})
+    {
+        messageHandler->dataReceived(1);
+        if (m_remotePartnersUpdated)
+        {
+            break;
+        }
+        std::chrono::milliseconds step(500);
+        std::this_thread::sleep_for(step);
+        timeout += step;
+    }
+    if (!m_remotePartnersUpdated)
+    {
+        MEUserInterface::instance()->writeInfoMessage("No remote partners available. \nConnection to controller timed out.", Qt::blue);
+    }
 
-    QString caption = QString(framework);
-    if (m_hostMode == ADDHOST)
-        caption.append(" Add Host");
-    else
-        caption.append(" Add Partner");
+    if (!m_addPartnerDialog)
+    {
+        m_addPartnerDialog = new MERemotePartner();
+        connect(m_addPartnerDialog, &MERemotePartner::takeAction, this, [this](covise::LaunchStyle launchStyle, const std::vector<int> &clientIds, QString password, QString display) {
+            std::cerr << covise::launchStyleNames[launchStyle] << ": ";
+            for(int i : clientIds)
+            {
+                std::cerr << i << ", ";
+            }
+            requestPartnerAction(launchStyle, clientIds, password, display);
 
-    m_addHostBox->setWindowTitle(caption);
-    m_addHostBox->show();
+        });
+    }
+    std::lock_guard<std::mutex> g{m_remotePartnerMutex};
+    m_addPartnerDialog->setPartners(m_remotePartners);
+    m_addPartnerDialog->show();
 }
 
-//!
-//! add a new host (CSCW)
-//!
-void MEMainHandler::addHost()
-{
-    m_hostMode = ADDHOST;
-    if (m_addHostBox == NULL)
-        m_addHostBox = new MECSCW(0);
+void MEMainHandler::requestPartnerAction(covise::LaunchStyle launchStyle, const std::vector<int> &clients, const QString &password, const QString &display){
+    QStringList list;
+    list << "HANDLE_PARTNERS";
+    list << QString::number(static_cast<int>(launchStyle));
+    list << password << display;
+    const char *timeout = "30";
+    list << timeout;
+    list << QString::number(clients.size());
+    for (const int i : clients)
+    {
+        list << QString::number(i);
+    }
 
-    QString caption = QString(framework);
-    if (m_hostMode == ADDHOST)
-        caption.append(" Add Host");
-    else
-        caption.append(" Add Partner");
-    static int counter = 0;
-    QStringList vrbPartner;
-    vrbPartner << ("test_" + std::to_string(counter)).c_str();
-    ++counter;
-    m_addHostBox->setVrbPartner(vrbPartner);
-    m_addHostBox->setWindowTitle(caption);
-    m_addHostBox->show();
+    QString tmp = list.join("\n");
+
+    MEMessageHandler::instance()->sendMessage(covise::COVISE_MESSAGE_UI, tmp);
+
 }
 
-//!
-//! delete all selected nodes
-//!
 void MEMainHandler::deleteSelectedNodes()
 {
     mapEditor->deleteSelectedNodes();
@@ -1060,7 +1078,7 @@ void MEMainHandler::deleteSelectedNodes()
 }
 
 //!
-//! delete a host/partner (CSCW)
+//! delete a host/partner 
 //!
 void MEMainHandler::delHost()
 {
@@ -1338,6 +1356,12 @@ QColor MEMainHandler::getHostColor(int entry)
         color.setNamedColor(m_hostColor[entry]);
 
     return color;
+}
+
+void MEMainHandler::updateRemotePartners(const std::vector<std::pair<int, std::string>> &partners){
+    std::lock_guard<std::mutex> g{m_remotePartnerMutex};
+    m_remotePartners = partners;
+    m_remotePartnersUpdated = true;
 }
 
 //!
@@ -1703,38 +1727,6 @@ void MEMainHandler::removeLink(MENode *n1, MEPort *p1, MENode *n2, MEPort *p2)
 {
     MELinkListHandler::instance()->deleteLink(n1, p1, n2, p2);
     mapWasChanged("UI_REMOVE_LINK");
-}
-
-//!
-//! show given parameters for adding a host or partner
-//!
-void MEMainHandler::showCSCWParameter(const QStringList &list, addHostModes mode)
-{
-    if (!m_CSCWParam)
-        m_CSCWParam = new MECSCWParam(0);
-
-    m_CSCWParam->setHost(list[1]);
-    m_CSCWParam->setUser(list[2]);
-    m_CSCWParam->setDefaults(list[1]);
-
-    m_hostMode = mode;
-
-    m_CSCWParam->show();
-}
-
-//!
-//! show default parameters for a given host(used for connecting a host or partner)
-//!
-void MEMainHandler::showCSCWDefaults(const QStringList &list)
-{
-    if (!m_CSCWParam)
-        m_CSCWParam = new MECSCWParam(0);
-
-    int curr = list[1].toInt();
-    m_CSCWParam->setMode(curr - 1); // execution mode
-    m_CSCWParam->setTimeout(list[2]); // timeout
-    m_CSCWParam->setHost(list[3]); // host
-    m_CSCWParam->show();
 }
 
 //!

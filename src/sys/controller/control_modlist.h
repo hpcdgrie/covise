@@ -24,7 +24,9 @@
 extern "C" int execvp(const string &file, const string &const argv[]);
 #endif
 #endif
-
+namespace vrb{
+    class RemoteClient;
+}
 namespace covise
 {
 
@@ -148,7 +150,7 @@ public:
     };
     AppModule *get_DM();
 
-    int start_crb(int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype);
+    int start_crb(int clientID, int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype);
     void quit();
     int new_desk();
     void send_msg(Message *msg);
@@ -173,7 +175,7 @@ public:
 
     AppModule *start_local(const string &local_user);
     DM_data *get_local();
-    int add_crb(int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype);
+    int add_crb(int clientID, int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype);
 
     DM_data *get(const string &host);
     DM_data *get(const string &host, const string &user);
@@ -234,7 +236,7 @@ public:
         return htype;
     };
 
-    int start_ctrl(int type, const string &script_name, coHostType &htype);
+    int start_ctrl(int clientID, int type, const string &script_name, coHostType &htype);
 
     void send(Message *msg);
     void recv_msg(Message *msg);
@@ -264,7 +266,7 @@ public:
     rhost *get(const string &host);
     rhost *get(const string &host, const string &user);
     string get_hosts(const string &local_name, const string &local_user);
-    int add_host(const string &hostname, const string &user_id, const string &passwd, const string &script_name, coHostType &htype);
+    int add_host(const vrb::RemoteClient& client, const string &passwd, const string &script_name, coHostType &htype);
     int add_local_host(const string &local_user);
     int rmv_host(const string &hostname, const string &user_id);
     void mark_host();

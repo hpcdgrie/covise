@@ -14,22 +14,22 @@
 #include <pwd.h>
 #include <dirent.h>
 #endif
-#include <util/covise_version.h>
-#include "CTRLHandler.h"
 #include "CTRLGlobal.h"
-#include "control_modlist.h"
-#include "control_process.h"
-#include "covise_module.h"
-#include <covise/covise_process.h>
+#include "CTRLHandler.h"
+#include "control_coviseconfig.h"
 #include "control_def.h"
 #include "control_define.h"
+#include "control_modlist.h"
 #include "control_module.h"
-#include "control_coviseconfig.h"
-#include <config/CoviseConfig.h>
-#include <net/covise_host.h>
+#include "control_process.h"
+#include "covise_module.h"
 #include <comsg/CRB_EXEC.h>
+#include <config/CoviseConfig.h>
 #include <config/coConfig.h>
-
+#include <covise/covise_process.h>
+#include <net/covise_host.h>
+#include <util/covise_version.h>
+#include <vrb/RemoteClient.h>
 #define MAXMODULES 1000
 
 using namespace covise;
@@ -219,7 +219,7 @@ AppModule *DM_data::get_DM()
     return dm;
 }
 
-int DM_data::start_crb(int type, const string& host, const string& user, const string& passwd, const string& script_name, coHostType& /*htype*/)
+int DM_data::start_crb(int clientID, int type, const string& host, const string& user, const string& passwd, const string& script_name, coHostType& /*htype*/)
 {
 
     CTRLGlobal* global = CTRLGlobal::getInstance();
@@ -233,12 +233,12 @@ int DM_data::start_crb(int type, const string& host, const string& user, const s
     {
     case COVISE_LOCAL:
     {
-        dm = CTRLGlobal::getInstance()->controller->start_datamanager("crb");
+        dm = CTRLGlobal::getInstance()->controller->start_datamanager(clientID, "crb");
         break;
     }
     case COVISE_REXEC:
     {
-        dm = CTRLGlobal::getInstance()->controller->start_datamanager(p_host, user.c_str(), passwd.c_str(), executable.c_str());
+        dm = CTRLGlobal::getInstance()->controller->start_datamanager(clientID, p_host, user.c_str(), passwd.c_str(), executable.c_str());
         break;
     }
     case COVISE_SSH:
@@ -419,14 +419,14 @@ DM_data *DM_list::get_local()
 // start_remote startet einen datamanager auf dem Rechner host, wenn es dort
 // noch keinen gibt.
 
-int DM_list::add_crb(int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype)
+int DM_list::add_crb(int clientID, int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype)
 {
     DM_data *tmp_data = get(host, user);
 
     if (tmp_data == NULL)
     {
         tmp_data = new DM_data;
-        if (tmp_data->start_crb(type, host, user, passwd, script_name, htype) == 0)
+        if (tmp_data->start_crb(clientID, type, host, user, passwd, script_name, htype) == 0)
         {
             delete tmp_data;
             return (0);
@@ -650,12 +650,12 @@ bool rhost::get_mark()
     return save_info;
 }
 
-int rhost::start_ctrl(int type, const string &script_name, coHostType &htype)
+int rhost::start_ctrl(int clientID, int type, const string &script_name, coHostType &htype)
 {
 
     string DC_info;
 
-    if (CTRLGlobal::getInstance()->dataManagerList->add_crb(type, hostname, user, passwd, script_name, htype))
+    if (CTRLGlobal::getInstance()->dataManagerList->add_crb(clientID, type, hostname, user, passwd, script_name, htype))
     {
         DM_data *tmp_data = CTRLGlobal::getInstance()->dataManagerList->get(hostname, user);
         ctrl = tmp_data->get_DM();
@@ -835,11 +835,12 @@ string rhost_list::get_hosts(const string &local_name, const string &local_user)
     return result;
 }
 
-int rhost_list::add_host(const string &hostname, const string &user_id, const string &passwd, const string &script_name, coHostType &htype)
+int rhost_list::add_host(const vrb::RemoteClient& client, const string &passwd, const string &script_name, coHostType &htype)
 {
     Message *ui_msg = new Message;
     (void)ui_msg;
-
+    const std::string &hostname = client.userInfo().hostName;
+    const std::string &user_id = client.userInfo().name;
 
     // add new host in hostlist
 
@@ -865,7 +866,7 @@ int rhost_list::add_host(const string &hostname, const string &user_id, const st
     // start new datamanager
     int exec_type = CTRLHandler::instance()->Config->getexectype(hostname.c_str());
 
-    if (tmp_host->start_ctrl(exec_type, script_name, htype) == 0)
+    if (tmp_host->start_ctrl(client.ID(), exec_type, script_name, htype) == 0)
     {
         string text = "Controller\n \n \n CRB could not be started on host " + hostname + " !!!";
         CTRLGlobal::getInstance()->userinterfaceList->sendWarning2m(text);

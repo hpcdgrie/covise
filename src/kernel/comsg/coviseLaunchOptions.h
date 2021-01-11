@@ -1,0 +1,28 @@
+#ifndef COMSG_COVISE_LAUCH_OPTIONS_H
+#define COMSG_COVISE_LAUCH_OPTIONS_H
+
+namespace covise
+{
+enum class LaunchStyle
+{
+    Partner,
+    Host,
+    Disconnect,
+    LAST_DUMMY
+};
+
+struct LaunchStyleNames{
+    const char *operator[](LaunchStyle l)const{
+        return detail::LaunchStyleNames[static_cast<int>(l)];
+    }
+};
+constexpr LaunchStyleNames launchStyleNames;
+constexpr int numLaunchStyles = static_cast < int>(LaunchStyle::LAST_DUMMY);
+namespace detail
+{
+
+    constexpr std::array<const char *, numLaunchStyles> LaunchStyleNames{"Partner", "Host", "Disconnect"};
+}
+} // namespace covise
+
+#endif;

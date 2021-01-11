@@ -33,7 +33,7 @@
 MECSCW::MECSCW(QWidget *parent)
     : QDialog(parent)
 {
-
+    std::cerr << "MECSCW constructed" << std::endl;
     setWindowIcon(MEMainHandler::instance()->pm_logo);
 
     // read config file for available hosts
@@ -93,8 +93,8 @@ MECSCW::MECSCW(QWidget *parent)
 
 MECSCW::~MECSCW()
 {
+    std::cerr << "MECSCW destroyed" << std::endl;
 }
-
 
 void MECSCW::setVrbPartner(const QStringList &vrbPartner){
     m_listbox->clear();

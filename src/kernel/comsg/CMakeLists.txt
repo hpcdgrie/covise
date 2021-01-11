@@ -1,5 +1,6 @@
 set(CO_MSG_HEADER
   CRB_EXEC.h
+  coviseLaunchOptions.h
 )
 
 set(CO_MSG_SOURCES

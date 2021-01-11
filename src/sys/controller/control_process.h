@@ -42,7 +42,7 @@ public:
        *  @param   name  the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(const string &name);
+    AppModule *start_datamanager(int clientID, const string &name);
 
     /**
        *  start datamanager on the remote host
@@ -50,7 +50,7 @@ public:
        *  @param   name    the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(Host *rhost, const char *name);
+    AppModule *start_datamanager(int clientID, Host *rhost, const char *name);
 
     /**
        *  start datamanager on the remote host
@@ -60,7 +60,7 @@ public:
        *  @param   name      the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name);
+    AppModule *start_datamanager(int clientID, Host *rhost, const char *user, const char *passwd, const char *name);
 
     /**
        *  start datamanager on the remote host
@@ -72,7 +72,7 @@ public:
        *                       for starting dtm.
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(Host *rhost, const char *user, const char *name, int exec_type, const char *script_name = NULL);
+    AppModule *start_datamanager(int clientID, Host *rhost, const char *user, const char *name, int exec_type, const char *script_name = NULL);
 
     
     /**

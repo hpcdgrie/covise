@@ -54,6 +54,8 @@ public:
     vector<string> splitString(string text, const string &sep);
     bool recreate(string buffer, readMode mode);
     int vrbClientID();
+    void sendLaunchRequest(int clientID, const std::vector<std::string> &args, bool proxy = false);
+
 private:
     static CTRLHandler *singleton;
     FILE *fp;
@@ -70,7 +72,7 @@ private:
     SSLClient *m_SSLClient;
     bool m_clientRegistered = false;
     vrb::VRBClient m_client;
-    std::vector<std::pair<int, std::string>> m_remoteLauncher;
+    std::vector<vrb::RemoteClient> m_remoteLauncher;
     int parseCommandLine(int argc, char **argv);
     void startCrbUiDm();
     void loadNetworkFile();
@@ -95,6 +97,9 @@ private:
     string writeClipboard(const string &keyword, vector<net_module *> liste, bool all = false);
     void addBuffer(const QString &text);
     void sendCollaborativeState();
+    void addHost(int clID, const std::string &display, const std::string &password, const std::string &timeout);
+    void addPartner(int clID, const std::string &display, const std::string &password, const std::string &timeout);
+    void removeClient(int clID, const std::string &display, const std::string &password, const std::string &timeout);
 
     std::string m_autosavefile;
 

@@ -11,6 +11,10 @@
 #include <QLineEdit>
 #include <QMap>
 #include <QSslError>
+#include <vector>
+#include <string>
+#include <utility>
+#include <mutex>
 
 class QListWidget;
 class QListWidgetItem;
@@ -32,9 +36,10 @@ class METimer;
 class MEMessageHandler;
 class MEDeleteHostDialog;
 class MEMirrorHostDialog;
-
+class MERemotePartner;
 namespace covise
 {
+enum class LaunchStyle : int;
 class coSendBuffer;
 class coRecvBuffer;
 class Message;
@@ -64,12 +69,6 @@ public:
         MEMCHECK,
         MOVE_DEBUG,
         MOVE_MEMCHECK
-    };
-    enum addHostModes
-    {
-        UNKNOWN,
-        ADDHOST,
-        ADDPARTNER
     };
 
     QString localHost, localUser, onlineDir, localIP;
@@ -175,8 +174,6 @@ public:
     };
     void updateHistoryFiles(const QString &);
     void storeMapName(const QString &mapname);
-    void showCSCWParameter(const QStringList &, addHostModes);
-    void showCSCWDefaults(const QStringList &);
     void initHost(const QStringList &);
     void finishNode(const QStringList &);
     void setDescriptionOfNode(const QStringList &);
@@ -193,13 +190,8 @@ public:
     QString generateTitle(const QString &text);
     QColor getHostColor(int);
 
-    MECSCW *getAddHostBox()
-    {
-        return m_addHostBox;
-    };
-
     void initNode(int nodeid, MEHost *host, covise::coRecvBuffer &tb);
-
+    void updateRemotePartners(const std::vector<std::pair<int, std::string>> &partners);
 signals:
 
     void usingNode(const QString &);
@@ -224,7 +216,7 @@ public slots:
     void saveNet();
     void addHost();
     void saveAsNet();
-    void addPartner();
+    void handlePartner();
     void execNet();
     void settingXML();
     void deleteSelectedNodes();
@@ -244,7 +236,6 @@ private:
     static MEMessageHandler *messageHandler;
 
     copyModes m_copyMode;
-    addHostModes m_hostMode;
 
     bool m_helpFromWeb, m_helpExist;
     bool m_masterUI, force, m_loadedMapWasModified, m_autoSave;
@@ -252,6 +243,9 @@ private:
     bool m_executeOnChange, m_inMapLoading;
     int m_mirrorMode, m_localHostID, m_connectedPartner;
     int m_portSize, m_sliderWidth;
+    std::atomic_bool m_remotePartnersUpdated{false};
+    std::mutex m_remotePartnerMutex;
+    std::vector<std::pair<int, std::string>> m_remotePartners;
 
     QString m_mapName, m_libFileName;
     QStringList m_hostColor;
@@ -262,6 +256,7 @@ private:
 
     MENode *m_currentNode, *m_newNode;
     MESessionSettings *m_settings;
+    MERemotePartner *m_addPartnerDialog = nullptr;
     MECSCW *m_addHostBox;
     MECSCWParam *m_CSCWParam;
     MEDeleteHostDialog *m_deleteHostBox;
@@ -269,10 +264,6 @@ private:
 
     bool m_requestingMaster;
 
-    void setHostMode(addHostModes mode)
-    {
-        m_hostMode = mode;
-    };
     void switchModuleTree(MEModuleTree *);
     void storeSessionParam();
     void readConfigFile();
@@ -281,7 +272,7 @@ private:
     void embeddedRenderer();
     void saveMap();
     void setLocalHost(int id, const QString &name, const QString &user);
-
+    void requestPartnerAction(covise::LaunchStyle launchStyle, const std::vector<int> &clients, const QString &password, const QString &display);
 private slots:
 
     void printCB();
