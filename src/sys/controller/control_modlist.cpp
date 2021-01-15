@@ -204,11 +204,6 @@ void DM_data::set_modname(const string &str)
     modname = str;
 }
 
-void DM_data::set_passwd(const string &str)
-{
-    passwd = str;
-}
-
 void DM_data::set_DM(AppModule *dmod)
 {
     dm = dmod;
@@ -219,48 +214,24 @@ AppModule *DM_data::get_DM()
     return dm;
 }
 
-int DM_data::start_crb(int clientID, int type, const string& host, const string& user, const string& passwd, const string& script_name, coHostType& /*htype*/)
+int DM_data::start_crb(ExecType type, const string& host, const string& user, const string& script_name, coHostType& /*htype*/)
 {
 
     CTRLGlobal* global = CTRLGlobal::getInstance();
 
-    string executable = "crb";
-    if (CTRLHandler::instance()->Config->getshminfo(host.c_str()) == COVISE_PROXIE)
-        executable = "crbProxy";
+    bool proxy = CTRLHandler::instance()->Config->getshminfo(host.c_str()) == COVISE_PROXIE;
 
     Host* p_host = new Host(host.c_str());
-    switch (type)
+
+    if(type == ExecType::Local)
     {
-    case COVISE_LOCAL:
+        dm = CTRLGlobal::getInstance()->controller->start_datamanager("crb");
+    } 
+    else
     {
-        dm = CTRLGlobal::getInstance()->controller->start_datamanager(clientID, "crb");
-        break;
+        dm = CTRLGlobal::getInstance()->controller->start_datamanager(p_host, user.c_str(), proxy, type, script_name.c_str());
     }
-    case COVISE_REXEC:
-    {
-        dm = CTRLGlobal::getInstance()->controller->start_datamanager(clientID, p_host, user.c_str(), passwd.c_str(), executable.c_str());
-        break;
-    }
-    case COVISE_SSH:
-    case COVISE_RSH:
-    case COVISE_NQS:
-    case COVISE_MANUAL:
-    case COVISE_SSLDAEMON:
-    case COVISE_SCRIPT:
-    case COVISE_ACCESSGRID:
-    case COVISE_REMOTE_DAEMON:
-    {
-        dm = CTRLGlobal::getInstance()->controller->start_datamanager(p_host, user.c_str(), executable.c_str(), type, script_name.c_str());
-        break;
-    }
-    default:
-    {
-        print_comment(__LINE__, __FILE__, " ERROR: unknown EXEC_TYPE\n");
-        //print_exit(__LINE__, __FILE__, 1);
-        return 0;
-        break;
-    }
-    }
+    
     if (dm == NULL)
         return (0); // starting datamanager failed
 
@@ -348,7 +319,6 @@ int DM_data::start_crb(int clientID, int type, const string& host, const string&
 
     set_hostname(host);
     set_user(user);
-    set_passwd(passwd);
     return (1);
 }
 
@@ -419,14 +389,14 @@ DM_data *DM_list::get_local()
 // start_remote startet einen datamanager auf dem Rechner host, wenn es dort
 // noch keinen gibt.
 
-int DM_list::add_crb(int clientID, int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype)
+int DM_list::add_crb(ExecType type, const string &host, const string &user, const string &script_name, coHostType &htype)
 {
     DM_data *tmp_data = get(host, user);
 
     if (tmp_data == NULL)
     {
         tmp_data = new DM_data;
-        if (tmp_data->start_crb(clientID, type, host, user, passwd, script_name, htype) == 0)
+        if (tmp_data->start_crb(type, host, user, script_name, htype) == 0)
         {
             delete tmp_data;
             return (0);
@@ -441,7 +411,7 @@ int DM_list::add_crb(int clientID, int type, const string &host, const string &u
             local_dm->connect_datamanager(dmod);
         }
         add(tmp_data);
-        if (type == COVISE_LOCAL)
+        if (type == ExecType::Local)
             local = tmp_data;
         return 1;
     }
@@ -625,11 +595,6 @@ void rhost::set_user(const string &str)
     user = str;
 }
 
-void rhost::set_passwd(const string &str)
-{
-    passwd = str;
-}
-
 void rhost::set_type(const string &str)
 {
     htype = str;
@@ -650,12 +615,12 @@ bool rhost::get_mark()
     return save_info;
 }
 
-int rhost::start_ctrl(int clientID, int type, const string &script_name, coHostType &htype)
+int rhost::start_ctrl(ExecType type, const string &script_name, coHostType &htype)
 {
 
     string DC_info;
 
-    if (CTRLGlobal::getInstance()->dataManagerList->add_crb(clientID, type, hostname, user, passwd, script_name, htype))
+    if (CTRLGlobal::getInstance()->dataManagerList->add_crb(type, hostname, user, script_name, htype))
     {
         DM_data *tmp_data = CTRLGlobal::getInstance()->dataManagerList->get(hostname, user);
         ctrl = tmp_data->get_DM();
@@ -835,13 +800,8 @@ string rhost_list::get_hosts(const string &local_name, const string &local_user)
     return result;
 }
 
-int rhost_list::add_host(const vrb::RemoteClient& client, const string &passwd, const string &script_name, coHostType &htype)
+int rhost_list::add_host(const std::string &hostname, const std::string &user_id, const string &script_name, coHostType &htype)
 {
-    Message *ui_msg = new Message;
-    (void)ui_msg;
-    const std::string &hostname = client.userInfo().hostName;
-    const std::string &user_id = client.userInfo().name;
-
     // add new host in hostlist
 
     rhost *tmp_host = get(hostname); //, user_id); // restrict to only one user/host
@@ -851,7 +811,6 @@ int rhost_list::add_host(const vrb::RemoteClient& client, const string &passwd, 
         tmp_host = new rhost;
         tmp_host->set_hostname(hostname);
         tmp_host->set_user(user_id);
-        tmp_host->set_passwd(passwd);
         if (htype.get_type() == CO_HOST)
             tmp_host->set_type("COHOST");
     }
@@ -864,9 +823,9 @@ int rhost_list::add_host(const vrb::RemoteClient& client, const string &passwd, 
     }
 
     // start new datamanager
-    int exec_type = CTRLHandler::instance()->Config->getexectype(hostname.c_str());
+    ExecType exec_type = CTRLHandler::instance()->Config->getexectype(hostname.c_str());
 
-    if (tmp_host->start_ctrl(client.ID(), exec_type, script_name, htype) == 0)
+    if (tmp_host->start_ctrl(exec_type, script_name, htype) == 0)
     {
         string text = "Controller\n \n \n CRB could not be started on host " + hostname + " !!!";
         CTRLGlobal::getInstance()->userinterfaceList->sendWarning2m(text);
@@ -881,10 +840,6 @@ int rhost_list::add_host(const vrb::RemoteClient& client, const string &passwd, 
 
 int rhost_list::add_local_host(const string &local_user)
 {
-
-#ifndef _WIN32
-    struct passwd *pwd;
-#endif
 
     Host host;
 
@@ -901,19 +856,11 @@ int rhost_list::add_local_host(const string &local_user)
     }
     cerr << "* Local IP address: " << host.getAddress() << endl;
 
-    string user, passwd;
+    string user;
     if (!local_user.empty())
     {
 #ifdef _WIN32
         user = local_user;
-        passwd = "none";
-#else
-        pwd = getpwnam(local_user.c_str());
-        if (pwd)
-        {
-            user = local_user;
-            passwd = pwd->pw_passwd;
-        }
 #endif
     }
 
@@ -921,22 +868,19 @@ int rhost_list::add_local_host(const string &local_user)
     {
 #ifdef _WIN32
         user = getenv("USERNAME");
-        passwd = "none";
 #else
-        pwd = getpwuid(getuid());
+        auto pwd = getpwuid(getuid());
         user = pwd->pw_name;
-        passwd = pwd->pw_passwd;
 #endif
     }
 
     rhost *tmp_host = new rhost;
     tmp_host->set_hostname(host.getAddress());
     tmp_host->set_user(user);
-    tmp_host->set_passwd(passwd);
     this->add(tmp_host);
 
     coHostType htype(CO_PARTNER);
-    int ret = tmp_host->start_ctrl(COVISE_LOCAL, "", htype);
+    int ret = tmp_host->start_ctrl(ExecType::Local, "", htype);
 
     return ret;
 }
@@ -1199,11 +1143,6 @@ void userinterface::set_host(const string &str)
 void userinterface::set_userid(const string &str)
 {
     userid = str;
-}
-
-void userinterface::set_passwd(const string &str)
-{
-    passwd = str;
 }
 
 int UIMapEditor::start(bool restart) // if restart is true a restart was done
@@ -1636,7 +1575,6 @@ int ui_list::start_local_Mapeditor(const string &moduleinfo)
     local->set_host(local_name);
     local->set_userid(local_user);
     local->set_status("MASTER");
-    local->set_passwd("LOCAL");
     int ret = local->start(false);
     if (ret == 0)
     {
@@ -1681,7 +1619,6 @@ int ui_list::start_local_WebService(const string &moduleinfo)
     local->set_host(local_name);
     local->set_userid(local_user);
     local->set_status("MASTER");
-    local->set_passwd("LOCAL");
     int ret = local->start(false);
     if (ret == 0)
     {
@@ -1709,7 +1646,6 @@ int ui_list::start_local_xuif(const string &moduleinfo, const string &pyFile)
     local->set_host(local_name);
     local->set_userid(local_user);
     local->set_status("MASTER");
-    local->set_passwd("LOCAL");
     int ret = local->xstart(pyFile);
     if (ret == 0)
     {
@@ -1776,9 +1712,10 @@ bool ui_list::add_config(const string &file, const string &mapfile)
                     break;
                 }
             }
-            if ((test == false) && ((CTRLHandler::instance()->Config->getexectype(host) == COVISE_SSH) || (CTRLHandler::instance()->Config->getexectype(host) == COVISE_REMOTE_DAEMON) || (CTRLHandler::instance()->Config->getexectype(host) == COVISE_ACCESSGRID) || (CTRLHandler::instance()->Config->getexectype(host) == COVISE_RSH) || (CTRLHandler::instance()->Config->getexectype(host) == COVISE_NQS) || (CTRLHandler::instance()->Config->getexectype(host) == COVISE_MANUAL) || (CTRLHandler::instance()->Config->getexectype(host) == COVISE_SCRIPT)))
+            if ((test == false) && 
+            ( ((CTRLHandler::instance()->Config->getexectype(host) == ExecType::VRB) ||CTRLHandler::instance()->Config->getexectype(host) == ExecType::Manual) || (CTRLHandler::instance()->Config->getexectype(host) == ExecType::Script)))
             {
-                if (!config_action(mapfile, host, userid, "none"))
+                if (!config_action(mapfile, host, userid))
                 {
                     test = false;
                     break;
@@ -1818,9 +1755,9 @@ bool ui_list::add_config(const string &file, const string &mapfile)
     return test;
 }
 
-int ui_list::config_action(const string &mapfile, const string &host, const string &userid, const string &passwd)
+int ui_list::config_action(const string &mapfile, const string &host, const string &userid)
 {
-    return add_partner(mapfile, host, userid, passwd, "");
+    return add_partner(mapfile, host, userid, "");
 }
 
 bool ui_list::slave_update()
@@ -1858,13 +1795,12 @@ bool ui_list::slave_update()
     return true;
 }
 
-int ui_list::add_partner(const string &filename, const string &host, const string &userid, const string &passwd, const string &script_name)
+int ui_list::add_partner(const string &filename, const string &host, const string &userid, const string &script_name)
 {
 
     // add here the interfacelist. Advantage: the information is transmitted
     // in one message
     // action for new userinterface
-
     if (this->get(host))
     { // a partner already exists on that host
         string text = "Controller\n \n \n A partner already exists on host " + host + " !!!";
@@ -1878,7 +1814,7 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
         // no crb exist on that host for the specified user
         // start crb
         coHostType htype(CO_PARTNER);
-        if (CTRLGlobal::getInstance()->hostList->add_host(host, userid, passwd, script_name, htype) == 0)
+        if (CTRLGlobal::getInstance()->hostList->add_host(host, userid, script_name, htype) == 0)
         { // error while trying to add host
             return 0;
         }
@@ -1890,7 +1826,6 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
     tmp->set_host(host);
     tmp->set_userid(userid);
     tmp->set_status("SLAVE");
-    tmp->set_passwd(passwd);
 
     // start Mapeditor
     if ((tmp->start(false)) == 0)
@@ -2355,11 +2290,6 @@ void uif::set_userid(const string &tmp)
     userid = tmp;
 }
 
-void uif::set_passwd(const string &tmp)
-{
-    passwd = tmp;
-}
-
 void uif::set_status(const string &tmp)
 {
     status = tmp;
@@ -2414,7 +2344,6 @@ void uiflist::create_uifs(const string &execname, const string &category, const 
 
         new_uif->set_host(tmp_ui->get_host());
         new_uif->set_userid(tmp_ui->get_userid());
-        new_uif->set_passwd(tmp_ui->get_passwd());
         new_uif->set_status(tmp_ui->get_status());
 
         this->add(new_uif);

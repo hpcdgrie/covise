@@ -44,7 +44,7 @@ extern "C" int rexec(char **ahost, int inport, char *user, char *passwd,
 #endif
 
 // LOCAL .....
-AppModule *Controller::start_datamanager(int clientID, const string &name)
+AppModule *Controller::start_datamanager(const string &name)
 {
     char chport[10];
     char chid[16];
@@ -158,7 +158,7 @@ void Controller::addConnection(Connection *conn)
 }
 
 // REXEC......
-AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *user, const char *passwd, const char *name)
+AppModule *Controller::start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name)
 {
     char remote_command[100];
     int port, ret;
@@ -226,15 +226,15 @@ AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *
     return mod;
 }
 
-AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *user, const char *name,
-                                         int exec_type, const char *script_name)
+AppModule *Controller::start_datamanager(Host *rhost, const char *user, bool proxy,
+                                         ExecType exec_type, const char *script_name)
 {
     //std::cerr << "Controller::start_datamanager: name=" << name << ", rhost name=" <<  rhost->getName() << ", v4=" << rhost->get_ipv4() << std::endl;
     char chport[10];
     char chid[16];
     int port;
     char *dsp = CTRLHandler::instance()->Config->getDisplayIP(*rhost);
-
+    std::string name = proxy ? "crbProxy" : "crb";
     CTRLGlobal *global = CTRLGlobal::getInstance();
 
     module_count += 2;
@@ -242,117 +242,25 @@ AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *
     if (!conn->is_connected())
         return NULL;
     conn->listen();
-    if (exec_type == COVISE_MANUAL)
+    if (exec_type == ExecType::Manual)
     {
         char text[1000];
-        snprintf(text, sizeof(text), "please start \"%s %d %s %d\" on %s", name, port,
+        snprintf(text, sizeof(text), "please start \"%s %d %s %d\" on %s", name.c_str(), port,
                  host->getAddress(), module_count, rhost->getName());
         Message *msg = new Message(COVISE_MESSAGE_COVISE_ERROR, text);
         global->userinterfaceList->send_master(msg);
+        std::cerr << text << std::endl;
         delete msg;
-        fprintf(stderr, "please start \"%s %d %s %d\" on %s", name, port, host->getAddress(),
-                module_count, rhost->getName());
-    }
 
-    else if (exec_type == COVISE_ACCESSGRID)
+    }
+    else if(exec_type == ExecType::VRB)
+    {
+        CTRLHandler::instance()->sendLaunchRequest(port, module_count, rhost, proxy);
+    }
+    else if (exec_type == ExecType::Script)
     {
         char start_string[200];
-        sprintf(start_string, "startCrb %s %d %s %d %s\n", name, port, host->getAddress(), module_count - 1, dsp);
-        // open connection to remote Accessgrid Daemon
-
-        SimpleClientConnection *conn = new SimpleClientConnection(rhost, CTRLHandler::instance()->m_accessGridDaemon->DaemonPort, 0);
-        if (!conn->is_connected()) // could not open server port
-        {
-            fprintf(stderr, "Could not connect to Accessgrid Daemon %s, port %d\n", rhost->getAddress(), port);
-            fprintf(stdout, "start \" %s %d %s %d \" on %s\n", name, port, host->getAddress(),
-                    module_count, rhost->getName());
-            delete conn;
-            conn = NULL;
-        }
-        else
-        {
-            conn->getSocket()->setNonBlocking(true);
-            conn->getSocket()->write(start_string, (int)strlen(start_string));
-        }
-        delete conn;
-    }
-    else if (exec_type == COVISE_SSLDAEMON)
-    {
-#ifdef HAVE_OPENSSL
-        int remotePort = coCoviseConfig::getInt("port", "System.CoviseDaemon.Server", 31090);
-
-        //Create start string
-        char start_string[200];
-        sprintf(start_string, "startCrb %s %d %s %d %s\n", name, port, host->getAddress(), module_count - 1, dsp);
-
-        //Use a SSLConnection to start CRB
-        //Do SSL handling
-        SSLClientConnection *sslconn = new SSLClientConnection(rhost, remotePort, NULL, NULL);
-
-        //Attach SSL to socket
-        if (sslconn->AttachSSLToSocket(sslconn->getSocket()) == 0)
-        {
-            global->userinterfaceList->sendWarning("SSLConnection to RemoteHost failed! Local SSL attach failed");
-            delete sslconn;
-            sslconn = NULL;
-            return NULL;
-        }
-
-        //Connect SSL, do handshake
-        if (sslconn->connect() < 0)
-        {
-            global->userinterfaceList->sendWarning("SSLConnection to RemoteHost failed! Connect failed!");
-            delete sslconn;
-            sslconn = NULL;
-            return NULL;
-        }
-
-        //Check for connection
-        if (!sslconn->is_connected())
-        {
-            fprintf(stderr, "Could not connect to SSLDaemon %s, port %d\n", rhost->getAddress(), remotePort);
-            fprintf(stdout, "start \" %s %d %s %d \" on %s\n", name, remotePort, host->getAddress(),
-                    module_count, rhost->getName());
-            delete sslconn;
-            sslconn = NULL;
-        }
-        else
-        {
-            // send command string
-            sslconn->send(start_string, (int)strlen(start_string));
-
-            //listen for ACK
-            bool bWaitingForAck = true;
-            int timeout = 65000;
-            while (bWaitingForAck || --timeout <= 0)
-            {
-                sslconn->check_for_input((float)0.1);
-                const char *result = sslconn->readLine();
-                //Check for result == NULL here to avoid crashes
-                if (result && strncmp(result, "ACK\n", 4))
-                {
-                    global->userinterfaceList->sendWarning("RemoteHost confirmed command!");
-                    bWaitingForAck = false;
-                }
-            }
-            if (bWaitingForAck)
-            {
-                global->userinterfaceList->sendWarning("Command timed out!");
-            }
-        }
-
-        //Cleanup everything
-        delete sslconn;
-        sslconn = NULL;
-#else
-        fprintf(stderr, "no SSL support, cannot handle exec type \"SSL daemon\"");
-#endif
-    }
-
-    else if (exec_type == COVISE_SCRIPT)
-    {
-        char start_string[200];
-        sprintf(start_string, "%s %s %d %s %d", script_name, name, port, host->getAddress(), module_count - 1);
+        sprintf(start_string, "%s %s %d %s %d", script_name, name.c_str(), port, host->getAddress(), module_count - 1);
         int retval;
         retval = system(start_string);
         if (retval == -1)
@@ -361,124 +269,13 @@ AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *
             return NULL;
         }
     }
-
-    else if (exec_type == COVISE_REMOTE_DAEMON)
-    {
-
-        Host *rdHost = rhost;
-
-        int remport = coCoviseConfig::getInt("port", "System.RemoteDaemon.Server", 31090);
-
-        // verify myID value
-        SimpleClientConnection *clientConn = new SimpleClientConnection(rdHost, remport);
-        if (!clientConn)
-        {
-            cerr << "Creation of ClientConnection failed!" << endl;
-            return NULL;
-        }
-        else
-        {
-            cerr << "ClientConnection created!" << endl;
-        }
-        if (!(clientConn->is_connected()))
-        {
-            cerr << "Connection to RemoteDaemon on " << rhost->getAddress() << " failed!" << endl;
-            return NULL;
-        }
-        else
-        {
-            cerr << "Connection to RemoteDaemon on " << rhost->getAddress() << " established!" << endl;
-        }
-
-        char start_string[2000];
-        sprintf(start_string, "startFEN %s %d %s %d\n", name, port, host->getAddress(), module_count);
-        clientConn->getSocket()->write(start_string, (int)strlen(start_string));
-
-        cerr << "Message sent!" << endl;
-        cerr << "Closing connection objects!" << endl;
-
-        delete clientConn;
-
-        cerr << "Leaving Start-Method of coVRSlave " << endl;
-    }
     else
     {
         sprintf(chport, "%d", port);
         sprintf(chid, "%d", module_count - 1);
 
-#ifdef _WIN32
-        switch (exec_type)
-        {
-        case COVISE_SSH:
-            if (spawnlp(P_NOWAIT, "ssh", "ssh", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL) == -1
-                && (errno == ENOENT || errno == ENOEXEC))
-            {
-                spawnlp(P_NOWAIT, "ssh2", "ssh2", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL);
-            }
-            break;
-        case COVISE_RSH:
-            //fclose(stdin);
-            spawnlp(P_NOWAIT, "rsh", "rsh", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL);
-            break;
-        case COVISE_NQS:
-            spawnlp(P_NOWAIT, "qsub", "qsub", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL);
-            break;
-        case COVISE_GLOBUS_GRAM:
-            cerr << "globus gram support NYI" << endl;
-            break;
-        case COVISE_REATTACH:
-            cerr << "reattach support NYI" << endl;
-            break;
-        }
-#else
-        if (fork() == 0)
-        {
-            if (user && strlen(user) > 0)
-            {
-                switch (exec_type)
-                {
-                case COVISE_SSH:
-                    execlp("ssh", "ssh", "-f", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL);
-                    break;
-                case COVISE_RSH:
-//fclose(stdin);
-#ifdef __hpux
-                    execlp("remsh", "remsh", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL);
-#else
-                    execlp("rsh", "rsh", rhost->getAddress(), "-l", user, "-n", name, chport, host->getAddress(), chid, dsp, NULL);
-#endif
-                    break;
-                case COVISE_NQS:
-                    execlp("qsub", "qsub", rhost->getAddress(), "-l", user, name, chport, host->getAddress(), chid, dsp, NULL);
-                    break;
-                }
-            }
-            else
-            {
-                switch (exec_type)
-                {
-                case COVISE_SSH:
-                    execlp("ssh", "ssh", "-f", rhost->getAddress(), name, chport, host->getAddress(), chid, dsp, NULL);
-                    break;
-                case COVISE_RSH:
-//fclose(stdin);
-#ifdef __hpux
-                    execlp("remsh", "remsh", rhost->getAddress(), name, chport, host->getAddress(), chid, dsp, i NULL);
-#else
-                    execlp("rsh", "rsh", rhost->getAddress(), "-n", name, chport, host->getAddress(), chid, dsp, NULL);
-#endif
-                    break;
-                case COVISE_NQS:
-                    execlp("qsub", "qsub", rhost->getAddress(), name, chport, host->getAddress(), chid, dsp, NULL);
-                    break;
-                }
-            }
-            print_error(__LINE__, __FILE__, "exec of remote command failed");
-            _exit(1);
-        }
-#endif
     }
-    if (exec_type == COVISE_MANUAL)
+    if (exec_type == ExecType::Manual)
         conn->acceptOne(-1);
     else
     {
@@ -487,6 +284,10 @@ AppModule *Controller::start_datamanager(int clientID, Host *rhost, const char *
             cerr << "* timelimit in accept for crb exceeded!!" << endl;
             delete conn;
             return NULL;
+            if (exec_type != ExecType::Manual) //retry manual start
+            {
+                start_datamanager(rhost, user, proxy, ExecType::Manual, script_name);
+            }
         }
     }
     AppModule *mod = new AppModule(conn, module_count - 1, name, rhost);

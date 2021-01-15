@@ -1227,7 +1227,6 @@ int net_module::init(int nodeid, const string &name, const string &instanz, cons
 
         // start applicationmodule
         tmp_host = CTRLGlobal::getInstance()->hostList->get(host);
-        tmp_passwd = tmp_host->get_passwd();
         tmp_user = tmp_host->get_user();
 
         applmod = CTRLGlobal::getInstance()->controller->start_applicationmodule(APPLICATIONMODULE, get_name().c_str(), dmod, instanz.c_str(), flags,
@@ -1245,7 +1244,6 @@ int net_module::init(int nodeid, const string &name, const string &instanz, cons
         tmp_data->set_user(tmp_user);
         tmp_data->set_modname(name);
         tmp_data->set_hostname(host);
-        tmp_data->set_passwd(tmp_passwd);
         tmp_data->set_DM(applmod);
 
         CTRLGlobal::getInstance()->dataManagerList->connect_all(applmod);
@@ -2489,7 +2487,6 @@ int displaylist::init(const string &excovise_name, const string &info_str, modul
         {
             string tmp_hostname = tmp_ui->get_host();
             string tmp_userid = tmp_ui->get_userid();
-            string tmp_passwd = tmp_ui->get_passwd();
             string tmp_status = tmp_ui->get_status();
 
             if (this->contains(tmp_hostname, tmp_userid))
@@ -2522,7 +2519,6 @@ int displaylist::init(const string &excovise_name, const string &info_str, modul
 
             tmp_dis->set_hostname(tmp_hostname);
             tmp_dis->set_userid(tmp_userid);
-            tmp_dis->set_passwd(tmp_passwd);
             tmp_dis->set_execstat(tmp_status);
 
             DM_data *tmp_data = CTRLGlobal::getInstance()->dataManagerList->get(tmp_hostname);
@@ -2551,7 +2547,6 @@ int displaylist::init(const string &excovise_name, const string &info_str, modul
         // no partner on this host or it's a mirror node
 
         string tmp_userid = host->get_user();
-        string tmp_passwd = host->get_passwd();
 
         if (this->contains(tmp_hostname, tmp_userid))
             return 1;
@@ -2560,7 +2555,6 @@ int displaylist::init(const string &excovise_name, const string &info_str, modul
 
         tmp_dis->set_hostname(tmp_hostname);
         tmp_dis->set_userid(tmp_userid);
-        tmp_dis->set_passwd(tmp_passwd);
         tmp_dis->set_execstat(string("MIRROR"));
 
         DM_data *tmp_data = CTRLGlobal::getInstance()->dataManagerList->get(tmp_hostname);
@@ -2740,14 +2734,13 @@ int displaylist::addHelperCRB(const string &helperHost, const string &host)
     DM_data *moduleDmgr = CTRLGlobal::getInstance()->dataManagerList->get(host);
 
     string user = moduleDmgr->get_user();
-    string passwd = moduleDmgr->get_passwd();
 
     if (helperDmgr == NULL) // no crb on helper host
     {
         // start crb
-        int exec_type = CTRLHandler::instance()->Config->getexectype(helperHost.c_str());
+        ExecType exec_type = CTRLHandler::instance()->Config->getexectype(helperHost.c_str());
         coHostType htype(CO_PARTNER);
-        if (CTRLGlobal::getInstance()->dataManagerList->add_crb(exec_type, helperHost, user, passwd, "", htype) == 0)
+        if (CTRLGlobal::getInstance()->dataManagerList->add_crb(exec_type, helperHost, user, "", htype) == 0)
         {
             return (0);
         }
@@ -2756,7 +2749,6 @@ int displaylist::addHelperCRB(const string &helperHost, const string &host)
         rhost *tmp_host = new rhost;
         tmp_host->set_hostname(helperHost);
         tmp_host->set_user(user);
-        tmp_host->set_passwd(passwd);
         CTRLGlobal::getInstance()->hostList->add(tmp_host);
     }
     return 1;
@@ -2774,12 +2766,10 @@ int render_module::add_helper(const string &helperHost, // host to start the hel
     DM_data *helperDmgr = CTRLGlobal::getInstance()->dataManagerList->get(helperHost);
     DM_data *moduleDmgr = CTRLGlobal::getInstance()->dataManagerList->get(host);
     string user = moduleDmgr->get_user();
-    string passwd = moduleDmgr->get_passwd();
 
     display *tmp_dis = new display;
     tmp_dis->set_hostname(helperHost);
     tmp_dis->set_userid(user);
-    tmp_dis->set_passwd(passwd);
     tmp_dis->set_helper(1);
 
     helperDmgr = CTRLGlobal::getInstance()->dataManagerList->get(helperHost);
@@ -3378,12 +3368,10 @@ bool render_module::add_display(userinterface *ui)
     display *tmp_dis = new display;
     string tmp_hostname = ui->get_host();
     string tmp_userid = ui->get_userid();
-    string tmp_passwd = ui->get_passwd();
     string tmp_status = ui->get_status();
 
     tmp_dis->set_hostname(tmp_hostname);
     tmp_dis->set_userid(tmp_userid);
-    tmp_dis->set_passwd(tmp_passwd);
     tmp_dis->set_execstat(tmp_status);
 
     DM_data *tmp_data = CTRLGlobal::getInstance()->dataManagerList->get(tmp_hostname);
@@ -3555,14 +3543,13 @@ int render_module::addHelperCRB(const string &helperHost, const string &host)
     DM_data *moduleDmgr = CTRLGlobal::getInstance()->dataManagerList->get(host);
 
     string user = moduleDmgr->get_user();
-    string passwd = moduleDmgr->get_passwd();
 
     if (helperDmgr == NULL) // no crb on helper host
     {
         // start crb
-        int exec_type = CTRLHandler::instance()->Config->getexectype(helperHost.c_str());
+        ExecType exec_type = CTRLHandler::instance()->Config->getexectype(helperHost.c_str());
         coHostType htype(CO_PARTNER);
-        if (CTRLGlobal::getInstance()->dataManagerList->add_crb(exec_type, helperHost, user, passwd, "", htype) == 0)
+        if (CTRLGlobal::getInstance()->dataManagerList->add_crb(exec_type, helperHost, user, "", htype) == 0)
         {
             return (0);
         }
@@ -3571,7 +3558,6 @@ int render_module::addHelperCRB(const string &helperHost, const string &host)
         rhost *tmp_host = new rhost;
         tmp_host->set_hostname(helperHost);
         tmp_host->set_user(user);
-        tmp_host->set_passwd(passwd);
         CTRLGlobal::getInstance()->hostList->add(tmp_host);
     }
     else

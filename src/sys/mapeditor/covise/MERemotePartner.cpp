@@ -106,10 +106,8 @@ MERemotePartner::MERemotePartner(QWidget *parent)
         m_actions[i]->setEnabled(false);
         connect(m_actions[i], &QPushButton::clicked, this, [this, i]() {
             emit takeAction(static_cast<covise::LaunchStyle>(i),
-                            m_clients->getSelectedClients(static_cast<covise::LaunchStyle>(i)),
-                            m_ui->passwordIpf->text(),
-                            m_ui->displayIpf->text());
-        });
+                            m_clients->getSelectedClients(static_cast<covise::LaunchStyle>(i)));
+                });
     }
     connect(m_ui->cancelBtn, &QPushButton::clicked, this, [this]() {
         for (auto btn : m_actions)

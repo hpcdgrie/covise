@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <string>
 #include <functional>
+#include <boost/program_options.hpp>
 
 #include <appl/CoviseBase.h>
 #include <comsg/CRB_EXEC.h>
@@ -53,6 +54,7 @@
 #include <QFileInfo>
 
 using namespace covise;
+namespace po = boost::program_options;
 
 CTRLHandler *CTRLHandler::singleton = NULL;
 
@@ -85,6 +87,23 @@ static void sigHandler(int sigNo) //  catch SIGPWR as addpartner signal
 //  m_quitNow == 1 if a SIGTERM signal was sent to the controller
 int m_quitNow = 0;
 
+
+std::string autosaveFile(){
+    QString file = QDir::homePath();
+#ifdef _WIN32
+    file += "/COVISE";
+#else
+    file += "/.covise";
+#endif
+#if QT_VERSION < 0x040400
+    pid_t pid = getpid();
+#else
+    qint64 pid = QCoreApplication::applicationPid();
+#endif
+    file += "/autosave-" + QString(Host().getAddress()) + "-" + QString::number(pid) + ".net";
+    return file.toStdString();
+}
+
 class sigQuitHandler : public coSignalHandler
 {
     virtual void sigHandler(int sigNo) //  catch SIGTERM
@@ -100,10 +119,45 @@ class sigQuitHandler : public coSignalHandler
     virtual const char *sigHandlerName() { return "sigQuitHandler"; }
 };
 
-const char *short_usage = "\n usage: covise [--help] [--minigui] [--gui] [--nogui] [network.net] [-a] [-d] [-i] [-m] [-p] [-s] [-t] [-u] [-q] [-x] [-e] [-v] [-V] [--script [script.py]]\n";
+void preventBrokenPipe(){
+//  prevent "broken pipe" forever
+#ifdef _WIN32
+
+    int err;
+    unsigned short wVersionRequested;
+    struct WSAData wsaData;
+    wVersionRequested = MAKEWORD(1, 1);
+    err = WSAStartup(wVersionRequested, &wsaData);
+
+#else
+
+    coSignalHandler emptyHandler;
+    coSignal::addSignal(SIGPIPE, emptyHandler);
+
+#endif
+}
+
+
+void initDummyMessage(){
+    m_dummyMessage.type = COVISE_MESSAGE_LAST_DUMMY_MESSAGE; //  initialize dummy message
+    m_dummyMessage.data = DataHandle(2);
+    memcpy(m_dummyMessage.data.accessData(), " ", 2);
+}
+
+void sayHello(){
+    //  Say hello
+    cerr << endl;
+    cerr << "*******************************************************************************" << endl;
+    string text = CoviseVersion::shortVersion();
+    string text2 = "* COVISE " + text + " starting up, please be patient....                    *";
+    cerr << text2 << endl;
+    cerr << "*                                                                             *" << endl;
+
+}
+
+const char *short_usage = "\n usage: covise [--help] [--minigui] [--gui] [--nogui] [network.net] [-a] [-i] [-m] [-p] [-s] [-t] [-u] [-q] [-x] [-e] [-v] [-V] [--script [script.py]]\n";
 const char *long_usage = "\n"
                          "  -a\tscan for AccessGrid daemon\n"
-                         "  -d\tscan for daemon\n"
                          "  -i\ticonify map editor\n"
                          "  -m\tmaximize map editor\n"
                          "  -q\tquit after execution\n"
@@ -131,7 +185,6 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
     , m_rgbTextOpen(false)
     , m_numRunning(0)
     , m_numRendererRunning(0)
-    , m_accessGridDaemon(NULL)
     , m_globalLoadReady(true)
     , m_clipboardReady(true)
     , m_readConfig(true)
@@ -141,53 +194,18 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
     , m_iconify(false)
     , m_maximize(false)
     , m_quitAfterExececute(0)
-    , m_daemonPort(-1)
     , m_xuif(0)
     , m_startScript(0)
-    , m_accessGridDaemonPort(0)
     , m_writeUndoBuffer(true)
-    , m_client(vrb::Program::Covise)
+    , m_client(vrb::Program::Controller)
+    , m_autosavefile(autosaveFile())
 // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
 {
 
     singleton = this;
 
-
-//  prevent "broken pipe" forever
-#ifdef _WIN32
-
-    int err;
-    unsigned short wVersionRequested;
-    struct WSAData wsaData;
-    wVersionRequested = MAKEWORD(1, 1);
-    err = WSAStartup(wVersionRequested, &wsaData);
-
-#else
-
-    coSignalHandler emptyHandler;
-    coSignal::addSignal(SIGPIPE, emptyHandler);
-
-#endif
-
-    QString file = QDir::homePath();
-#ifdef _WIN32
-    file += "/COVISE";
-#else
-    file += "/.covise";
-#endif
-#if QT_VERSION < 0x040400
-    pid_t pid = getpid();
-#else
-    qint64 pid = QCoreApplication::applicationPid();
-#endif
-    file += "/autosave-" + QString(Host().getAddress()) + "-" + QString::number(pid) + ".net";
-    m_autosavefile = file.toStdString();
-
-    m_dummyMessage.type = COVISE_MESSAGE_LAST_DUMMY_MESSAGE; //  initialize dummy message
-    m_dummyMessage.data = DataHandle(2);
-    memcpy(m_dummyMessage.data.accessData(), " ", 2);
-    m_SSLDaemonPort = 0;
-    m_SSLClient = NULL;
+    preventBrokenPipe();
+    initDummyMessage();
 
     // signal(SIGTERM, sigHandlerQuit );
     sigQuitHandler quitHandler;
@@ -202,9 +220,19 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
     //  needed for SIGPWR && SIGTERM
     userinterfaceList = CTRLGlobal::getInstance()->userinterfaceList;
 
+
+    lookupSiblings();
+    sayHello();
+    startCrbUiAndDatamanager();
+
+    loadNetworkFile();
+    m_client.connectToServer();
+    loop();
+}
+
+void CTRLHandler::lookupSiblings(){
     coConfigEntryStringList list = coConfig::getInstance()->getScopeList("System.Siblings");
 
-    //std::list<std::pair<std::string,std::string>> siblings;
     std::list<coConfigEntryString>::iterator listentry = list.begin();
     while (listentry != list.end() && (!list.empty()))
     {
@@ -217,25 +245,13 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
         //mHostList.push_back(value.toStdString());
         listentry++;
     }
+}
 
-    //  Say hello
-    cerr << endl;
-    cerr << "*******************************************************************************" << endl;
-    string text = CoviseVersion::shortVersion();
-    string text2 = "* COVISE " + text + " starting up, please be patient....                    *";
-    cerr << text2 << endl;
-    cerr << "*                                                                             *" << endl;
-
-    //  start crb, datamanager and UI
-    startCrbUiDm();
-
-    // load a network file
-    loadNetworkFile();
-
+void CTRLHandler::loop()
+{
     // start Controller main-Loop
     // check for daemons and handler messages
     bool startMainLoop = true;
-    m_client.connectToServer();
     while (1)
     {
         Message *msg = new Message;
@@ -253,7 +269,7 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
                 input.getline(partner_name, 128);
 
                 sprintf(partner_msg.accessData(), "ADDPARTNER\n%s\n%s\nNONE\n%d\n500\n \n",
-                        partner_host, partner_name, m_startScript ? COVISE_SCRIPT : COVISE_MANUAL);
+                        partner_host, partner_name, m_startScript ? static_cast<int>(ExecType::Script) : static_cast<int>(ExecType::Manual));
                 partner_msg.setLength(strlen(partner_msg.data()) + 1);
                 msg->data = partner_msg;
                 msg->type = COVISE_MESSAGE_UI;
@@ -274,12 +290,8 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
 
         handleAndDeleteMsg(msg);
     } //  while
-
-    delete m_accessGridDaemon;
-    m_accessGridDaemon = NULL;
-
-    return;
 }
+
 
 CTRLHandler *CTRLHandler::instance()
 {
@@ -312,14 +324,6 @@ void CTRLHandler::handleAndDeleteMsg(Message *msg)
 			handleClosedMsg(msg);
         break;
     }
-
-    case COVISE_MESSAGE_ACCESSGRID_DAEMON:
-        handleAccessGridDaemon(msg);
-        break;
-
-    case COVISE_MESSAGE_SSLDAEMON:
-        handleSSLDaemon(msg);
-        break;
 
     case COVISE_MESSAGE_QUIT:
 		handleQuit(msg);
@@ -719,14 +723,8 @@ void CTRLHandler::handleClosedMsg(Message *msg)
         break;
     }
 
-    // delete AccessGrid Daemon
     default:
     {
-        if (m_accessGridDaemon && msg->conn == m_accessGridDaemon->conn)
-        {
-            delete m_accessGridDaemon;
-            m_accessGridDaemon = NULL;
-        }
         break;
     }
     }
@@ -737,71 +735,18 @@ void CTRLHandler::handleClosedMsg(Message *msg)
 //!
 int CTRLHandler::parseCommandLine(int argc, char **argv)
 {
-
     //  add partner manually: start script with crb parameters
-    int scan_script_name = 0;
+    bool scan_script_name = false;
 
     //  file which contains the host of the partner
-    int scan_add_partner_host = 0;
+    bool scan_add_partner_host = false;
 
     //  name of local user
-    int scan_m_localUser = 0;
-
-    //  port to connect to the local daemon
-    int scan_daemon = 0;
-
-    // flag indicating whether secure connection is requested
-    bool scan_SSLDaemon = false;
-
-    bool scan_AccessGridDaemon = false;
+    bool scan_m_localUser = false;
 
     for (int i = 1; i < argc; i++)
     {
-        if (scan_daemon)
-        {
-            //  argument: -d [port#] [room name]
-            int retval = sscanf(argv[i], "%d", &m_daemonPort);
-            if (retval != 1)
-            {
-                std::cerr << "main: sscanf failed" << std::endl;
-                return -1;
-            }
-
-            if (++i == argc)
-            {
-                m_collaborationRoom = "ROOM";
-            }
-
-            else
-            {
-                m_collaborationRoom = argv[i];
-            }
-
-            scan_daemon = 0;
-        }
-
-        else if (scan_AccessGridDaemon)
-        {
-            //  argument: -a [port#]
-            int retval = sscanf(argv[i], "%d", &m_accessGridDaemonPort);
-            if (retval != 1)
-            {
-                std::cerr << "main: sscanf failed" << std::endl;
-                return -1;
-            }
-
-            scan_AccessGridDaemon = false;
-        }
-        else if (scan_SSLDaemon)
-        {
-            //Do port retrieval for SSL conn
-            std::string sport = std::string(argv[i]);
-            std::stringstream strm;
-            strm.str(sport);
-            strm >> m_SSLDaemonPort;
-        }
-
-        else if (scan_add_partner_host)
+        if (scan_add_partner_host)
         {
             //  argument: -p [m_filename]
             //     file format: <hostname>\n<username>
@@ -831,25 +776,6 @@ int CTRLHandler::parseCommandLine(int argc, char **argv)
             //  options
             switch (argv[i][1])
             {
-            case 'r':
-            case 'R':
-            {
-                //Secure connection for Covise Start from CoviseSSLDaemon
-                scan_SSLDaemon = true;
-                break;
-            }
-            case 'd':
-            case 'D': //  daemon infos
-            {
-                scan_daemon = 1;
-                break;
-            }
-            case 'a':
-            case 'A': //  daemon infos
-            {
-                scan_AccessGridDaemon = true;
-                break;
-            }
             case 'i':
             case 'I':
                 m_iconify = true;
@@ -1016,7 +942,7 @@ int CTRLHandler::parseCommandLine(int argc, char **argv)
 //!
 //! start the request broker, the datamanager and the user interface
 //!
-void CTRLHandler::startCrbUiDm()
+void CTRLHandler::startCrbUiAndDatamanager()
 {
 
     // read covise.config
@@ -1054,37 +980,6 @@ void CTRLHandler::startCrbUiDm()
             CTRLGlobal::getInstance()->userinterfaceList->start_local_Mapeditor(moduleinfo);
 #ifdef HAVE_GSOAP
         CTRLGlobal::getInstance()->userinterfaceList->start_local_WebService(moduleinfo);
-#endif
-    }
-
-    //  connect to an AccessGrid Daemon
-    if (m_accessGridDaemonPort)
-    {
-        cerr << "* Connect to AccessGridDaemon on Port = " << m_accessGridDaemonPort << "                                     *" << endl;
-        m_accessGridDaemon = new AccessGridDaemon(m_accessGridDaemonPort);
-    }
-    if (m_SSLDaemonPort)
-    {
-#ifdef HAVE_OPENSSL
-        cerr << "* Connect to SSLDaemon on Port = " << m_SSLDaemonPort << endl;
-        Host *hostid = new Host("localhost");
-        SSLClientConnection *conn = new SSLClientConnection(hostid, m_SSLDaemonPort, NULL, NULL);
-
-        if (conn->AttachSSLToSocket(conn->getSocket()) == 0)
-        {
-            cerr << "Attaching socket FD to SSL failed!" << endl;
-        }
-
-        cerr << "Waiting for SSL-connect..." << endl;
-        if (conn->connect() <= 0)
-        {
-            cerr << "SSL_Connect failed!" << endl;
-        }
-
-        CTRLGlobal::getInstance()->controller->addConnection(conn);
-        cerr << "* SSL done! " << endl;
-#else
-        cerr << "* No SSL support" << endl;
 #endif
     }
 
@@ -1128,56 +1023,6 @@ void CTRLHandler::loadNetworkFile()
             {
                 netmod->exec_module(global->userinterfaceList);
             }
-        }
-    }
-}
-
-//!
-//! handle messages from the AccessGrid Daemon
-//!
-void CTRLHandler::handleAccessGridDaemon(Message *msg)
-{
-
-    if (strncmp(msg->data.data(), "join", 4) == 0)
-    {
-        const char *hname = msg->data.data() + 5;
-        const char *passwd = "sessionpwd";
-        const char *user_id = "AG2User";
-        const char *c = strchr(hname, ':');
-
-        if (c)
-        {
-            char *tmp = new char[strlen(c) + 1];
-            strcpy(tmp, c);
-            *tmp = '\0';
-            size_t retval;
-            retval = sscanf(tmp + 1, "%d", &m_accessGridDaemon->DaemonPort);
-            if (retval != 1)
-            {
-                cerr << "main: sscanf failed" << endl;
-                exit(-1);
-            }
-            delete[] tmp;
-        }
-
-        // set exectype to remote daemon which is 6
-        Config->set_exectype(hname, "6");
-        string hostname(hname);
-        if (CTRLGlobal::getInstance()->userinterfaceList->add_partner(m_globalFilename, hostname, user_id, passwd, m_scriptName))
-        {
-            if (m_globalLoadReady == false)
-            {
-                m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
-            }
-        }
-
-        else
-        {
-            char *msg_tmp = new char[200];
-            sprintf(msg_tmp, "ADDPARTNER_FAILED\n%s\n%s\nPassword\n", hostname.c_str(), user_id);
-
-            Message f_msg{ COVISE_MESSAGE_UI , DataHandle{msg_tmp, strlen(msg_tmp) + 1} };
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(&f_msg);
         }
     }
 }
@@ -2778,7 +2623,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         iel++;
         if (!hostname.empty())
         {
-            int exectype = Config->getexectype(hostname);
+            ExecType exectype = Config->getexectype(hostname);
             int timeout = Config->gettimeout(hostname);
             ostringstream buffer;
             buffer << "HOSTINFO\n" << exectype << "\n" << timeout << "\n" << hostname;
@@ -2797,22 +2642,22 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
     {
         using namespace std;
         LaunchStyle launchStyle = static_cast<LaunchStyle>(stoi(list[iel++]));
-        function<void(int, const string&, const string&, const string&)> action;
+        function<void(int, const string&)> action;
         switch (launchStyle)
         {
             case LaunchStyle::Host:
             {
-                action = addHost;
+                action = std::bind(&CTRLHandler::addHost, this, std::placeholders::_1, std::placeholders::_2);
             }
             break;
             case LaunchStyle::Partner:
             {
-                action = addPartner;
+                action = std::bind(&CTRLHandler::addPartner, this, std::placeholders::_1, std::placeholders::_2);
             }
             break;
             case LaunchStyle::Disconnect:
             {
-                action = removeClient;
+                action = std::bind(&CTRLHandler::removeClient, this, std::placeholders::_1, std::placeholders::_2);
             }
             break;
 
@@ -2822,8 +2667,6 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         
         bool completed = false;
 
-        string display = list[iel++];
-        string passwd = list[iel++];
         string timeout = list[iel++];
         int numPartners = std::stoi(list[iel++]);
         
@@ -2831,162 +2674,9 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         for (size_t i = 0; i < numPartners; i++)
         {
             int clID = std::stoi(list[iel++]);
-            action(clID, display, passwd, timeout);
+            action(clID, timeout);
         }
     }
-    else if (key == "ADD_HOST")
-    {
-        addHost();
-    }
-    //       UI::ADD_PARTNER
-    // ----------------------------------------------------------
-
-    else if (key == "ADD_PARTNER")
-    {
-        if (m_addPartner)
-            m_addPartner = false;
-/*
-        int id = std::stoi(list[iel++]);
-        CRB_EXEC exec{ ExecFlag::Normal,
-            "crb",
-     int, port,
-     char *, localIp,
-     int, moduleCount,
-     char *, moduleId,
-     char *, moduleIp,
-     char *, moduleHostName,
-     char *, displayIp,
-     char *, category,
-     int, vrbClientIdOfController,
-     vrb::VrbCredentials, vrbCredentials,
-     std::vector<std::string>, params)}
-        std::vector<std::string> args;
-        vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{vrb::Program::Controller, id, args}, &m_client);
-*/
-        string hname = list[iel];
-        iel++;
-        string user_id = list[iel];
-        iel++;
-        string passwd = list[iel];
-        iel++;
-        string exectype = list[iel];
-        iel++;
-        string timeout = list[iel];
-        iel++;
-        string display;
-        if (list.size() < iel)
-            display = list[iel];
-        iel++;
-
-        string hostname = hname;
-        if (!hostname.empty())
-        {
-            Config->set_exectype(hostname.c_str(), exectype.c_str());
-
-            if (!timeout.empty())
-                Config->set_timeout(hostname.c_str(), timeout.c_str());
-
-            if (!display.empty())
-                Config->set_display(hostname.c_str(), display.c_str());
-
-            if (CTRLGlobal::getInstance()->userinterfaceList->add_partner(m_globalFilename, hostname, user_id, passwd, m_scriptName))
-            {
-                if (!m_globalLoadReady)
-                    m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
-
-                if (!m_clipboardReady)
-                    m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
-
-                // send infos about hosttype & ui status
-                sendCollaborativeState();
-            }
-
-            else
-            {
-                string text = "ADDPARTNER_FAILED\n" + hostname + "\n" + user_id + "\nPassword\n";
-                Message tmpmsg{COVISE_MESSAGE_UI, text};
-                CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
-            }
-
-            m_addPartner = false;
-        }
-
-        else
-        {
-            string text = "ADDPARTNER_FAILED\nBad Hostname\n" + user_id + "\nPassword\n";
-            Message tmpmsg{COVISE_MESSAGE_UI, text};
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
-        }
-    }
-
-    //       UI::RMV_HOST
-    // ----------------------------------------------------------
-
-    else if (key == "RMV_HOST")
-    {
-        string w_hostname = list[iel];
-        iel++;
-        string w_user = list[iel];
-        iel++;
-
-        if (!w_hostname.empty())
-        {
-            string hostname = w_hostname;
-            if (!hostname.empty())
-            {
-                if (!CTRLGlobal::getInstance()->hostList->rmv_host(hostname, w_user))
-                {
-                    string text = "REMOVING HOST OR PARTNER " + hostname + " FAILED !!!";
-                    CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
-                }
-            }
-
-            else
-            {
-                string text = "HOSTNAME " + w_hostname + "NOT FOUND !!!";
-                CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
-            }
-        }
-
-        else
-            CTRLGlobal::getInstance()->userinterfaceList->sendError("A HOST SHOULD BE SPECIFIED !!!");
-    }
-
-    //       UI::RMV_PARTNER
-    // ----------------------------------------------------------
-
-    else if (key == "RMV_PARTNER")
-    {
-        string w_hostname = list[iel];
-        iel++;
-        string w_user = list[iel];
-        iel++;
-
-        if (!w_hostname.empty())
-        {
-            string hostname = w_hostname;
-            if (!hostname.empty())
-            {
-                if (!CTRLGlobal::getInstance()->userinterfaceList->rmv_partner(hostname, w_user))
-                {
-                    string text = "REMOVING PARTNER ON HOST " + hostname + " FAILED !!!";
-                    CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
-                }
-            }
-
-            else
-            {
-                string text = "HOSTNAME " + w_hostname + "NOT FOUND !!!";
-                CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
-            }
-        }
-
-        else
-        {
-            CTRLGlobal::getInstance()->userinterfaceList->sendError("A HOST SHOULD BE SPECIFIED !!!");
-        }
-    }
-
     //       UI::NEW
     // ----------------------------------------------------------
 
@@ -3096,13 +2786,10 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
     else if(key == "REQUEST_AVAILABLE_PARTNERS"){
         vrbUpdate();
         std::cerr << "vrb remote launchers requested:" << std::endl;
-        for(const auto &cl : m_remoteLauncher){
-            std::cerr << cl.first << ": " << cl.second << std::endl;
-        }
         std::stringstream ss;
         ss << "AVAILABLE_PARTNERS";
         for(const auto &partner : m_remoteLauncher){
-            ss << "\n" << partner.first << "\n" << partner.second;
+            ss << "\n" << partner.ID() << "\n" << partner.userInfo().hostName;
         }
         ss << "\n";
         Message tmpmsg{COVISE_MESSAGE_UI, ss.str()};
@@ -3119,7 +2806,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
     }
 }
 
-void CTRLHandler::addHost(int clID, const std::string& display, const std::string& password, const std::string&timeout){
+void CTRLHandler::addHost(int clID, const std::string&timeout){
     bool completed = false;
     auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
         return cl.ID() == clID;
@@ -3130,12 +2817,9 @@ void CTRLHandler::addHost(int clID, const std::string& display, const std::strin
         if (!timeout.empty())
             Config->set_timeout(hostname, timeout.c_str());
 
-        if (!display.empty())
-            Config->set_display(hostname, display.c_str());
-
         if (m_readConfig == false)
         {
-            int ret = CTRLGlobal::getInstance()->userinterfaceList->config_action("", hostname, client->userInfo().name, password);
+            int ret = CTRLGlobal::getInstance()->userinterfaceList->config_action("", hostname, client->userInfo().name);
             if (ret)
             {
                 m_readConfig = CTRLGlobal::getInstance()->userinterfaceList->add_config(m_filename, NULL);
@@ -3152,7 +2836,7 @@ void CTRLHandler::addHost(int clID, const std::string& display, const std::strin
         else
         {
             coHostType htype(CO_HOST);
-            if (CTRLGlobal::getInstance()->hostList->add_host(*client, password, "", htype))
+            if (CTRLGlobal::getInstance()->hostList->add_host(client->userInfo().hostName, client->userInfo().name, "", htype))
             {
                 completed = 1;
                 if (!m_globalLoadReady)
@@ -3160,13 +2844,6 @@ void CTRLHandler::addHost(int clID, const std::string& display, const std::strin
 
                 if (!m_clipboardReady)
                     m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
-                vrb::Program p = vrb::Program::Controller;
-                if (CTRLHandler::instance()->Config->getshminfo(hostname) == COVISE_PROXIE)
-                    p = vrb::Program::ControllerProxy;
-                std::vector<std::string> args;
-                args.emplace_back()
-                vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{p, clID, args}, &m_client);
-
                 // send infos about hosttype & ui status
                 sendCollaborativeState();
             }
@@ -3206,32 +2883,88 @@ void CTRLHandler::addHost(int clID, const std::string& display, const std::strin
     }
     else
     {
-        string text = "ADDHOST_FAILED\n" + hostname + "\n" + user_id + "\nPassword\n";
+        string text = "ADDHOST_FAILED\n" + client->userInfo().hostName  + "\n" + client->userInfo().name + "\nPassword\n";
         Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
         CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
 
         completed = false;
     } //  add_host
 }
+  
 
-    
 
-    else
-    {
-        string text = "ADDHOST_FAILED\nBad Hostname\n" + user_id + "\nPassword\n";
-        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
-        CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-        delete tmpmsg;
-    }
+void CTRLHandler::addPartner(int clID, const std::string&timeout){
+    auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
+        return cl.ID() == clID;
+    });
+    if (client != m_remoteLauncher.end())
+        m_addPartner = false;
+        const char *hostname = client->userInfo().hostName.c_str();
+        if (hostname && strlen(hostname) > 0)
+        {
+            if (!timeout.empty())
+                Config->set_timeout(hostname, timeout.c_str());
 
+            if (CTRLGlobal::getInstance()->userinterfaceList->add_partner(m_globalFilename, hostname, client->userInfo().name, m_scriptName))
+            {
+                if (!m_globalLoadReady)
+                    m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
+
+                if (!m_clipboardReady)
+                    m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
+
+                // send infos about hosttype & ui status
+                sendCollaborativeState();
+            }
+
+            else
+            {
+                string text{"ADDPARTNER_FAILED\n" + string{hostname} + "\n" + client->userInfo().name + "\nPassword\n"};
+                Message tmpmsg{COVISE_MESSAGE_UI, text};
+                CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
+            }
+
+            m_addPartner = false;
+        }
+
+        else
+        {
+            string text = "ADDPARTNER_FAILED\nBad Hostname\n" + client->userInfo().name + "\nPassword\n";
+            Message tmpmsg{COVISE_MESSAGE_UI, text};
+            CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
+        }
 }
 
-void CTRLHandler::addPartner(int clID, const std::string& display, const std::string& password, const std::string&timeout){
+void CTRLHandler::removeClient(int clID, const std::string&timeout){
+        
+        
+    auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
+        return cl.ID() == clID;
+    });
+    if (client != m_remoteLauncher.end())
+        {
+            const std::string &hostname = client->userInfo().hostName;
+            const std::string &username = client->userInfo().name;
+            bool removed = false;
+            if (CTRLGlobal::getInstance()->userinterfaceList->rmv_partner(hostname, username))
+            {
+                removed = true;
+            }
+            if (CTRLGlobal::getInstance()->hostList->rmv_host(hostname, username))
+            {
+                removed = true;
+            }
+            if(!removed)
+            {
+                string text = "removeClient: HOSTNAME " + hostname + "NOT FOUND !!!";
+                CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
+            }
+        }
 
-}
-
-void CTRLHandler::removeClient(int clID, const std::string& display, const std::string& password, const std::string&timeout){
-
+        else
+        {
+            CTRLGlobal::getInstance()->userinterfaceList->sendError("VrbRemoteLauncher not found !!!");
+        }
 }
 //!
 //! reset lists when NEW or OPEN was received
@@ -3964,14 +3697,37 @@ int CTRLHandler::vrbClientID()
     return 0;
 }
 
-void CTRLHandler::sendLaunchRequest(int clientID, const std::vector<std::string> &args, bool proxy = false)
+int CTRLHandler::getClientID(const std::string& hostAddress, const std::string&user_id) const{
+    auto cl = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [hostAddress, user_id](const vrb::RemoteClient &cl) {
+        return cl.userInfo().ipAdress == hostAddress && cl.userInfo().name == user_id;
+    });
+    if (cl != m_remoteLauncher.end())
+    {
+        return cl->ID();
+    }
+    return 0;
+}
+
+void CTRLHandler::sendLaunchRequest(int port, int moduleCount, const Host* rhost, bool proxy)
 {
     vrb::Program p = vrb::Program::Controller;
     if (proxy)
     {
         p = vrb::Program::ControllerProxy;
     }
-
+    std::vector<std::string> args;
+    args.emplace_back(std::to_string(port));
+    args.emplace_back(m_client.userInfo().ipAdress);
+    args.emplace_back(std::to_string(moduleCount));
+    args.emplace_back(m_client.getCredentials().ipAddress);
+    args.emplace_back(std::to_string(m_client.getCredentials().tcpPort));
+    args.emplace_back(std::to_string(m_client.getCredentials().udpPort));
+    int clientID = getClientID(rhost->getAddress(), rhost->getName());
+    if(clientID == 0)
+    {
+        std::cerr << "sendLaunchRequest failed: VrbRemoteLauncher for " << rhost << " not found" << std::endl;
+        return;
+    }
     vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{p, clientID, args}, &m_client);
 }
 
@@ -4015,7 +3771,13 @@ bool CTRLHandler::vrbUpdate() {
             tb >> id;
             if (id != m_client.ID())
             {
-                std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const vrb::RemoteClient& cl) {return cl.ID() == id; });
+                //std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const vrb::RemoteClient& cl) {return cl.ID() == id; });
+                auto clIt = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const vrb::RemoteClient& cl) {return cl.ID() == id; });
+                if (clIt != m_remoteLauncher.end())
+                {
+                    m_remoteLauncher.erase(clIt);
+                }
+
                 retval = true;
             }
         }
@@ -4040,7 +3802,7 @@ void CTRLHandler::vrbClientsUpdate(const Message &userInfoMessage) {
     {
         if (cl.userInfo().userType == vrb::Program::VrbRemoteLauncher)
         {
-            m_remoteLauncher.emplace_back(std::move(cl));
+            m_remoteLauncher.insert(std::move(cl));
         }
     }
 }
@@ -4270,56 +4032,6 @@ void CTRLHandler::getAllConnections()
             itl++; //   to_host
             to_port.push_back(token[itl]);
             itl++; //   to_port
-        }
-    }
-}
-
-//!
-//! handle messages from the SSL-Daemon
-//!
-void CTRLHandler::handleSSLDaemon(Message *msg)
-{
-
-    if (strncmp(msg->data.data(), "join", 4) == 0)
-    {
-        const char *hname = msg->data.data() + 5;
-        const char *passwd = "<empty>";
-        const char *user_id = "<empty>";
-        const char *c = strchr(hname, ':');
-
-        if (c)
-        {
-            char *tmp = new char[strlen(c) + 1];
-            strcpy(tmp, c);
-            *tmp = '\0';
-            size_t retval;
-            retval = sscanf(tmp + 1, "%d", &m_accessGridDaemon->DaemonPort);
-            if (retval != 1)
-            {
-                cerr << "main: sscanf failed" << endl;
-                exit(-1);
-            }
-            delete[] tmp;
-        }
-
-        // set exectype to remote daemon which is 6
-        Config->set_exectype(hname, "7");
-        string hostname(hname);
-        if (CTRLGlobal::getInstance()->userinterfaceList->add_partner(m_globalFilename, hostname, user_id, passwd, m_scriptName))
-        {
-            if (m_globalLoadReady == false)
-            {
-                m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
-            }
-        }
-
-        else
-        {
-            char *msg_tmp = new char[200];
-            sprintf(msg_tmp, "ADDPARTNER_FAILED\n%s\n%s\nPassword\n", hostname.c_str(), user_id);
-
-            Message f_msg{ COVISE_MESSAGE_UI , DataHandle{msg_tmp, strlen(msg_tmp) + 1} };
-            CTRLGlobal::getInstance()->userinterfaceList->send_master(&f_msg);
         }
     }
 }

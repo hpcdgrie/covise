@@ -43,7 +43,6 @@ public:
     int m_numRunning, m_numRendererRunning;
 
     ControlConfig *Config;
-    AccessGridDaemon *m_accessGridDaemon;
 
     static CTRLHandler *instance();
     void handleClosedMsg(Message *msg);
@@ -54,7 +53,8 @@ public:
     vector<string> splitString(string text, const string &sep);
     bool recreate(string buffer, readMode mode);
     int vrbClientID();
-    void sendLaunchRequest(int clientID, const std::vector<std::string> &args, bool proxy = false);
+    int getClientID(const std::string& hostname, const std::string&user_id) const;
+    void sendLaunchRequest(int port, int moduleCount, const Host* rhost, bool proxy = false);
 
 private:
     static CTRLHandler *singleton;
@@ -67,17 +67,16 @@ private:
     bool m_useGUI; /* use an user interface */
     bool m_isLoaded, m_executeOnLoad, m_iconify, m_maximize;
     int m_quitAfterExececute;
-    int m_daemonPort, m_xuif, m_startScript, m_accessGridDaemonPort;
-    int m_SSLDaemonPort;
+    int m_xuif, m_startScript;
     SSLClient *m_SSLClient;
     bool m_clientRegistered = false;
     vrb::VRBClient m_client;
-    std::vector<vrb::RemoteClient> m_remoteLauncher;
+    std::set<vrb::RemoteClient> m_remoteLauncher;
+    void lookupSiblings();
+    void loop();
     int parseCommandLine(int argc, char **argv);
-    void startCrbUiDm();
+    void startCrbUiAndDatamanager();
     void loadNetworkFile();
-    void handleAccessGridDaemon(Message *msg);
-    void handleSSLDaemon(Message *msg);
     void handleQuit(Message *msg);
     void handleUI(Message *msg, string data);
     void handleFinall(Message *msg, string data);
@@ -97,9 +96,9 @@ private:
     string writeClipboard(const string &keyword, vector<net_module *> liste, bool all = false);
     void addBuffer(const QString &text);
     void sendCollaborativeState();
-    void addHost(int clID, const std::string &display, const std::string &password, const std::string &timeout);
-    void addPartner(int clID, const std::string &display, const std::string &password, const std::string &timeout);
-    void removeClient(int clID, const std::string &display, const std::string &password, const std::string &timeout);
+    void addHost(int clID, const std::string &timeout);
+    void addPartner(int clID, const std::string &timeout);
+    void removeClient(int clID, const std::string &timeout);
 
     std::string m_autosavefile;
 

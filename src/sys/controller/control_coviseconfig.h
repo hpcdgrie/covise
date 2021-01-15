@@ -30,21 +30,16 @@
 namespace covise
 {
 
-enum exec_type
+enum class ExecType
 {
-    COVISE_REXEC = 1,
-    COVISE_RSH,
-    COVISE_SSH,
-    COVISE_NQS,
-    COVISE_MANUAL,
-    COVISE_REMOTE_DAEMON,
-    COVISE_SSLDAEMON,
-    COVISE_SCRIPT,
-    COVISE_LOCAL,
-    COVISE_ACCESSGRID,
-    COVISE_GLOBUS_GRAM,
-    COVISE_REATTACH
+    Local, VRB, Manual, Script
 };
+
+template<typename T>
+T &operator<<(T &stream, ExecType execType){
+    stream << static_cast<int>(execType);
+    return stream;
+}
 
 class ControlConfig
 {
@@ -52,7 +47,7 @@ private:
     struct HostInfo
     {
         int shminfo;
-        int exectype;
+        ExecType exectype;
         int timeout;
         char *display;
     };
@@ -60,7 +55,7 @@ private:
     HostMap hostMap;
 
     HostMap::iterator getOrCreateHostInfo(const std::string &);
-    void addhostinfo(const std::string &name, int s_mode, int e_mode, int t);
+    void addhostinfo(const std::string &name, int s_mode, ExecType e_mode, int t);
     void addhostinfo_from_config(const std::string &name);
 
 public:
@@ -72,7 +67,7 @@ public:
     }
 
     int getshminfo(const std::string &n);
-    int getexectype(const std::string &n);
+    ExecType getexectype(const std::string &n);
 	int gettimeout(const std::string &n);
 	int gettimeout(const covise::Host &h);
 
@@ -80,7 +75,7 @@ public:
 
     int set_shminfo(const std::string &n, const char *shm_mode);
     int set_timeout(const std::string &n, const char *t);
-    int set_exectype(const std::string &n, const char *e);
+    ExecType set_exectype(const std::string &n, const char *e);
     char *set_display(const std::string &n, const char *e);
 
 };

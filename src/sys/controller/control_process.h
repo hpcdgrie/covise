@@ -15,17 +15,18 @@
 namespace covise
 {
    enum class ExecFlag : int;
-   
-/**
+   enum class ExecType : int;
+
+   /**
  *  Controller class:  contains the informations
  *  concerning the controller process
  */
 
-class Controller : public Process // process for the controller
-{
+   class Controller : public Process // process for the controller
+   {
 
-    /// pointer to the sharedmemory object
-    ShmAccess *shm;
+      /// pointer to the sharedmemory object
+      ShmAccess *shm;
       /**
        *  when starting a renderer ask crb if a plugin is possible and get the right name
        *  @param   category    the category of the applicationmodule
@@ -42,15 +43,7 @@ public:
        *  @param   name  the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(int clientID, const string &name);
-
-    /**
-       *  start datamanager on the remote host
-       *  @param   rhost   the remote host
-       *  @param   name    the name of the datamanager executable
-       *  @return  object holding information about the connection to dtm.
-       */
-    AppModule *start_datamanager(int clientID, Host *rhost, const char *name);
+    AppModule *start_datamanager(const string &name);
 
     /**
        *  start datamanager on the remote host
@@ -60,19 +53,19 @@ public:
        *  @param   name      the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(int clientID, Host *rhost, const char *user, const char *passwd, const char *name);
+    AppModule *start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name);
 
     /**
        *  start datamanager on the remote host
        *  @param   rhost       the remote host
        *  @param   user        the username of the remote account
-       *  @param   name        the name of the datamanager executable
+       *  @param   proxy       start crbProxy or crb
        *  @param   exec_type   the method used for starting datamanager
        *  @param   script_name the name of the script file used
        *                       for starting dtm.
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(int clientID, Host *rhost, const char *user, const char *name, int exec_type, const char *script_name = NULL);
+    AppModule *start_datamanager(Host *rhost, const char *user, bool proxy, ExecType exec_type, const char *script_name = NULL);
 
     
     /**

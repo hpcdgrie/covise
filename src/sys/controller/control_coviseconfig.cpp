@@ -28,16 +28,17 @@ using namespace covise;
 #define DEFAULT_TIMEOUT 30
 
 //----------------------------------------------------------------------------
-void ControlConfig::addhostinfo(const std::string &name, int s_mode, int e_mode, int t)
+void ControlConfig::addhostinfo(const std::string &name, int s_mode, ExecType e_mode, int t)
 //----------------------------------------------------------------------------
 {
     //std::cerr << "adding host info for " << name << std::endl;
-    if (name.length()>0)
+    if (!name.empty())
     {
-        hostMap[name].exectype = e_mode;
-        hostMap[name].shminfo = s_mode;
-        hostMap[name].display = NULL;
-        hostMap[name].timeout = t;
+        auto &h = hostMap[name];
+        h.exectype = e_mode;
+        h.shminfo = s_mode;
+        h.display = NULL;
+        h.timeout = t;
     }
 }
 
@@ -58,19 +59,15 @@ ControlConfig::HostMap::iterator ControlConfig::getOrCreateHostInfo(const std::s
     {
         return it;
     }
-
-    hostMap[name].timeout = DEFAULT_TIMEOUT;
-#ifdef WIN32
-    hostMap[name].exectype = COVISE_REMOTE_DAEMON;
-#else
-    hostMap[name].exectype = COVISE_SSH;
-#endif
-    hostMap[name].display = NULL;
-    hostMap[name].shminfo = COVISE_SHM;
+    it = hostMap.insert(HostMap::value_type{name, HostMap::value_type::second_type{}}).first;
+    it->second.timeout = DEFAULT_TIMEOUT;
+    it->second.exectype = ExecType::VRB;
+    it->second.display = NULL;
+    it->second.shminfo = COVISE_SHM;
 
     addhostinfo_from_config(name);
 
-    return hostMap.find(name);
+    return it;
 }
 
 
@@ -111,21 +108,20 @@ int ControlConfig::set_timeout(const std::string &n, const char *t)
 }
 
 //----------------------------------------------------------------------------
-int ControlConfig::set_exectype(const std::string &n, const char *exec_mode)
+ExecType ControlConfig::set_exectype(const std::string &n, const char *exec_mode)
 //----------------------------------------------------------------------------
 {
     HostMap::iterator it = getOrCreateHostInfo(n);
 
-    int e_mode = COVISE_SSH;
+    int e_mode = static_cast<int>(ExecType::VRB);
     int retval = sscanf(exec_mode, "%d", &e_mode);
     if (retval != 1)
     {
         std::cerr << "ControlConfig::set_exectype_ip: sscanf failed" << std::endl;
     }
+    it->second.exectype = static_cast<ExecType>(e_mode);
 
-    it->second.exectype = e_mode;
-
-    return (e_mode);
+    return (it->second.exectype);
 }
 
 //----------------------------------------------------------------------------
@@ -147,42 +143,36 @@ char *ControlConfig::set_display(const std::string &n, const char *dp)
 }
 
 //----------------------------------------------------------------------------
-int ControlConfig::getexectype(const std::string &n)
+ExecType ControlConfig::getexectype(const std::string &n)
 //----------------------------------------------------------------------------
 {
-	getOrCreateHostInfo(n);
-	return hostMap[n].exectype;
+	return getOrCreateHostInfo(n)->second.exectype;
 }
 
 //----------------------------------------------------------------------------
 int ControlConfig::gettimeout(const std::string &n)
 //----------------------------------------------------------------------------
 {
-	getOrCreateHostInfo(n);
-
-	return hostMap[n].timeout;
+	return getOrCreateHostInfo(n)->second.timeout;
 }
 
 int covise::ControlConfig::gettimeout(const covise::Host & h)
 {
-	getOrCreateHostInfo(h.getName());
-
-	return hostMap[h.getName()].timeout;
+    return gettimeout(std::string{h.getName()});
 }
 
 //----------------------------------------------------------------------------
 int ControlConfig::getshminfo(const std::string &n)
 //----------------------------------------------------------------------------
 {
-    getOrCreateHostInfo(n);
-
-    return hostMap[n].shminfo;
+    return getOrCreateHostInfo(n)->second.shminfo;
 }
 
 void ControlConfig::addhostinfo_from_config(const std::string &name)
 {
 	std::string shm_mode, exec_mode;
-    int s_mode, e_mode, tim;
+    int s_mode, tim;
+    ExecType e_mode;
 
     /// default values
 
@@ -231,46 +221,29 @@ void ControlConfig::addhostinfo_from_config(const std::string &name)
         print_error(__LINE__, __FILE__, "Wrong memory mode %s for %s, should be shm, mmap, or none (covise.config)! Using default shm", shm_mode.c_str(), name.c_str());
         fflush(stderr);
     }
-    e_mode = COVISE_REXEC;
-    if (strcasecmp(exec_mode.c_str(), "rexec") == 0)
+    e_mode = ExecType::VRB;
+    if (strcasecmp(exec_mode.c_str(), "rexec") == 0 ||
+        strcasecmp(exec_mode.c_str(), "rsh") == 0 ||
+        strcasecmp(exec_mode.c_str(), "ssh") == 0 ||
+        strcasecmp(exec_mode.c_str(), "accessGrid") == 0 ||
+        strcasecmp(exec_mode.c_str(), "SSLDaemon") == 0 ||
+        strcasecmp(exec_mode.c_str(), "nqs") == 0 ||
+        strcasecmp(exec_mode.c_str(), "remoteDaemon") == 0 ||
+        strcasecmp(exec_mode.c_str(), "globus_gram") == 0)
     {
-        e_mode = COVISE_REXEC;
-    }
-    else if (strcasecmp(exec_mode.c_str(), "rsh") == 0)
-    {
-        e_mode = COVISE_RSH;
-    }
-    else if (strcasecmp(exec_mode.c_str(), "ssh") == 0)
-    {
-        e_mode = COVISE_SSH;
-    }
-    else if (strcasecmp(exec_mode.c_str(), "accessGrid") == 0)
-    {
-        e_mode = COVISE_ACCESSGRID;
+        std::cerr << exec_mode << "is no longer supported" << std::endl;
     }
     else if (strcasecmp(exec_mode.c_str(), "manual") == 0)
     {
-        e_mode = COVISE_MANUAL;
+        e_mode = ExecType::Manual;
     }
-    else if (strcasecmp(exec_mode.c_str(), "SSLDaemon") == 0)
+    else if (strcasecmp(exec_mode.c_str(), "vrb") == 0)
     {
-        e_mode = COVISE_SSLDAEMON;
-    }
-    else if (strcasecmp(exec_mode.c_str(), "nqs") == 0)
-    {
-        e_mode = COVISE_NQS;
-    }
-    else if (strcasecmp(exec_mode.c_str(), "remoteDaemon") == 0)
-    {
-        e_mode = COVISE_REMOTE_DAEMON;
-    }
-    else if (strcasecmp(exec_mode.c_str(), "globus_gram") == 0)
-    {
-        e_mode = COVISE_GLOBUS_GRAM;
+        e_mode = ExecType::VRB;
     }
     else
     {
-        print_error(__LINE__, __FILE__, "Wrong exec mode %s for %s, should be rexec, rsh or ssh (covise.config)! Using default rexec", shm_mode.c_str(), name.c_str());
+        print_error(__LINE__, __FILE__, "Wrong exec mode %s for %s, should be vrb, manual or script (covise.config)! Using default vrb", shm_mode.c_str(), name.c_str());
         fflush(stderr);
     }
     if (tim == 0)

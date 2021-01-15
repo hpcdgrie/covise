@@ -1052,7 +1052,6 @@ void MEMainHandler::requestPartnerAction(covise::LaunchStyle launchStyle, const 
     QStringList list;
     list << "HANDLE_PARTNERS";
     list << QString::number(static_cast<int>(launchStyle));
-    list << password << display;
     const char *timeout = "30";
     list << timeout;
     list << QString::number(clients.size());

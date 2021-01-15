@@ -116,7 +116,6 @@ class DM_data
 {
     AppModule *dm;
     string user;
-    string passwd;
     string hostname;
     string modname;
 
@@ -127,7 +126,6 @@ public:
     ~DM_data();
 
     void set_user(const string &str);
-    void set_passwd(const string &str);
     void set_hostname(const string &str);
     void set_modname(const string &str);
     void set_DM(AppModule *dmod);
@@ -140,17 +138,13 @@ public:
     {
         return user;
     };
-    string get_passwd()
-    {
-        return passwd;
-    };
     string get_hostname()
     {
         return hostname;
     };
     AppModule *get_DM();
 
-    int start_crb(int clientID, int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype);
+    int start_crb(ExecType type, const string &host, const string &user, const string &script_name, coHostType &htype);
     void quit();
     int new_desk();
     void send_msg(Message *msg);
@@ -175,7 +169,7 @@ public:
 
     AppModule *start_local(const string &local_user);
     DM_data *get_local();
-    int add_crb(int clientID, int type, const string &host, const string &user, const string &passwd, const string &script_name, coHostType &htype);
+    int add_crb(ExecType type, const string &host, const string &user, const string &script_name, coHostType &htype);
 
     DM_data *get(const string &host);
     DM_data *get(const string &host, const string &user);
@@ -198,7 +192,6 @@ class rhost
 {
     string hostname;
     string user;
-    string passwd;
     string htype;
     AppModule *ctrl;
     bool save_info;
@@ -212,7 +205,6 @@ public:
     ~rhost();
     void set_hostname(const string &str);
     void set_user(const string &str);
-    void set_passwd(const string &str);
     void set_type(const string &str);
     AppModule *get_crb()
     {
@@ -223,10 +215,6 @@ public:
     {
         return user;
     };
-    string get_passwd()
-    {
-        return passwd;
-    };
     string get_hostname()
     {
         return hostname;
@@ -236,7 +224,7 @@ public:
         return htype;
     };
 
-    int start_ctrl(int clientID, int type, const string &script_name, coHostType &htype);
+    int start_ctrl(ExecType type, const string &script_name, coHostType &htype);
 
     void send(Message *msg);
     void recv_msg(Message *msg);
@@ -266,7 +254,7 @@ public:
     rhost *get(const string &host);
     rhost *get(const string &host, const string &user);
     string get_hosts(const string &local_name, const string &local_user);
-    int add_host(const vrb::RemoteClient& client, const string &passwd, const string &script_name, coHostType &htype);
+    int add_host(const std::string &hostname, const std::string &user_id, const string &script_name, coHostType &htype);
     int add_local_host(const string &local_user);
     int rmv_host(const string &hostname, const string &user_id);
     void mark_host();
@@ -284,7 +272,6 @@ class uif
 {
     string host;
     string userid;
-    string passwd;
     string status;
 
     AppModule *applmod;
@@ -293,7 +280,6 @@ class uif
 public:
     void set_host(const string &tmp);
     void set_userid(const string &tmp);
-    void set_passwd(const string &tmp);
     void set_status(const string &tmp);
 
     string get_host();
@@ -406,7 +392,6 @@ protected:
     string status;
     string hostname;
     string userid;
-    string passwd;
 
     bool rendererIsPossible;
     bool rendererIsActive;
@@ -428,12 +413,8 @@ public:
     {
         return userid;
     };
-    string get_passwd()
-    {
-        return passwd;
-    };
+
     void set_userid(const string &str);
-    void set_passwd(const string &str);
     void set_status(const string &str);
     string get_status()
     {
@@ -519,8 +500,8 @@ public:
     int start_local_WebService(const string &moduleinfo);
     int start_local_xuif(const string &moduleinfo, const string &pyFile);
     bool add_config(const string &file, const string &mapfile);
-    int config_action(const string &mapfile, const string &host, const string &userid, const string &passwd);
-    int add_partner(const string &filename, const string &host, const string &userid, const string &passwd, const string &script_name);
+    int config_action(const string &mapfile, const string &host, const string &userid);
+    int add_partner(const string &filename, const string &host, const string &userid, const string &script_name);
     int rmv_partner(const string &host, const string &user_id);
     void send_slave(Message *msg);
     void send_master(Message *msg);
