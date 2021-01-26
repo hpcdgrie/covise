@@ -150,7 +150,7 @@ inline bool equals<char const*>(const char* const& t1, const char* const& t2){
     {                                                                                                 \
         EXPAND(MY_OVERLOADED(DECLARATION, DECLARATION, __VA_ARGS__))                                  \
         ClassName(EXPAND(MY_OVERLOADED(CONSTRUCTOR_ELEMENT, CONSTRUCTOR_ELEMENT_LAST, __VA_ARGS__))); \
-        ClassName(const covise::Message &msg);                                                        \
+        explicit ClassName(const covise::Message &msg);                                                        \
                                                                                                       \
     private:                                                                                          \
         ClassName(covise::TokenBuffer &&tb);                                                          \
@@ -200,12 +200,12 @@ inline bool equals<char const*>(const char* const& t1, const char* const& t2){
     {                                                                                             \
         friend class ClassName;                                                                   \
         EXPAND(MY_OVERLOADED(DECLARATION, DECLARATION, __VA_ARGS__))                                      \
-        FullClassName(EXPAND(MY_OVERLOADED(CONSTRUCTOR_ELEMENT, CONSTRUCTOR_ELEMENT_LAST, __VA_ARGS__))); \
+        explicit FullClassName(EXPAND(MY_OVERLOADED(CONSTRUCTOR_ELEMENT, CONSTRUCTOR_ELEMENT_LAST, __VA_ARGS__))); \
                                                                                                   \
     private:                                                                                      \
         static const EnumClass subType = EnumClass::EnumType;                                       \
-        FullClassName(const covise::Message &msg);                                                \
-        FullClassName(covise::TokenBuffer &&tb);                                                  \
+        explicit FullClassName(const covise::Message &msg);                                                \
+        explicit FullClassName(covise::TokenBuffer &&tb);                                                  \
     };                                                                                            \
     export covise::TokenBuffer &operator<<(covise::TokenBuffer &tb, const FullClassName &msg);    \
     export std::ostream &operator<<(std::ostream &tb, const FullClassName &exe);                  \
