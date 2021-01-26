@@ -99,15 +99,15 @@ public:
 
     // empty initialization:
     Message();
-	Message(TokenBuffer& t);
-    Message(Connection *c);
+	explicit Message(TokenBuffer& t);
+    explicit Message(Connection *c);
 
     // initialization with data only (for sending):
-    Message(int message_type, const std::string &str = std::string());
+    explicit Message(int message_type, const std::string &str = std::string());
 
     Message(int message_type, const DataHandle& dh);
 
-    Message(const Message &); // copy constructor
+    explicit Message(const Message &); // copy constructor
     //copies data
     Message &operator=(const Message &src); // assignment
     //does not copy data
