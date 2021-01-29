@@ -1,6 +1,6 @@
 #ifndef COMSG_COVISE_LAUCH_OPTIONS_H
 #define COMSG_COVISE_LAUCH_OPTIONS_H
-
+#include <array>
 namespace covise
 {
 enum class LaunchStyle
