@@ -107,7 +107,7 @@ public:
 
     Message(int message_type, const DataHandle& dh);
 
-    explicit Message(const Message &); // copy constructor
+    Message(const Message &); // copy constructor
     //copies data
     Message &operator=(const Message &src); // assignment
     //does not copy data
