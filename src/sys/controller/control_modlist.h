@@ -388,7 +388,7 @@ class userinterface : public MessageSenderInterface
 {
 
 protected:
-    AppModule *ui;
+    std::unique_ptr<AppModule> ui;
     string status;
     string hostname;
     string userid;
@@ -485,6 +485,8 @@ private:
     int iconify;
     int maximize;
     bool m_slaveUpdate;
+    void setLocalUIParams(userinterface *localUi);
+    void addLocalUi(userinterface *localUi);
 
 public:
     ui_list();
@@ -496,9 +498,9 @@ public:
     userinterface *get(const string &hostname, const string &user);
     userinterface *get(const string &hostname); // only host counts anyway :-(
     userinterface *get(int sender_no);
-    int start_local_Mapeditor(const string &moduleinfo);
-    int start_local_WebService(const string &moduleinfo);
-    int start_local_xuif(const string &moduleinfo, const string &pyFile);
+    bool start_local_Mapeditor();
+    bool start_local_WebService();
+    bool start_local_xuif(const string &pyFile);
     bool add_config(const string &file, const string &mapfile);
     int config_action(const string &mapfile, const string &host, const string &userid);
     int add_partner(const string &filename, const string &host, const string &userid, const string &script_name);
@@ -522,5 +524,62 @@ public:
     void update_ui(userinterface *ui);
     int update_all(const string &mod_info, const string &DC_info);
 };
+
+namespace controller{
+class userinterface : public controller::Module
+{
+
+protected:
+    string status;
+    bool rendererIsPossible;
+    bool rendererIsActive;
+
+
+
+public:
+    userinterface(const RemoteHost& host, const std::string&name);
+    virtual ~userinterface() = default;
+
+    const std::string &get_status()const
+    {
+        return status;
+    };
+
+    virtual int start(const Module &crb, bool restart) = 0;
+    int restart(const Module &crb);
+    int xstart(const string &pyFile);
+    void quit();
+
+    void change_status(const string &str);
+    void change_master(const string &user, const string &host);
+};
+
+
+class UIMapEditor : public userinterface
+{
+public:
+    UIMapEditor(const RemoteHost& host);
+
+    int start(const Module &crb, bool restart) override;
+};
+
+class UISoap : public userinterface
+{
+public:
+    UISoap(const RemoteHost& host)
+        : userinterface(host, "uisoap")
+    {
+    }
+    ~UISoap()
+    {
+    }
+    int start(const Module &crb, bool restart) override;
+};
+
+
+}
+
+
+
 }
 #endif

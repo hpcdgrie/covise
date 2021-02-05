@@ -21,14 +21,20 @@
 
 #define COVISE_MAXHOSTCONFIG 2000
 
-#define COVISE_POSIX 5
-#define COVISE_PROXIE 4
-#define COVISE_NOSHM 3
-#define COVISE_MMAP 2
-#define COVISE_SHM 1
+
 
 namespace covise
 {
+constexpr int DEFAULT_TIMEOUT = 30;
+
+
+enum class ShmMode {
+    Default = 1, //COVISE_SHM 
+    MMap, //COVISE_MMAP,
+    NoShm, //COVISE_NOSHM, 
+    Proxie, //COVISE_PROXIE, 
+    Posix //COVISE_POSIX, 
+ };
 
 enum class ExecType
 {
@@ -46,17 +52,17 @@ class ControlConfig
 private:
     struct HostInfo
     {
-        int shminfo;
-        ExecType exectype;
-        int timeout;
-        char *display;
+        ShmMode shmMode = ShmMode::Default;
+        ExecType exectype = ExecType::VRB;
+        int timeout = DEFAULT_TIMEOUT;
+        char *display = nullptr;
     };
     typedef std::map<std::string, HostInfo> HostMap;
     HostMap hostMap;
 
     HostMap::iterator getOrCreateHostInfo(const std::string &);
-    void addhostinfo(const std::string &name, int s_mode, ExecType e_mode, int t);
-    void addhostinfo_from_config(const std::string &name);
+    void addhostinfo(const HostMap::iterator &host, ShmMode s_mode, ExecType e_mode, int t);
+    void addhostinfo_from_config(const HostMap::iterator &host);
 
 public:
     ControlConfig()
@@ -66,14 +72,15 @@ public:
     {
     }
 
-    int getshminfo(const std::string &n);
-    ExecType getexectype(const std::string &n);
-	int gettimeout(const std::string &n);
+    ShmMode getshmMode(const std::string &hostName);
+    ExecType getexectype(const std::string &hostName);
+	int gettimeout(const std::string &hostName);
 	int gettimeout(const covise::Host &h);
 
-	char *getDisplayIP(const covise::Host &h);
+	const char *getDisplayIP(const covise::Host &host);
+	const char *getDisplayIP(const char* hostName);
 
-    int set_shminfo(const std::string &n, const char *shm_mode);
+    ShmMode set_shminfo(const std::string &n, const char *shm_mode);
     int set_timeout(const std::string &n, const char *t);
     ExecType set_exectype(const std::string &n, const char *e);
     char *set_display(const std::string &n, const char *e);

@@ -32,6 +32,7 @@
 #include <vrb/VrbSetUserInfoMessage.h>
 #include <vrb/client/LaunchRequest.h>
 #include <vrb/client/VRBClient.h>
+#include <comsg/NEW_UI.h>
 
 #include "AccessGridDaemon.h"
 #include "CTRLGlobal.h"
@@ -54,7 +55,9 @@
 #include <QFileInfo>
 
 using namespace covise;
+using namespace controller;
 namespace po = boost::program_options;
+namespace po_style = boost::program_options::command_line_style;
 
 CTRLHandler *CTRLHandler::singleton = NULL;
 
@@ -144,7 +147,7 @@ void initDummyMessage(){
     memcpy(m_dummyMessage.data.accessData(), " ", 2);
 }
 
-void sayHello(){
+void printWelcomeMessage(){
     //  Say hello
     cerr << endl;
     cerr << "*******************************************************************************" << endl;
@@ -155,25 +158,6 @@ void sayHello(){
 
 }
 
-const char *short_usage = "\n usage: covise [--help] [--minigui] [--gui] [--nogui] [network.net] [-a] [-i] [-m] [-p] [-s] [-t] [-u] [-q] [-x] [-e] [-v] [-V] [--script [script.py]]\n";
-const char *long_usage = "\n"
-                         "  -a\tscan for AccessGrid daemon\n"
-                         "  -i\ticonify map editor\n"
-                         "  -m\tmaximize map editor\n"
-                         "  -q\tquit after execution\n"
-                         "  -e\texecute on loading\n"
-                         "  -u\tscan local user\n"
-                         "  -t\tactivate timer\n"
-                         "  -x\tstart X11 user interface\n"
-                         "  --script [script.py]\n\tstart script mode, executing Python script script.py\n"
-                         "  -v\tshort version\n"
-                         "  -V\tlong version\n"
-                         "  --version\n\tlong version\n"
-                         "  --nogui\n\tdon't start the userinterface when loading and executing a network\n"
-                         "  --gui\n\tstart userinterface, even in scripting mode (specify as last argument)\n"
-                         "  --minigui\n\tStart a minimal userinterface when loading and executing a network\n"
-                         "  --help\n\tthis help\n";
-
 /*!
     \class CTRLHandler
     \brief Covise controller main handling   
@@ -181,27 +165,10 @@ const char *long_usage = "\n"
 
 // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
 CTRLHandler::CTRLHandler(int argc, char *argv[])
-    : m_miniGUI(false)
-    , m_rgbTextOpen(false)
-    , m_numRunning(0)
-    , m_numRendererRunning(0)
-    , m_globalLoadReady(true)
-    , m_clipboardReady(true)
-    , m_readConfig(true)
-    , m_useGUI(true)
-    , m_isLoaded(true)
-    , m_executeOnLoad(false)
-    , m_iconify(false)
-    , m_maximize(false)
-    , m_quitAfterExececute(0)
-    , m_xuif(0)
-    , m_startScript(0)
-    , m_writeUndoBuffer(true)
-    , m_client(vrb::Program::Controller)
-    , m_autosavefile(autosaveFile())
+   :m_autosavefile(autosaveFile())
 // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
 {
-
+    
     singleton = this;
 
     preventBrokenPipe();
@@ -211,22 +178,17 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
     sigQuitHandler quitHandler;
     coSignal::addSignal(SIGTERM, quitHandler);
 
-    //  parse commandline
-    int ierr = parseCommandLine(argc, argv);
-    if (ierr != 0)
-        return;
-
-
-    //  needed for SIGPWR && SIGTERM
-    userinterfaceList = CTRLGlobal::getInstance()->userinterfaceList;
-
+    parseCommandLine(argc, argv);
 
     lookupSiblings();
-    sayHello();
+    printWelcomeMessage();
+    m_remoteHostManager.getLocalHost().startCrb();
+    m_remoteHostManager.getLocalHost().startUI(m_options.uiOptions, m_remoteHostManager.getLocalHost());
     startCrbUiAndDatamanager();
+    // read covise.config
+    Config = new ControlConfig;
 
     loadNetworkFile();
-    m_client.connectToServer();
     loop();
 }
 
@@ -628,7 +590,12 @@ void CTRLHandler::handleAndDeleteMsg(Message *msg)
 
         break;
     }
-
+    case COVISE_MESSAGE_NEW_UI:
+    {
+        NEW_UI uimsg{*msg};
+        handleNewUi(uimsg);
+    }
+    break;
     default:
         break;
     } //  end message switch
@@ -733,220 +700,151 @@ void CTRLHandler::handleClosedMsg(Message *msg)
 //!
 //! parse the commandline & init global states
 //!
-int CTRLHandler::parseCommandLine(int argc, char **argv)
-{
-    //  add partner manually: start script with crb parameters
-    bool scan_script_name = false;
 
-    //  file which contains the host of the partner
-    bool scan_add_partner_host = false;
+void CTRLHandler::parseCommandLine(int argc, char **argv){
+po::options_description desc("usage");
+    desc.add_options()
+        ("help", "show this message")
+        ("iconify,i", "iconify map editor")
+        ("maximize,m", "maximize map editor")
+        ("quit,q", "quit after execution")
+        ("execute,e", "execute on loading")
+        ("user,u", po::value<std::string>(&m_options.localUserName), "scan local user")
+        ("timer,t", "activate timer")
+        ("X11,x", "start X11 user interface")
+        ("script", po::value<std::string>(&m_options.pyFile), "start script mode, executing Python script script.py")
+        ("CrbScript,s", po::value<std::string>(&m_options.crbLaunchScript), "Starts script with the manual message \"crb ...\" as parameter for every connection")
+        ("short,v", "print short version")
+        ("version", "print long version")
+        ("nogui", "don't start the userinterface when loading and executing a network")
+        ("gui", "start userinterface, even in scripting mode (specify as last argument)")
+        ("minigui", "start a minimal userinterface when loading and executing a network");
 
-    //  name of local user
-    bool scan_m_localUser = false;
-
-    for (int i = 1; i < argc; i++)
+    po::options_description hidden("");
+    hidden.add_options()("mapFile", "covise map(.net) or python(.py) file to load");
+    po::positional_options_description p;
+    p.add("mapFile", 1);
+    po::options_description all("");
+    all.add(desc).add(hidden);
+    po::variables_map vm;
+    try
     {
-        if (scan_add_partner_host)
+        po::store(po::command_line_parser(argc, argv).options(all).style(po_style::unix_style).run(), vm);
+        po::notify(vm);
+    }
+    catch (std::exception &e)
+    {
+        std::cerr << e.what() << std::endl;
+        std::cerr << desc << std::endl;
+        return;
+    }
+
+    if (vm.count("help"))
+    {
+        std::cerr << desc << std::endl;
+        exit(0);
+    }
+    if (vm.count("short"))
+    {
+        printf("%s\n", CoviseVersion::shortVersion());
+        exit(0);
+    }
+    if (vm.count("version"))
+    {
+        printf("%s\n", CoviseVersion::longVersion());
+        exit(0);
+    }
+    if (vm.count("timer"))
+    {
+        coTimer::init("timing", 2000);
+    }
+    if (vm.count("quit"))
+    {
+        m_options.quit = true;
+    }
+    if (vm.count("execute"))
+    {
+        m_options.execute = true;
+    }
+    if (vm.count("iconify"))
+    {
+        m_options.uiOptions.iconify = true;
+    }
+    if (vm.count("maximize"))
+    {
+        m_options.uiOptions.maximize = true;
+    }
+    if (vm.count("script")|| vm.count("X11"))
+    {
+        m_options.uiOptions.type = UIOptions::python;
+    }
+    if (vm.count("nogui"))
+    {
+        m_options.uiOptions.type = UIOptions::nogui;
+        m_options.execute = true;
+    }
+    if (vm.count("gui"))
+    {
+        m_options.uiOptions.type = UIOptions::gui;
+    }
+    if (vm.count("minigui"))
+    {
+        m_options.uiOptions.type = UIOptions::miniGui;
+        m_options.execute = true;
+    }
+    if (vm.count("mapFile"))
+    {
+        auto file = vm["mapFile"].as<std::vector<std::string>>()[0];
+        if (file.substr(file.find_last_of('.')) == ".net")
         {
-            //  argument: -p [m_filename]
-            //     file format: <hostname>\n<username>
-            m_filePartnerHost = argv[i];
-            scan_add_partner_host = 0;
+            m_options.netFile = file;
+            m_isLoaded = true;
         }
-
-        else if (scan_script_name)
+        else if (file.substr(file.find_last_of('.')) == ".py")
         {
-            //  argument: -s [m_filename]
-            //  Starts script with the manual message "crb ..." as parameter for
-            //  every connection
-            m_scriptName = argv[i];
-            scan_script_name = 0;
+            m_options.uiOptions.type = UIOptions::python;
+            m_options.uiOptions.pyFile = file;
         }
-
-        else if (scan_m_localUser)
-        {
-            //  argument: -u [username]
-            //  set user name for the host the controller is running on
-            m_localUser = argv[i];
-            scan_m_localUser = 0;
-        }
-
-        else if (argv[i][0] == '-')
-        {
-            //  options
-            switch (argv[i][1])
-            {
-            case 'i':
-            case 'I':
-                m_iconify = true;
-                break;
-            case 'm':
-            case 'M':
-
-                m_maximize = true;
-                break;
-            case 'p':
-            case 'P':
-
-//  initialize signal handler
-#if !defined(_WIN32) && !defined(__APPLE__) && !defined(__FreeBSD__)
-                signal(SIGPWR, sigHandler);
-#endif
-                scan_add_partner_host = 1;
-                break;
-
-            case 's':
-            case 'S':
-                m_startScript = 1;
-                scan_script_name = 1;
-                break;
-
-            case 'v':
-                printf("%s\n", CoviseVersion::shortVersion());
-                exit(0);
-                break;
-
-            case 'V':
-                printf("%s\n", CoviseVersion::longVersion());
-                exit(0);
-                break;
-
-            case 'e':
-            case 'E':
-                m_executeOnLoad = true;
-                break;
-            case 't':
-            {
-                //  activate timing
-                coTimer::init("timing", 2000);
-                break;
-            }
-            case 'u':
-            case 'U':
-            {
-                scan_m_localUser = 1;
-                break;
-            }
-            case 'q':
-            case 'Q':
-            {
-                m_quitAfterExececute = 1;
-                break;
-            }
-            case 'x':
-                m_xuif = 1;
-                break;
-
-            case '-':
-                if (strncmp(argv[i], "--script", 8) == 0)
-                {
-                    m_xuif = 1;
-                    m_useGUI = false;
-                    if ((argv[i + 1]) && (strncmp(argv[i + 1], "--", 2)))
-                    {
-                        m_pyFile = argv[i + 1];
-                        i++;
-                        break;
-                    }
-                }
-                else if (strncmp(argv[i], "--nogui", 7) == 0)
-                {
-                    m_useGUI = false;
-                    m_executeOnLoad = true;
-                    break;
-                }
-                else if (strncmp(argv[i], "--gui", 5) == 0)
-                {
-                    m_useGUI = true;
-                    break;
-                }
-
-                else if (strncmp(argv[i], "--minigui", 9) == 0)
-                {
-                    m_miniGUI = true;
-                    m_executeOnLoad = true;
-                    break;
-                }
-
-                else if (strncmp(argv[i], "--version", 9) == 0)
-                {
-                    printf("%s\n", CoviseVersion::longVersion());
-                    exit(0);
-                    break;
-                }
-                else
-                {
-                    if (strncmp(argv[i], "--help", 6) != 0)
-                        cerr << "Unrecognized Option -" << argv[i][1] << " \n";
-                    cerr << short_usage;
-                    cerr << long_usage;
-                    exit(-1);
-                }
-                break;
-
-            default:
-            {
-                cerr << "Unrecognized Option -" << argv[i][1] << " \n";
-                cerr << short_usage;
-                exit(-1);
-                break;
-            }
-            } //  end options switch
-        } //  end options if
-
-        else if (strlen(argv[i]) > 4)
-        {
-            if (strcmp(argv[i] + strlen(argv[i]) - 4, ".net") == 0)
-            {
-                m_netfile = argv[i];
-                m_isLoaded = true;
-            }
-
-            else if (strcmp(argv[i] + strlen(argv[i]) - 3, ".py") == 0 && m_useGUI)
-            {
-                m_xuif = 1;
-                m_pyFile = argv[i];
-            }
-        }
-
         else
         {
-            cerr << short_usage;
+            std::cerr << desc << std::endl;
+            std::cerr << "the provided filename has to a COVISE map file (.net) or a python script (.py)" << std::endl;
             exit(-1);
         }
-    } //  end arguments - for
+        if (!m_options.isLoaded && m_options.uiOptions.type == UIOptions::miniGui)
+        {
+            cerr << endl;
+            cerr << "***********************  E R R O R   **************************" << endl;
+            cerr << "Starting COVISE with a minimal user interface is only possible " << endl;
+            cerr << "with a network file (.net) given" << endl;
+            cerr << "***************************************************************" << endl;
+            exit(5);
+        }
 
-    if (!m_isLoaded && m_miniGUI)
-    {
-        cerr << endl;
-        cerr << "***********************  E R R O R   **************************" << endl;
-        cerr << "Starting COVISE with a minimal user interface is only possible " << endl;
-        cerr << "with a network file (.net) given" << endl;
-        cerr << "***************************************************************" << endl;
-        exit(5);
+        if (!m_options.isLoaded && m_options.uiOptions.type != UIOptions::miniGui)
+        {
+            cerr << endl;
+            cerr << "***********************  E R R O R   **************************" << endl;
+            cerr << "Starting COVISE without a user interface is only possible" << endl;
+            cerr << "with a network file (.net) given" << endl;
+            cerr << "***************************************************************" << endl;
+            exit(6);
+        }
+
+        
+        
     }
-
-    if (!m_isLoaded && !m_useGUI)
-    {
-        cerr << endl;
-        cerr << "***********************  E R R O R   **************************" << endl;
-        cerr << "Starting COVISE without a user interface is only possible" << endl;
-        cerr << "with a network file (.net) given" << endl;
-        cerr << "***************************************************************" << endl;
-        exit(6);
-    }
-
-    return 0;
 }
+
+
+
+
 
 //!
 //! start the request broker, the datamanager and the user interface
 //!
 void CTRLHandler::startCrbUiAndDatamanager()
 {
-
-    // read covise.config
-    Config = new ControlConfig;
 
     //  start crb (covise request broker)
     cerr << "* Starting local request broker...                                            *" << endl;
@@ -968,18 +866,16 @@ void CTRLHandler::startCrbUiAndDatamanager()
 
     //  start user interface
     cerr << "* Starting user interface....                                                 *" << endl;
-    string moduleinfo = CTRLGlobal::getInstance()->moduleList->create_modulelist();
-
     if (m_xuif == 1)
     {
-        CTRLGlobal::getInstance()->userinterfaceList->start_local_xuif(moduleinfo, m_pyFile);
+        CTRLGlobal::getInstance()->userinterfaceList->start_local_xuif(m_pyFile);
     }
     //else
     {
         if (m_useGUI)
-            CTRLGlobal::getInstance()->userinterfaceList->start_local_Mapeditor(moduleinfo);
+            CTRLGlobal::getInstance()->userinterfaceList->start_local_Mapeditor();
 #ifdef HAVE_GSOAP
-        CTRLGlobal::getInstance()->userinterfaceList->start_local_WebService(moduleinfo);
+        CTRLGlobal::getInstance()->userinterfaceList->start_local_WebService();
 #endif
     }
 
@@ -2635,48 +2531,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         else
             CTRLGlobal::getInstance()->userinterfaceList->sendError("A HOST SHOULD BE SPECIFIED !!!");
     }
-
-    //       UI::ADD_HOST
-    // ----------------------------------------------------------
-    else if(key == "HANDLE_PARTNERS")
-    {
-        using namespace std;
-        LaunchStyle launchStyle = static_cast<LaunchStyle>(stoi(list[iel++]));
-        function<void(int, const string&)> action;
-        switch (launchStyle)
-        {
-            case LaunchStyle::Host:
-            {
-                action = std::bind(&CTRLHandler::addHost, this, std::placeholders::_1, std::placeholders::_2);
-            }
-            break;
-            case LaunchStyle::Partner:
-            {
-                action = std::bind(&CTRLHandler::addPartner, this, std::placeholders::_1, std::placeholders::_2);
-            }
-            break;
-            case LaunchStyle::Disconnect:
-            {
-                action = std::bind(&CTRLHandler::removeClient, this, std::placeholders::_1, std::placeholders::_2);
-            }
-            break;
-
-            default:
-                break;
-        }
-        
-        bool completed = false;
-
-        string timeout = list[iel++];
-        int numPartners = std::stoi(list[iel++]);
-        
-        
-        for (size_t i = 0; i < numPartners; i++)
-        {
-            int clID = std::stoi(list[iel++]);
-            action(clID, timeout);
-        }
-    }
+  
     //       UI::NEW
     // ----------------------------------------------------------
 
@@ -2783,20 +2638,6 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             }
         }
     }
-    else if(key == "REQUEST_AVAILABLE_PARTNERS"){
-        vrbUpdate();
-        std::cerr << "vrb remote launchers requested:" << std::endl;
-        std::stringstream ss;
-        ss << "AVAILABLE_PARTNERS";
-        for(const auto &partner : m_remoteLauncher){
-            ss << "\n" << partner.ID() << "\n" << partner.userInfo().hostName;
-        }
-        ss << "\n";
-        Message tmpmsg{COVISE_MESSAGE_UI, ss.str()};
-        CTRLGlobal::getInstance()->userinterfaceList->send_all(&tmpmsg);
-        
-    }
-
     //       UI::DEFAULT
     // ----------------------------------------------------------
 
@@ -2806,48 +2647,84 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
     }
 }
 
-void CTRLHandler::addHost(int clID, const std::string&timeout){
-    bool completed = false;
-    auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
-        return cl.ID() == clID;
-    });
-    if (client != m_remoteLauncher.end())
+void CTRLHandler::handleNewUi(const NEW_UI &msg){
+    switch (msg.type)
     {
-        const char *hostname = client->userInfo().hostName.c_str();
-        if (!timeout.empty())
-            Config->set_timeout(hostname, timeout.c_str());
-
-        if (m_readConfig == false)
+    case NEW_UI_TYPE::HandlePartners:
+    {
+        std::cerr << "CTRLHANDLER::HandlePartners" << std::endl;
+        auto &handlePartnerMsg = msg.unpackOrCast<NEW_UI_HandlePartners>();
+        using namespace std;
+        function<void(const vrb::RemoteClient&)> action;
+        switch (handlePartnerMsg.launchStyle)
         {
-            int ret = CTRLGlobal::getInstance()->userinterfaceList->config_action("", hostname, client->userInfo().name);
-            if (ret)
+            case LaunchStyle::Host:
             {
-                m_readConfig = CTRLGlobal::getInstance()->userinterfaceList->add_config(m_filename, NULL);
-                if (m_readConfig == true)
-                    completed = true;
+                action = std::bind(&CTRLHandler::addHost, this, std::placeholders::_1);
+            }
+            break;
+            case LaunchStyle::Partner:
+            {
+                action = std::bind(&CTRLHandler::addPartner, this, std::placeholders::_1);
+            }
+            break;
+            case LaunchStyle::Disconnect:
+            {
+                action = std::bind(&CTRLHandler::removeClient, this, std::placeholders::_1);
+            }
+            break;
 
-                if (m_readConfig && m_isLoaded)
-                {
-                    m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_netfile);
-                    m_isLoaded = false;
-                }
+            default:
+                break;
+        }
+        m_remoteHostManager.handleAction(handlePartnerMsg);
+    }
+    break;
+    case NEW_UI_TYPE::RequestAvailablePartners:
+    {
+        m_remoteHostManager.uiUpdate();
+    }
+    default:
+        break;
+    }
+}
+
+
+void CTRLHandler::addHost(const vrb::RemoteClient &client){
+
+    bool completed = false;
+    const char *hostname = client.userInfo().hostName.c_str();
+    if (m_readConfig == false)
+    {
+        int ret = CTRLGlobal::getInstance()->userinterfaceList->config_action("", hostname, client.userInfo().name);
+        if (ret)
+        {
+            m_readConfig = CTRLGlobal::getInstance()->userinterfaceList->add_config(m_filename, NULL);
+            if (m_readConfig == true)
+                completed = true;
+
+            if (m_readConfig && m_isLoaded)
+            {
+                m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_netfile);
+                m_isLoaded = false;
             }
         }
-        else
+    }
+    else
+    {
+        coHostType htype(CO_HOST);
+        if (CTRLGlobal::getInstance()->hostList->add_host(client.userInfo().hostName, client.userInfo().name, "", htype))
         {
-            coHostType htype(CO_HOST);
-            if (CTRLGlobal::getInstance()->hostList->add_host(client->userInfo().hostName, client->userInfo().name, "", htype))
-            {
-                completed = 1;
-                if (!m_globalLoadReady)
-                    m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
+            completed = true;
+            if (!m_globalLoadReady)
+                m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
 
-                if (!m_clipboardReady)
-                    m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
-                // send infos about hosttype & ui status
-                sendCollaborativeState();
-            }
+            if (!m_clipboardReady)
+                m_clipboardReady = recreate(m_clipboardBuffer, CLIPBOARD);
+            // send infos about hosttype & ui status
+            sendCollaborativeState();
         }
+    }
 
 //  m_readConfig
     if (m_globalLoadReady && completed)
@@ -2879,33 +2756,16 @@ void CTRLHandler::addHost(int clID, const std::string&timeout){
             }
         }
     }
-
-    }
-    else
-    {
-        string text = "ADDHOST_FAILED\n" + client->userInfo().hostName  + "\n" + client->userInfo().name + "\nPassword\n";
-        Message *tmpmsg = new Message(COVISE_MESSAGE_UI, text);
-        CTRLGlobal::getInstance()->userinterfaceList->send_master(tmpmsg);
-
-        completed = false;
-    } //  add_host
 }
   
 
 
-void CTRLHandler::addPartner(int clID, const std::string&timeout){
-    auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
-        return cl.ID() == clID;
-    });
-    if (client != m_remoteLauncher.end())
+void CTRLHandler::addPartner(const vrb::RemoteClient &client){
         m_addPartner = false;
-        const char *hostname = client->userInfo().hostName.c_str();
+        const char *hostname = client.userInfo().hostName.c_str();
         if (hostname && strlen(hostname) > 0)
         {
-            if (!timeout.empty())
-                Config->set_timeout(hostname, timeout.c_str());
-
-            if (CTRLGlobal::getInstance()->userinterfaceList->add_partner(m_globalFilename, hostname, client->userInfo().name, m_scriptName))
+            if (CTRLGlobal::getInstance()->userinterfaceList->add_partner(m_globalFilename, hostname, client.userInfo().name, m_scriptName))
             {
                 if (!m_globalLoadReady)
                     m_globalLoadReady = CTRLGlobal::getInstance()->netList->load_config(m_globalFilename);
@@ -2919,7 +2779,7 @@ void CTRLHandler::addPartner(int clID, const std::string&timeout){
 
             else
             {
-                string text{"ADDPARTNER_FAILED\n" + string{hostname} + "\n" + client->userInfo().name + "\nPassword\n"};
+                string text{"ADDPARTNER_FAILED\n" + string{hostname} + "\n" + client.userInfo().name};
                 Message tmpmsg{COVISE_MESSAGE_UI, text};
                 CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
             }
@@ -2929,42 +2789,30 @@ void CTRLHandler::addPartner(int clID, const std::string&timeout){
 
         else
         {
-            string text = "ADDPARTNER_FAILED\nBad Hostname\n" + client->userInfo().name + "\nPassword\n";
+            string text = "ADDPARTNER_FAILED\nBad Hostname\n" + client.userInfo().name + "\nPassword\n";
             Message tmpmsg{COVISE_MESSAGE_UI, text};
             CTRLGlobal::getInstance()->userinterfaceList->send_master(&tmpmsg);
         }
 }
 
-void CTRLHandler::removeClient(int clID, const std::string&timeout){
+void CTRLHandler::removeClient(const vrb::RemoteClient &client){
         
-        
-    auto client = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [clID](const vrb::RemoteClient &cl){
-        return cl.ID() == clID;
-    });
-    if (client != m_remoteLauncher.end())
-        {
-            const std::string &hostname = client->userInfo().hostName;
-            const std::string &username = client->userInfo().name;
-            bool removed = false;
-            if (CTRLGlobal::getInstance()->userinterfaceList->rmv_partner(hostname, username))
-            {
-                removed = true;
-            }
-            if (CTRLGlobal::getInstance()->hostList->rmv_host(hostname, username))
-            {
-                removed = true;
-            }
-            if(!removed)
-            {
-                string text = "removeClient: HOSTNAME " + hostname + "NOT FOUND !!!";
-                CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
-            }
-        }
-
-        else
-        {
-            CTRLGlobal::getInstance()->userinterfaceList->sendError("VrbRemoteLauncher not found !!!");
-        }
+    const std::string &hostname = client.userInfo().hostName;
+    const std::string &username = client.userInfo().name;
+    bool removed = false;
+    if (CTRLGlobal::getInstance()->userinterfaceList->rmv_partner(hostname, username))
+    {
+        removed = true;
+    }
+    if (CTRLGlobal::getInstance()->hostList->rmv_host(hostname, username))
+    {
+        removed = true;
+    }
+    if(!removed)
+    {
+        string text = "removeClient: HOSTNAME " + hostname + "NOT FOUND !!!";
+        CTRLGlobal::getInstance()->userinterfaceList->sendError(text);
+    }
 }
 //!
 //! reset lists when NEW or OPEN was received
@@ -3687,127 +3535,6 @@ bool CTRLHandler::recreate(string content, readMode mode)
 
     return true;
 }
-
-int CTRLHandler::vrbClientID() 
-{
-    if (waitForVrbRegistration())
-    {
-        return m_client.ID();
-    }
-    return 0;
-}
-
-int CTRLHandler::getClientID(const std::string& hostAddress, const std::string&user_id) const{
-    auto cl = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [hostAddress, user_id](const vrb::RemoteClient &cl) {
-        return cl.userInfo().ipAdress == hostAddress && cl.userInfo().name == user_id;
-    });
-    if (cl != m_remoteLauncher.end())
-    {
-        return cl->ID();
-    }
-    return 0;
-}
-
-void CTRLHandler::sendLaunchRequest(int port, int moduleCount, const Host* rhost, bool proxy)
-{
-    vrb::Program p = vrb::Program::Controller;
-    if (proxy)
-    {
-        p = vrb::Program::ControllerProxy;
-    }
-    std::vector<std::string> args;
-    args.emplace_back(std::to_string(port));
-    args.emplace_back(m_client.userInfo().ipAdress);
-    args.emplace_back(std::to_string(moduleCount));
-    args.emplace_back(m_client.getCredentials().ipAddress);
-    args.emplace_back(std::to_string(m_client.getCredentials().tcpPort));
-    args.emplace_back(std::to_string(m_client.getCredentials().udpPort));
-    int clientID = getClientID(rhost->getAddress(), rhost->getName());
-    if(clientID == 0)
-    {
-        std::cerr << "sendLaunchRequest failed: VrbRemoteLauncher for " << rhost << " not found" << std::endl;
-        return;
-    }
-    vrb::sendLaunchRequestToRemoteLaunchers(vrb::VRB_MESSAGE{p, clientID, args}, &m_client);
-}
-
-bool CTRLHandler::waitForVrbRegistration() {
-    if (!m_client.isConnected())
-    {
-        m_clientRegistered = false;
-        m_remoteLauncher.clear();
-        if(!m_client.connectToServer())
-            return false;
-    }
-    if (m_clientRegistered)
-    {
-        return true;
-    }
-    Message msg;
-    if(m_client.wait(&msg, COVISE_MESSAGE_VRB_SET_USERINFO))
-        vrbClientsUpdate(msg);
-    return m_clientRegistered;
-}
-
-bool CTRLHandler::vrbUpdate() {
-    if (!m_clientRegistered && !waitForVrbRegistration())
-    {
-        return false;
-    }
-    Message msg;
-    bool retval = false;
-    while (m_client.poll(&msg)) {
-        switch (msg.type)
-        {
-        case COVISE_MESSAGE_VRB_SET_USERINFO:
-        {
-            vrbClientsUpdate(msg);
-            retval = true;
-        }
-        case COVISE_MESSAGE_VRB_QUIT:
-        {
-            TokenBuffer tb{ &msg };
-            int id;
-            tb >> id;
-            if (id != m_client.ID())
-            {
-                //std::remove_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const vrb::RemoteClient& cl) {return cl.ID() == id; });
-                auto clIt = std::find_if(m_remoteLauncher.begin(), m_remoteLauncher.end(), [id](const vrb::RemoteClient& cl) {return cl.ID() == id; });
-                if (clIt != m_remoteLauncher.end())
-                {
-                    m_remoteLauncher.erase(clIt);
-                }
-
-                retval = true;
-            }
-        }
-        break;
-        default:
-            std::cerr << "received vrb message" << std::endl;
-            break;
-        } 
-    }
-    return retval;
-}
-
-void CTRLHandler::vrbClientsUpdate(const Message &userInfoMessage) {
-    vrb::UserInfoMessage uim(&userInfoMessage);
-    if (uim.hasMyInfo)
-    {
-        m_clientRegistered = true;
-        m_client.setSession(uim.mySession);
-        m_client.setID(uim.myClientID);
-    }
-    for (auto& cl : uim.otherClients)
-    {
-        if (cl.userInfo().userType == vrb::Program::VrbRemoteLauncher)
-        {
-            m_remoteLauncher.insert(std::move(cl));
-        }
-    }
-}
-
-
 
 bool CTRLHandler::checkModule(const string &modname, const string &modhost)
 {

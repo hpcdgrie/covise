@@ -43,7 +43,7 @@ public:
        *  @param   name  the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(const string &name);
+    std::unique_ptr<AppModule> start_datamanager(const string &name);
 
     /**
        *  start datamanager on the remote host
@@ -53,7 +53,7 @@ public:
        *  @param   name      the name of the datamanager executable
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name);
+    std::unique_ptr<AppModule> start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name);
 
     /**
        *  start datamanager on the remote host
@@ -65,7 +65,7 @@ public:
        *                       for starting dtm.
        *  @return  object holding information about the connection to dtm.
        */
-    AppModule *start_datamanager(Host *rhost, const char *user, bool proxy, ExecType exec_type, const char *script_name = NULL);
+    std::unique_ptr<AppModule> start_datamanager(Host *rhost, const char *user, bool proxy, ExecType exec_type, const char *script_name = NULL);
 
     
     /**
@@ -79,7 +79,7 @@ public:
        *  @return  object holding info about the connection
        *           to the application module
        */
-    AppModule *start_applicationmodule(sender_type peer_type, const char *name, AppModule *dmod, const char *instance, 
+    std::unique_ptr<AppModule> start_applicationmodule(sender_type peer_type, const char *name, AppModule *dmod, const char *instance, 
                                        ExecFlag flags, const char *category = nullptr, const std::vector<std::string> &params = std::vector<std::string>{});
 
 
@@ -134,6 +134,9 @@ public:
        *                   towards the datamanager
        */
     void get_shared_memory(AppModule *dmod);
+    void get_shared_memory(covise::Connection *conn);
+
+
 
     void addConnection(Connection *conn);
 

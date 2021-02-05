@@ -5,18 +5,58 @@
 
  * License: LGPL 2+ */
 
+#include "control_remoteHost.h"
 #include <covise/covise.h>
 #include <covise/covise_process.h>
 #include <covise/covise_msg.h>
 #include <net/covise_socket.h>
 #include <net/covise_host.h>
-
 const int SIZEOF_IEEE_INT = 4;
 
 #include "CTRLHandler.h"
 #include "covise_module.h"
 
 using namespace covise;
+using namespace covise::controller;
+
+size_t controller::Module::moduleCount = 0;
+
+Module::Module(const RemoteHost&h,sender_type t, const std::string &name)
+:host(h)
+,type(t)
+,name(name)
+,id(moduleCount++)
+{
+
+}
+
+void Module::setConn(std::unique_ptr<Connection> &&conn){
+    m_conn = std::move(conn);
+}
+
+const Connection *Module::conn(){
+    return &*m_conn;
+}
+
+void Module::recv_msg(Message *msg)
+{
+    if (m_conn)
+    {
+        m_conn->recv_msg(msg);
+    }
+};
+
+bool Module::sendMessage(const Message *msg)
+{
+    if (m_conn)
+        return m_conn->sendMessage(msg);
+    return false;
+}
+
+bool Module::sendMessage(const UdpMessage *msg)
+{
+    return false;
+}
 
 bool AppModule::sendMessage(const Message *msg)
 {

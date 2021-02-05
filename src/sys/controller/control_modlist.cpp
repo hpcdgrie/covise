@@ -5,7 +5,6 @@
 
  * License: LGPL 2+ */
 
-
 #include <covise/covise.h>
 
 #ifdef _WIN32
@@ -85,12 +84,16 @@ string modulelist::create_modulelist()
     mod = this->next();
 
     ostringstream os;
-    os << "LIST\n" << mod->get_host() << "\n" << mod->get_user() << "\n" << count << "\n";
+    os << "LIST\n"
+       << mod->get_host() << "\n"
+       << mod->get_user() << "\n"
+       << count << "\n";
 
     this->reset();
     while ((mod = this->next()) != NULL)
     {
-        os << mod->get_name() << "\n" << mod->get_category() << "\n";
+        os << mod->get_name() << "\n"
+           << mod->get_category() << "\n";
     }
 
     string buffer = os.str();
@@ -214,24 +217,24 @@ AppModule *DM_data::get_DM()
     return dm;
 }
 
-int DM_data::start_crb(ExecType type, const string& host, const string& user, const string& script_name, coHostType& /*htype*/)
+int DM_data::start_crb(ExecType type, const string &host, const string &user, const string &script_name, coHostType & /*htype*/)
 {
 
-    CTRLGlobal* global = CTRLGlobal::getInstance();
+    CTRLGlobal *global = CTRLGlobal::getInstance();
 
     bool proxy = CTRLHandler::instance()->Config->getshminfo(host.c_str()) == COVISE_PROXIE;
 
-    Host* p_host = new Host(host.c_str());
+    Host *p_host = new Host(host.c_str());
 
-    if(type == ExecType::Local)
+    if (type == ExecType::Local)
     {
         dm = CTRLGlobal::getInstance()->controller->start_datamanager("crb");
-    } 
+    }
     else
     {
         dm = CTRLGlobal::getInstance()->controller->start_datamanager(p_host, user.c_str(), proxy, type, script_name.c_str());
     }
-    
+
     if (dm == NULL)
         return (0); // starting datamanager failed
 
@@ -267,7 +270,8 @@ int DM_data::start_crb(ExecType type, const string& host, const string& user, co
             text = text + partner_version + " from host " + host + " are different !!!";
             CTRLGlobal::getInstance()->userinterfaceList->sendWarning2m(text);
         }
-    } else
+    }
+    else
     {
         string text = "Controller WARNING : main covise version = " + main_version;
         text = text + " and the partner version = \"unknown\" from host " + host + " are different !!!";
@@ -278,7 +282,7 @@ int DM_data::start_crb(ExecType type, const string& host, const string& user, co
     string module_info;
     module_info.append(list_msg->data.data());
     module_info.insert(5, host + "\n" + user + "\n");
-    char* txt = new char[module_info.length() + 1];
+    char *txt = new char[module_info.length() + 1];
     strcpy(txt, module_info.c_str());
 
     list_msg->data = DataHandle{txt, module_info.length() + 1};
@@ -566,7 +570,8 @@ string rhost::get_DC_list()
     */
 
     ostringstream os;
-    os << "DC\n" << get_hostname() << "\n";
+    os << "DC\n"
+       << get_hostname() << "\n";
 
     int tmpi = intlist->get_default();
     os << tmpi << "\n";
@@ -628,7 +633,8 @@ int rhost::start_ctrl(ExecType type, const string &script_name, coHostType &htyp
         //  add Modules
         if (tmp_data->list_msg == NULL)
         {
-            cerr << endl << " ERROR: list_msg = NULL !!!\n";
+            cerr << endl
+                 << " ERROR: list_msg = NULL !!!\n";
             return 0;
         }
         string module_info = tmp_data->list_msg->data.data();
@@ -707,7 +713,8 @@ void rhost::send_ctrl_quit()
 
 void rhost::print(void)
 {
-    cerr << endl << " Host " << user << "@" << hostname << endl;
+    cerr << endl
+         << " Host " << user << "@" << hostname << endl;
 }
 
 //**********************************************************************
@@ -777,7 +784,8 @@ string rhost_list::get_hosts(const string &local_name, const string &local_user)
 
             i++;
 
-            buffer << tmp_host << "\n" << tmp_user;
+            buffer << tmp_host << "\n"
+                   << tmp_user;
 
             // if this host has a Userinterface
             if (tmp_host != "LOCAL" && CTRLGlobal::getInstance()->userinterfaceList->get(host->get_hostname()))
@@ -1013,7 +1021,8 @@ int rhost_list::rmv_host(const string &hostname, const string &user_id)
     }
 
     else
-        cerr << endl << "ERROR: rmv_host() list_msg  ==  NULL !!!" << endl;
+        cerr << endl
+             << "ERROR: rmv_host() list_msg  ==  NULL !!!" << endl;
 
     //  DC-info received from remote host
     string DC_info;
@@ -1112,8 +1121,8 @@ void rhost_list::print()
 //
 //**********************************************************************
 
-
-bool userinterface::sendMessage(const Message *msg) {
+bool userinterface::sendMessage(const Message *msg)
+{
     if (ui)
         return ui->send(msg);
 
@@ -1125,7 +1134,8 @@ bool userinterface::sendMessage(const Message *msg) {
     return false;
 }
 
-bool userinterface::sendMessage(const UdpMessage *msg) {
+bool userinterface::sendMessage(const UdpMessage *msg)
+{
     return false;
 }
 
@@ -1277,8 +1287,12 @@ int userinterface::restart()
     {
         cerr << mod->get_name() << endl;
         ostringstream mybuf;
-        mybuf << "INIT\n" << mod->get_name() << "\n" << mod->get_nr() << "\n";
-        mybuf << mod->get_host() << "\n" << mod->get_x_pos() << "\n" << mod->get_y_pos() << "\n";
+        mybuf << "INIT\n"
+              << mod->get_name() << "\n"
+              << mod->get_nr() << "\n";
+        mybuf << mod->get_host() << "\n"
+              << mod->get_x_pos() << "\n"
+              << mod->get_y_pos() << "\n";
         tmp_msg = new Message(COVISE_MESSAGE_UI, mybuf.str());
         ui->send(tmp_msg);
         delete tmp_msg;
@@ -1294,8 +1308,11 @@ int userinterface::restart()
         delete tmp_msg;
 
         ostringstream oss;
-        oss << "MODULE_TITLE\n" << mod->get_name() << "\n" << mod->get_nr() << "\n";
-        oss << mod->get_host() << "\n" << mod->get_title() << "\n";
+        oss << "MODULE_TITLE\n"
+            << mod->get_name() << "\n"
+            << mod->get_nr() << "\n";
+        oss << mod->get_host() << "\n"
+            << mod->get_title() << "\n";
         tmp_msg = new Message(COVISE_MESSAGE_UI, oss.str());
         ui->send(tmp_msg);
         delete tmp_msg;
@@ -1321,16 +1338,25 @@ int userinterface::restart()
             }
 
             ostringstream stream;
-            stream << "PARAM_RESTART\n" << mod->get_name() << "\n" << mod->get_nr() << "\n" << mod->get_host() << "\n"
-                   << name_list[i] << "\n" << type_list[i] << "\n" << value;
+            stream << "PARAM_RESTART\n"
+                   << mod->get_name() << "\n"
+                   << mod->get_nr() << "\n"
+                   << mod->get_host() << "\n"
+                   << name_list[i] << "\n"
+                   << type_list[i] << "\n"
+                   << value;
             Message *msg2 = new Message(COVISE_MESSAGE_UI, stream.str());
             ui->send(msg2);
             delete msg2;
 
             // send ADD_PANEL
             ostringstream mybuf2;
-            mybuf2 << "ADD_PANEL\n" << mod->get_name() << "\n" << mod->get_nr() << "\n" << mod->get_host() << "\n";
-            mybuf2 << name_list[i] << "\n" << panel_list[i];
+            mybuf2 << "ADD_PANEL\n"
+                   << mod->get_name() << "\n"
+                   << mod->get_nr() << "\n"
+                   << mod->get_host() << "\n";
+            mybuf2 << name_list[i] << "\n"
+                   << panel_list[i];
             msg2 = new Message(COVISE_MESSAGE_UI, mybuf2.str());
             CTRLGlobal::getInstance()->userinterfaceList->send_all(msg2);
             delete msg2;
@@ -1348,7 +1374,9 @@ int userinterface::restart()
         if (!buffer.empty() || i != 0)
         {
             ostringstream mybuf2;
-            mybuf2 << "OBJCONN2\n" << i << "\n" << buffer;
+            mybuf2 << "OBJCONN2\n"
+                   << i << "\n"
+                   << buffer;
             Message *tmp_msg = new Message(COVISE_MESSAGE_UI, mybuf2.str());
             ui->send(tmp_msg);
             delete tmp_msg;
@@ -1561,102 +1589,78 @@ userinterface *ui_list::get_master()
     return tmp;
 }
 
-int ui_list::start_local_Mapeditor(const string &moduleinfo)
+bool ui_list::start_local_Mapeditor()
 {
-    (void)moduleinfo;
-
-    DM_data *tmp_dm = CTRLGlobal::getInstance()->dataManagerList->get_local();
-
-    string local_user = tmp_dm->get_user();
-    string local_name = tmp_dm->get_hostname();
-
     userinterface *local = new UIMapEditor;
 
-    local->set_host(local_name);
-    local->set_userid(local_user);
-    local->set_status("MASTER");
-    int ret = local->start(false);
-    if (ret == 0)
+    setLocalUIParams(local);
+    if (local->start(false))
     {
-        delete local;
-        return 0;
-    }
+        addLocalUi(local);
+        if (iconify)
+        {
+            Message msg {COVISE_MESSAGE_UI, "ICONIFY"};
+            local->send(&msg);
+        }
 
-    this->locals.push_back(local);
-    add(local);
-
-    if (iconify)
-    {
-        Message *msg = new Message(COVISE_MESSAGE_UI, "ICONIFY");
-        local->send(msg);
-        delete msg;
-    }
-
-    if (maximize)
-    {
+        if (maximize)
+        {
 #ifndef _AIRBUS
-        Message *msg = new Message(COVISE_MESSAGE_UI, "MAXIMIZE");
+            Message msg{COVISE_MESSAGE_UI, "MAXIMIZE"};
 #else
-        Message *msg = new Message(COVISE_MESSAGE_UI, "PREPARE_CSCW");
+            Message msg{COVISE_MESSAGE_UI, "PREPARE_CSCW"};
 #endif
-        local->send(msg);
-        delete msg;
+            local->send(&msg);
+        }
+        return true;
     }
-    return 1;
+    return false;
+
+    
 }
 
-int ui_list::start_local_WebService(const string &moduleinfo)
+bool ui_list::start_local_WebService()
 {
-    (void)moduleinfo;
-
-    DM_data *tmp_dm = CTRLGlobal::getInstance()->dataManagerList->get_local();
-
-    string local_name = tmp_dm->get_hostname();
-    string local_user = tmp_dm->get_user();
-
     userinterface *local = new UISoap;
 
-    local->set_host(local_name);
-    local->set_userid(local_user);
-    local->set_status("MASTER");
-    int ret = local->start(false);
-    if (ret == 0)
+    setLocalUIParams(local);
+
+    if (local->start(false))
     {
-        delete local;
-        return 0;
+        addLocalUi(local);
+        return true;
     }
-
-    this->locals.push_back(local);
-    add(local);
-
-    return 1;
+    return false;
 }
 
 // test by RM
-int ui_list::start_local_xuif(const string &moduleinfo, const string &pyFile)
+bool ui_list::start_local_xuif(const string &pyFile)
 {
-    (void)moduleinfo;
 
+    userinterface *local = new UIMapEditor;
+    setLocalUIParams(local);
+    if (local->xstart(pyFile))
+    {
+        addLocalUi(local);
+        return true;
+    }
+    return false;
+}
+
+void ui_list::setLocalUIParams(userinterface *localUi)
+{
     DM_data *tmp_dm = CTRLGlobal::getInstance()->dataManagerList->get_local();
     string local_name = tmp_dm->get_hostname();
     string local_user = tmp_dm->get_user();
+    localUi->set_host(local_name);
+    localUi->set_userid(local_user);
+    localUi->set_status("MASTER");
+}
 
-    userinterface *local = new UIMapEditor;
-
-    local->set_host(local_name);
-    local->set_userid(local_user);
-    local->set_status("MASTER");
-    int ret = local->xstart(pyFile);
-    if (ret == 0)
-    {
-        delete local;
-        return 0;
-    }
-
+void ui_list::addLocalUi(userinterface *localUi)
+{
     this->locals.push_back(local);
     add(local);
-
-    return 1;
 }
 
 // test by RM end
@@ -1712,8 +1716,8 @@ bool ui_list::add_config(const string &file, const string &mapfile)
                     break;
                 }
             }
-            if ((test == false) && 
-            ( ((CTRLHandler::instance()->Config->getexectype(host) == ExecType::VRB) ||CTRLHandler::instance()->Config->getexectype(host) == ExecType::Manual) || (CTRLHandler::instance()->Config->getexectype(host) == ExecType::Script)))
+            if ((test == false) &&
+                (((CTRLHandler::instance()->Config->getexectype(host) == ExecType::VRB) || CTRLHandler::instance()->Config->getexectype(host) == ExecType::Manual) || (CTRLHandler::instance()->Config->getexectype(host) == ExecType::Script)))
             {
                 if (!config_action(mapfile, host, userid))
                 {
@@ -1784,7 +1788,10 @@ bool ui_list::slave_update()
             if (disp)
             {
                 ostringstream os;
-                os << "UPDATE\n" << name << "\n" << inst << "\n" << hostname << "\n";
+                os << "UPDATE\n"
+                   << name << "\n"
+                   << inst << "\n"
+                   << hostname << "\n";
                 Message *msg = new Message(COVISE_MESSAGE_RENDER, os.str());
                 disp->send_message(msg);
                 delete msg;
@@ -1868,8 +1875,12 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
     while ((mod = CTRLGlobal::getInstance()->netList->next()) != NULL)
     {
         ostringstream mybuf;
-        mybuf << "INIT\n" << mod->get_name() << "\n" << mod->get_nr() << "\n";
-        mybuf << mod->get_host() << "\n" << mod->get_x_pos() << "\n" << mod->get_y_pos() << "\n";
+        mybuf << "INIT\n"
+              << mod->get_name() << "\n"
+              << mod->get_nr() << "\n";
+        mybuf << mod->get_host() << "\n"
+              << mod->get_x_pos() << "\n"
+              << mod->get_y_pos() << "\n";
         tmp_msg = new Message(COVISE_MESSAGE_UI, mybuf.str());
         tmp->send(tmp_msg);
         delete tmp_msg;
@@ -1885,8 +1896,11 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
         delete tmp_msg;
 
         ostringstream oss;
-        oss << "MODULE_TITLE\n" << mod->get_name() << "\n" << mod->get_nr() << "\n";
-        oss << mod->get_host() << "\n" << mod->get_title() << "\n";
+        oss << "MODULE_TITLE\n"
+            << mod->get_name() << "\n"
+            << mod->get_nr() << "\n";
+        oss << mod->get_host() << "\n"
+            << mod->get_title() << "\n";
         tmp_msg = new Message(COVISE_MESSAGE_UI, oss.str());
         tmp->send(tmp_msg);
         delete tmp_msg;
@@ -1912,8 +1926,13 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
             }
 
             ostringstream stream;
-            stream << "PARAM_ADD\n" << mod->get_name() << "\n" << mod->get_nr() << "\n" << mod->get_host() << "\n"
-                   << name_list[i] << "\n" << type_list[i] << "\n" << value;
+            stream << "PARAM_ADD\n"
+                   << mod->get_name() << "\n"
+                   << mod->get_nr() << "\n"
+                   << mod->get_host() << "\n"
+                   << name_list[i] << "\n"
+                   << type_list[i] << "\n"
+                   << value;
 
             Message *msg2 = new Message(COVISE_MESSAGE_UI, stream.str());
             tmp->send(msg2);
@@ -1921,8 +1940,12 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
 
             // send ADD_PANEL
             ostringstream mybuf;
-            mybuf << "ADD_PANEL\n" << mod->get_name() << "\n" << mod->get_nr() << "\n" << mod->get_host() << "\n";
-            mybuf << name_list[i] << "\n" << panel_list[i];
+            mybuf << "ADD_PANEL\n"
+                  << mod->get_name() << "\n"
+                  << mod->get_nr() << "\n"
+                  << mod->get_host() << "\n";
+            mybuf << name_list[i] << "\n"
+                  << panel_list[i];
             msg2 = new Message(COVISE_MESSAGE_UI, mybuf.str());
             CTRLGlobal::getInstance()->userinterfaceList->send_all(msg2);
             delete msg2;
@@ -1939,7 +1962,9 @@ int ui_list::add_partner(const string &filename, const string &host, const strin
         if (!buffer.empty() || i != 0)
         {
             ostringstream text;
-            text << "OBJCONN2\n" << i << "\n" << buffer;
+            text << "OBJCONN2\n"
+                 << i << "\n"
+                 << buffer;
             Message *tmp_msg = new Message(COVISE_MESSAGE_UI, text.str());
             tmp->send(tmp_msg);
             delete tmp_msg;
@@ -2184,7 +2209,8 @@ void ui_list::update_ui(userinterface *ui)
                 ui->send(&ui_msg);
             }
             else
-                cerr << endl << "Controller ERROR : NULL list_msg !!!\n";
+                cerr << endl
+                     << "Controller ERROR : NULL list_msg !!!\n";
             p_data = CTRLGlobal::getInstance()->dataManagerList->next();
         }
 
@@ -2197,7 +2223,7 @@ void ui_list::update_ui(userinterface *ui)
             DC_info = p_host->get_DC_list();
             if (!DC_info.empty())
             {
-                ui_msg.data = DataHandle{ (char*)DC_info, strlen(DC_info) + 1, false };
+                ui_msg.data = DataHandle{(char *)DC_info, strlen(DC_info) + 1, false};
                 ui->send(&ui_msg);
             }
             p_host = CTRLGlobal::getInstance()->hostList->next();
@@ -2261,12 +2287,16 @@ void uif::start(AppModule *dmod, const string &execname, const string &category,
     // Auswertung ueberfluessig. evtl. im UIF-Teil das Versenden weglassen
     // im RenderModule: send status-Message MASTER/SLAVE
     ostringstream os;
-    os << key << "\nUIFINFO\n" << name << "\n" << instanz << "\n" << host << "\nSTATUS\n" << status << "\n";
+    os << key << "\nUIFINFO\n"
+       << name << "\n"
+       << instanz << "\n"
+       << host << "\nSTATUS\n"
+       << status << "\n";
     string data = os.str();
 
     char *tmp = new char[data.length() + 1];
     strcpy(tmp, data.c_str());
-    msg->data = DataHandle{ tmp, strlen(tmp) + 1 };
+    msg->data = DataHandle{tmp, strlen(tmp) + 1};
     msg->type = COVISE_MESSAGE_GENERIC;
     applmod->send(msg);
 
@@ -2505,7 +2535,11 @@ void modui::set_new_status()
 
         // neuen Status verschicken
         ostringstream os;
-        os << key << "\nUIFINFO\n" << name << "\n" << instanz << "\n" << host << "\nSTATUS\n" << new_status << "\n";
+        os << key << "\nUIFINFO\n"
+           << name << "\n"
+           << instanz << "\n"
+           << host << "\nSTATUS\n"
+           << new_status << "\n";
         Message *msg = new Message(COVISE_MESSAGE_GENERIC, os.str());
         tmp_uif->send_msg(msg);
         delete msg;
@@ -2638,3 +2672,278 @@ void modui_list::set_new_status()
         tmp_modui->set_new_status();
     };
 }
+
+
+//----------------------------------------------------------------
+//CONTROLLER
+//----------------------------------------------------------------
+namespace covise{
+namespace controller{
+
+
+userinterface::userinterface(const RemoteHost& h, const std::string&name)
+: Module(h, sender_type::USERINTERFACE, name)
+, status("INIT")
+{
+}
+
+int userinterface::restart(const Module &crb)
+{
+    start(crb, true);
+
+    // send current net to UIF
+    // send current controller information to ui
+    Message msg{COVISE_MESSAGE_UI, "START_READING\n"};
+    send(&msg);
+
+    // loop over all modules
+
+    net_module *mod;
+    CTRLGlobal::getInstance()->netList->reset();
+    while ((mod = CTRLGlobal::getInstance()->netList->next()) != NULL)
+    {
+        cerr << mod->get_name() << endl;
+        ostringstream mybuf;
+        mybuf << "INIT\n"
+              << mod->get_name() << "\n"
+              << mod->get_nr() << "\n";
+        mybuf << mod->get_host() << "\n"
+              << mod->get_x_pos() << "\n"
+              << mod->get_y_pos() << "\n";
+        msg = Message{COVISE_MESSAGE_UI, mybuf.str()};
+        send(&msg);
+
+        ostringstream os;
+        os << "DESC\n";
+        module *mymod = mod->get_type();
+        if (mymod)
+            os << mymod->create_descr();
+
+        msg = Message{COVISE_MESSAGE_UI, os.str()};
+        send(&msg);
+
+        ostringstream oss;
+        oss << "MODULE_TITLE\n"
+            << mod->get_name() << "\n"
+            << mod->get_nr() << "\n";
+        oss << mod->get_host() << "\n"
+            << mod->get_title() << "\n";
+        msg = Message{COVISE_MESSAGE_UI, oss.str()};
+        send(&msg);
+
+        // send current parameter
+        // only input parameter
+
+        vector<string> name_list;
+        vector<string> type_list;
+        vector<string> val_list;
+        vector<string> panel_list;
+        int n_pc = mod->get_inpars_values(&name_list, &type_list, &val_list, &panel_list);
+
+        // loop over all input parameters
+        for (int i = 0; i < n_pc; i++)
+        {
+            string value = val_list[i];
+
+            if (type_list[i] == "Browser")
+            {
+                CTRLHandler::instance()->handleBrowserPath(mod->get_name(), mod->get_nr(), mod->get_host(),
+                                                           mod->get_host(), name_list[i], value);
+            }
+
+            ostringstream stream;
+            stream << "PARAM_RESTART\n"
+                   << mod->get_name() << "\n"
+                   << mod->get_nr() << "\n"
+                   << mod->get_host() << "\n"
+                   << name_list[i] << "\n"
+                   << type_list[i] << "\n"
+                   << value;
+            Message msg2{COVISE_MESSAGE_UI, stream.str()};
+            send(&msg2);
+
+            // send ADD_PANEL
+            ostringstream mybuf2;
+            mybuf2 << "ADD_PANEL\n"
+                   << mod->get_name() << "\n"
+                   << mod->get_nr() << "\n"
+                   << mod->get_host() << "\n";
+            mybuf2 << name_list[i] << "\n"
+                   << panel_list[i];
+            msg2 = Message{COVISE_MESSAGE_UI, mybuf2.str()};
+            for(const auto &module : host)
+            {
+                if (module.type == USERINTERFACE)
+                {
+                    module.send(&msg2);
+                }
+                        }
+            CTRLGlobal::getInstance()->userinterfaceList->send_all&(msg2);
+        }
+    }
+
+    // send connection informations
+    object *tmp_obj;
+
+    CTRLGlobal::getInstance()->objectList->reset();
+    while ((tmp_obj = CTRLGlobal::getInstance()->objectList->next()) != NULL)
+    {
+        int i = 0;
+        string buffer = tmp_obj->get_simple_connection(&i);
+        if (!buffer.empty() || i != 0)
+        {
+            ostringstream mybuf2;
+            mybuf2 << "OBJCONN2\n"
+                   << i << "\n"
+                   << buffer;
+            Message *tmp_msg = new Message(COVISE_MESSAGE_UI, mybuf2.str());
+            ui->send(tmp_msg);
+            delete tmp_msg;
+        }
+    }
+
+    //
+    // send end message to UIF
+    //
+    tmp_msg = new Message(COVISE_MESSAGE_UI, "END_READING\ntrue");
+    ui->send(tmp_msg);
+    delete tmp_msg;
+
+    return (1);
+}
+
+UIMapEditor::UIMapEditor(const RemoteHost& h)
+    : userinterface(h, "mapeditor")
+{
+}
+
+int UIMapEditor::start(const Module &crb, bool restart) // if restart is true a restart was done
+{
+    constexpr char *instance = "001";
+
+   
+    int port;
+    std::unique_ptr<ServerConnection> conn{new ServerConnection(&port, id, CONTROLLER)};
+    if (!conn->is_connected())
+        return false;
+    conn->listen();
+   
+
+    
+    CRB_EXEC crbExec{ExecFlag::Normal, name.c_str(), port, host.userInfo().ipAdress.c_str(), static_cast<int>(id), instance, 
+                     crb.host.userInfo().ipAdress.c_str(), crb.host.userInfo().name.c_str(),  
+                     nullptr, host.ID(), vrb::VrbCredentials{}, std::vector<std::string>{}};
+    
+    int timeout = 0; // do not timeout
+
+    // start renderer (OPENSG) inside the mapeditor
+    auto mapeditor = crb.host.getModule(sender_type::USERINTERFACE);
+    sendCoviseMessage(crbExec, *const_cast<Module*>(&crb));
+
+    if (conn->acceptOne(timeout) < 0)
+    {
+        cerr << "* timelimit in accept for module " << name << " exceeded!!" << endl;
+        return false;
+    }
+    setConn(std::move(conn));
+    std::unique_ptr<AppModule> mod(new AppModule(conn, module_count - 1, name, rhost));
+    covise::Process::this_process->getConnectionList()->add(conn.release());
+    list_of_connections->add(conn);
+    mod->set_peer(module_count, peer_type);
+    if (ui == NULL)
+        return 0;
+    if (ui->connect(dmod) == 0)
+        return 0;
+
+    // send status-Message
+    string tmp = status;
+    if (restart)
+        tmp.append("_RESTART");
+
+    if (CTRLHandler::instance()->m_miniGUI)
+        tmp.append("\nMINI_GUI");
+
+    Message *msg = new Message(COVISE_MESSAGE_UI, tmp);
+    ui->send(msg);
+    delete msg;
+
+    CTRLGlobal::getInstance()->userinterfaceList->update_ui(this);
+
+    // wait for OK from Mapeditor
+
+    msg = new Message;
+    recv_msg(msg);
+
+    if (msg->type == COVISE_MESSAGE_MSG_OK)
+    {
+        if (msg->data.data())
+        {
+            msg->type = COVISE_MESSAGE_UI;
+            dmod->send(msg); //message for CRB that an embedded renderer is possible
+        }
+
+        delete msg;
+        return 1;
+    }
+
+    delete msg;
+    return 0;
+}
+
+int UISoap::start(bool)
+{
+    string instance("ws0001");
+
+    // get Datamanager for host
+    DM_data *tmp_data = CTRLGlobal::getInstance()->dataManagerList->get(hostname);
+    if (tmp_data == NULL)
+        return 0;
+
+    AppModule *dmod = tmp_data->get_DM();
+    if (dmod == 0)
+        return 0;
+
+    //Determine from config whether to use WSInterface
+    bool ws_enabled = covise::coConfig::getInstance()->getBool("System.WSInterface", true);
+    if (ws_enabled)
+    {
+        ui = CTRLGlobal::getInstance()->controller->start_applicationmodule(USERINTERFACE, "wsinterface", dmod, instance.c_str(), ExecFlag::Normal);
+    }
+    else
+    {
+        ui = 0;
+    }
+
+    if (ui == 0)
+        return 0;
+
+    if (ui->connect(dmod) == 0)
+        return 0;
+
+    // send status-Message
+    string tmp = status;
+    tmp.append("\n");
+
+    Message *msg = new Message(COVISE_MESSAGE_UI, tmp);
+    ui->send(msg);
+    delete msg;
+
+    CTRLGlobal::getInstance()->userinterfaceList->update_ui(this);
+
+    // wait for OK from Mapeditor
+
+    msg = new Message;
+    recv_msg(msg);
+
+    if (msg->type == COVISE_MESSAGE_MSG_OK)
+    {
+        delete msg;
+        return 1;
+    }
+
+    delete msg;
+    return 0;
+}
+
+}//controller
+}//covise

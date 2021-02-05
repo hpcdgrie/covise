@@ -14,7 +14,39 @@
 #include <net/message_sender_interface.h>
 namespace covise
 {
+namespace controller{
 
+struct RemoteHost;
+
+struct Module : MessageSenderInterface{
+    Module(const RemoteHost&host, sender_type t, const std::string &name);
+    virtual ~Module() = default;
+    const size_t id; 
+    const sender_type type;
+    const std::string name;
+    const RemoteHost &host;
+    template <typename T>
+    const T *as()
+    {
+        if (type == T::type)
+        {
+            return dynamic_cast<T>(this);
+        }
+        return nullptr;
+    }
+    void setConn(std::unique_ptr<Connection> &&conn);
+    const Connection *conn();
+    void recv_msg(Message *msg);
+    static ConnectionList connectionList;
+
+protected:
+    virtual bool sendMessage(const Message *msg) override;
+    virtual bool sendMessage(const UdpMessage *msg) override;
+private:
+    std::unique_ptr<Connection> m_conn; // connection to this other module
+    static size_t moduleCount;
+};
+} // namespace controller
 class AppModule : public MessageSenderInterface// class that represents other modules or processes
 {
 private:

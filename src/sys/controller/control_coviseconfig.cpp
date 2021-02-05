@@ -25,32 +25,30 @@
 
 using namespace covise;
 
-#define DEFAULT_TIMEOUT 30
 
 //----------------------------------------------------------------------------
-void ControlConfig::addhostinfo(const std::string &name, int s_mode, ExecType e_mode, int t)
+void ControlConfig::addhostinfo(const HostMap::iterator &host, ShmMode s_mode, ExecType e_mode, int t)
 //----------------------------------------------------------------------------
 {
-    //std::cerr << "adding host info for " << name << std::endl;
-    if (!name.empty())
-    {
-        auto &h = hostMap[name];
-        h.exectype = e_mode;
-        h.shminfo = s_mode;
-        h.display = NULL;
-        h.timeout = t;
-    }
+    host->second.exectype = e_mode;
+    host->second.shmMode = s_mode;
+    host->second.display = nullptr;
+    host->second.timeout = t;
 }
 
 //----------------------------------------------------------------------------
-char *ControlConfig::getDisplayIP(const covise::Host &h)
+const char *ControlConfig::getDisplayIP(const covise::Host &h)
 //----------------------------------------------------------------------------
 {
-    getOrCreateHostInfo(h.getName());
-
-    return hostMap[h.getName()].display;
+    return getDisplayIP(h.getName());
 }
 
+const char *ControlConfig::getDisplayIP(const char* hostName)
+//----------------------------------------------------------------------------
+{
+    auto it = getOrCreateHostInfo(hostName);
+    return it->second.display;
+}
 
 ControlConfig::HostMap::iterator ControlConfig::getOrCreateHostInfo(const std::string &name)
 {
@@ -60,33 +58,28 @@ ControlConfig::HostMap::iterator ControlConfig::getOrCreateHostInfo(const std::s
         return it;
     }
     it = hostMap.insert(HostMap::value_type{name, HostMap::value_type::second_type{}}).first;
-    it->second.timeout = DEFAULT_TIMEOUT;
-    it->second.exectype = ExecType::VRB;
-    it->second.display = NULL;
-    it->second.shminfo = COVISE_SHM;
-
-    addhostinfo_from_config(name);
+    addhostinfo_from_config(it);
 
     return it;
 }
 
 
 //----------------------------------------------------------------------------
-int ControlConfig::set_shminfo(const std::string &n, const char *shm_info)
+ShmMode ControlConfig::set_shminfo(const std::string &n, const char *shm_info)
 //----------------------------------------------------------------------------
 {
     HostMap::iterator it = getOrCreateHostInfo(n);
 
-    int s_info = COVISE_SHM;
+    int s_info;
     int retval = sscanf(shm_info, "%d", &s_info);
     if (retval != 1)
     {
         std::cerr << "ControlConfig::set_shminfo_ip: sscanf failed" << std::endl;
     }
 
-    it->second.shminfo = s_info;
+    it->second.shmMode = static_cast<ShmMode>(s_info);
 
-    return (s_info);
+    return it->second.shmMode;
 }
 
 //----------------------------------------------------------------------------
@@ -162,66 +155,56 @@ int covise::ControlConfig::gettimeout(const covise::Host & h)
 }
 
 //----------------------------------------------------------------------------
-int ControlConfig::getshminfo(const std::string &n)
+ShmMode ControlConfig::getshmMode(const std::string &hostName)
 //----------------------------------------------------------------------------
 {
-    return getOrCreateHostInfo(n)->second.shminfo;
+    return getOrCreateHostInfo(hostName)->second.shmMode;
 }
 
-void ControlConfig::addhostinfo_from_config(const std::string &name)
+void ControlConfig::addhostinfo_from_config(const HostMap::iterator &host)
 {
-	std::string shm_mode, exec_mode;
-    int s_mode, tim;
-    ExecType e_mode;
-
     /// default values
 
-    char key[1024];
-    snprintf(key, sizeof(key), "System.HostConfig.Host:%s", name.c_str());
-    for (int i = (int)strlen("System.HostConfig.Host:"); key[i]; i++)
-    {
-        if (key[i] == '.')
-            key[i] = '_';
-    }
-	tim = coCoviseConfig::getInt("timeout", key, DEFAULT_TIMEOUT);
-	shm_mode = coCoviseConfig::getEntry("memory", key, "shm");
-	exec_mode = coCoviseConfig::getEntry("method", key, "ssh");
+    std::string key = "System.HostConfig.Host:%s" + host->first;
+    host->second.timeout = coCoviseConfig::getInt("timeout", key, DEFAULT_TIMEOUT);
+    host->second.timeout = host->second.timeout == 0 ? DEFAULT_TIMEOUT : host->second.timeout;
+    std ::string shm_mode = coCoviseConfig::getEntry("memory", key, "shm");
+    std ::string exec_mode = coCoviseConfig::getEntry("method", key, "ssh");
 
-    s_mode = COVISE_SHM;
+
     if (strcasecmp(shm_mode.c_str(), "shm") == 0 || strcasecmp(shm_mode.c_str(), "sysv") == 0)
     {
-        s_mode = COVISE_SHM;
+        host->second.shmMode = ShmMode::Default;
     }
     else if (strcasecmp(shm_mode.c_str(), "posix") == 0)
     {
-        s_mode = COVISE_POSIX;
+        host->second.shmMode = ShmMode::Posix;
     }
     else if (strcasecmp(shm_mode.c_str(), "mmap") == 0)
     {
-        s_mode = COVISE_MMAP;
+        host->second.shmMode = ShmMode::MMap;
     }
     else if (strcasecmp(shm_mode.c_str(), "none") == 0)
     {
-        s_mode = COVISE_NOSHM;
+        host->second.shmMode = ShmMode::NoShm;
     }
     else if (strcasecmp(shm_mode.c_str(), "noshm") == 0)
     {
-        s_mode = COVISE_NOSHM;
+        host->second.shmMode = ShmMode::NoShm;
     }
     else if (strcasecmp(shm_mode.c_str(), "cray") == 0)
     {
-        s_mode = COVISE_NOSHM;
+        host->second.shmMode = ShmMode::NoShm;
     }
     else if (strcasecmp(shm_mode.c_str(), "proxie") == 0)
     {
-        s_mode = COVISE_PROXIE;
+        host->second.shmMode = ShmMode::Proxie;
     }
     else
     {
-        print_error(__LINE__, __FILE__, "Wrong memory mode %s for %s, should be shm, mmap, or none (covise.config)! Using default shm", shm_mode.c_str(), name.c_str());
+        print_error(__LINE__, __FILE__, "Wrong memory mode %s for %s, should be shm, mmap, or none (covise.config)! Using default shm", shm_mode.c_str(), host->first.c_str());
         fflush(stderr);
     }
-    e_mode = ExecType::VRB;
     if (strcasecmp(exec_mode.c_str(), "rexec") == 0 ||
         strcasecmp(exec_mode.c_str(), "rsh") == 0 ||
         strcasecmp(exec_mode.c_str(), "ssh") == 0 ||
@@ -235,19 +218,19 @@ void ControlConfig::addhostinfo_from_config(const std::string &name)
     }
     else if (strcasecmp(exec_mode.c_str(), "manual") == 0)
     {
-        e_mode = ExecType::Manual;
+        host->second.exectype = ExecType::Manual;
     }
     else if (strcasecmp(exec_mode.c_str(), "vrb") == 0)
     {
-        e_mode = ExecType::VRB;
+        host->second.exectype = ExecType::VRB;
+    }
+    else if (strcasecmp(exec_mode.c_str(), "script") == 0)
+    {
+        host->second.exectype = ExecType::Script;
     }
     else
     {
         print_error(__LINE__, __FILE__, "Wrong exec mode %s for %s, should be vrb, manual or script (covise.config)! Using default vrb", shm_mode.c_str(), name.c_str());
         fflush(stderr);
     }
-    if (tim == 0)
-        tim = DEFAULT_TIMEOUT;
-
-    addhostinfo(name, s_mode, e_mode, tim);
 }

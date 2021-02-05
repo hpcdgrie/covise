@@ -21,7 +21,9 @@ SET(CONTROLLER_SOURCES
 	control_netmod.cpp
 	control_object.cpp
 	control_port.cpp
-	AccessGridDaemon.cpp
+	control_remoteHost.cpp
+	control_uiManager.cpp
+	control_moduleManager.cpp
 )
 
 SET(CONTROLLER_HEADERS
@@ -36,7 +38,9 @@ SET(CONTROLLER_HEADERS
 	control_netmod.h
 	control_object.h
 	control_port.h
-	AccessGridDaemon.h
+	control_remoteHost.h
+	control_uiManager.h
+	control_moduleManager.h
 )
 
 if(OPENSSL_FOUND)

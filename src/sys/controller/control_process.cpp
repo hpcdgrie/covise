@@ -44,7 +44,7 @@ extern "C" int rexec(char **ahost, int inport, char *user, char *passwd,
 #endif
 
 // LOCAL .....
-AppModule *Controller::start_datamanager(const string &name)
+std::unique_ptr<AppModule> Controller::start_datamanager(const string &name)
 {
     char chport[10];
     char chid[16];
@@ -61,6 +61,7 @@ AppModule *Controller::start_datamanager(const string &name)
     sprintf(chid, "%d", module_count);
     string win_cmd_line(name);
     win_cmd_line.append(" ");
+    +
     win_cmd_line.append(chport);
     win_cmd_line.append(" ");
     win_cmd_line.append(host->getAddress());
@@ -144,9 +145,9 @@ AppModule *Controller::start_datamanager(const string &name)
             cerr << "* timelimit in accept for crb exceeded!!" << endl;
             return NULL;
         }
-        AppModule *mod = new AppModule(conn, module_count - 1, name, host);
+        std::unique_ptr<AppModule> mod{new AppModule(conn, module_count - 1, name, host)};
         list_of_connections->add(conn);
-        mod->set_peer(module_count - 1, DATAMANAGER);
+        mod->set_peer(module_count - 1, CRB);
         return mod;
     }
     return NULL;
@@ -158,7 +159,7 @@ void Controller::addConnection(Connection *conn)
 }
 
 // REXEC......
-AppModule *Controller::start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name)
+std::unique_ptr<AppModule> Controller::start_datamanager(Host *rhost, const char *user, const char *passwd, const char *name)
 {
     char remote_command[100];
     int port, ret;
@@ -206,7 +207,7 @@ AppModule *Controller::start_datamanager(Host *rhost, const char *user, const ch
     else
     {
         tmp_conn = new Connection(ret);
-        tmp_conn->set_peer(module_count - 1, DATAMANAGER);
+        tmp_conn->set_peer(module_count - 1, CRB);
         list_of_connections->add(tmp_conn);
     }
 #endif
@@ -220,13 +221,13 @@ AppModule *Controller::start_datamanager(Host *rhost, const char *user, const ch
 #endif
         return NULL;
     }
-    AppModule *mod = new AppModule(conn, module_count - 1, name, rhost);
+    std::unique_ptr<AppModule> mod(new AppModule(conn, module_count - 1, name, rhost));
     list_of_connections->add(conn);
-    mod->set_peer(module_count - 1, DATAMANAGER);
+    mod->set_peer(module_count - 1, CRB);
     return mod;
 }
 
-AppModule *Controller::start_datamanager(Host *rhost, const char *user, bool proxy,
+std::unique_ptr<AppModule> Controller::start_datamanager(Host *rhost, const char *user, bool proxy,
                                          ExecType exec_type, const char *script_name)
 {
     //std::cerr << "Controller::start_datamanager: name=" << name << ", rhost name=" <<  rhost->getName() << ", v4=" << rhost->get_ipv4() << std::endl;
@@ -242,39 +243,7 @@ AppModule *Controller::start_datamanager(Host *rhost, const char *user, bool pro
     if (!conn->is_connected())
         return NULL;
     conn->listen();
-    if (exec_type == ExecType::Manual)
-    {
-        char text[1000];
-        snprintf(text, sizeof(text), "please start \"%s %d %s %d\" on %s", name.c_str(), port,
-                 host->getAddress(), module_count, rhost->getName());
-        Message *msg = new Message(COVISE_MESSAGE_COVISE_ERROR, text);
-        global->userinterfaceList->send_master(msg);
-        std::cerr << text << std::endl;
-        delete msg;
-
-    }
-    else if(exec_type == ExecType::VRB)
-    {
-        CTRLHandler::instance()->sendLaunchRequest(port, module_count, rhost, proxy);
-    }
-    else if (exec_type == ExecType::Script)
-    {
-        char start_string[200];
-        sprintf(start_string, "%s %s %d %s %d", script_name, name.c_str(), port, host->getAddress(), module_count - 1);
-        int retval;
-        retval = system(start_string);
-        if (retval == -1)
-        {
-            std::cerr << "Controller::start_datamanager: system failed" << std::endl;
-            return NULL;
-        }
-    }
-    else
-    {
-        sprintf(chport, "%d", port);
-        sprintf(chid, "%d", module_count - 1);
-
-    }
+    
     if (exec_type == ExecType::Manual)
         conn->acceptOne(-1);
     else
@@ -290,13 +259,13 @@ AppModule *Controller::start_datamanager(Host *rhost, const char *user, bool pro
             }
         }
     }
-    AppModule *mod = new AppModule(conn, module_count - 1, name, rhost);
+    std::unique_ptr<AppModule> mod(new AppModule(conn, module_count - 1, name, rhost));
     list_of_connections->add(conn);
-    mod->set_peer(module_count - 1, DATAMANAGER);
+    mod->set_peer(module_count - 1, CRB);
     return mod;
 }
 
-AppModule* Controller::start_applicationmodule(sender_type peer_type, const char *name, AppModule *dmod, const char *instance, ExecFlag flags, const char *category, const std::vector<std::string> &params){
+std::unique_ptr<AppModule> Controller::start_applicationmodule(sender_type peer_type, const char *name, AppModule *dmod, const char *instance, ExecFlag flags, const char *category, const std::vector<std::string> &params){
     module_count++;
     int port;
     ServerConnection *conn = new ServerConnection(&port, module_count, CONTROLLER);
@@ -330,7 +299,7 @@ AppModule* Controller::start_applicationmodule(sender_type peer_type, const char
         delete conn;
         return NULL;
     }
-    AppModule *mod = new AppModule(conn, module_count, name, host);
+    std::unique_ptr<AppModule> mod(new AppModule(conn, module_count - 1, name, rhost));
     list_of_connections->add(conn);
     mod->set_peer(module_count, peer_type);
     return mod;
@@ -368,11 +337,16 @@ bool Controller::confirmIsRenderer(const char* cat, AppModule* dmod){
 
 void Controller::get_shared_memory(AppModule *dmod)
 {
+    get_shared_memory(dmod->get_conn());
+}
+
+void Controller::get_shared_memory(covise::Connection *conn)
+{
     Message msg{ COVISE_MESSAGE_GET_SHM_KEY , DataHandle{} };
 
     print_comment(__LINE__, __FILE__, "in get_shared_memory");
-    dmod->send(&msg);
-    dmod->recv_msg(&msg);
+    conn->sendMessage(&msg);
+    conn->recv_msg(&msg);
     if (msg.type == COVISE_MESSAGE_GET_SHM_KEY)
     {
         print_comment(__LINE__, __FILE__, "GET_SHM_KEY: %d: %x, %d length: %d", *(int *)msg.data.data(),
