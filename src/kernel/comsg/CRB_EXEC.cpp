@@ -38,13 +38,12 @@ IMPL_MESSAGE_CLASS(CRB_EXEC,
 	char*, moduleId,
 	char*, moduleIp,
 	char*, moduleHostName,
-	char*, displayIp,
 	char*, category,
 	int, vrbClientIdOfController,
     vrb::VrbCredentials, vrbCredentials,
 	std::vector<std::string>, params)
 
-constexpr size_t numMembers = 13;
+constexpr size_t numMembers = 12;
 
 std::string charToString(const char *c)
 {
@@ -72,7 +71,6 @@ std::vector<std::string> getCmdArgs(const CRB_EXEC& exec) {
 	args[pos++] = charToString(exec.moduleId);
 	args[pos++] = charToString(exec.moduleIp);
 	args[pos++] = charToString(exec.moduleHostName);
-	args[pos++] = charToString(exec.displayIp);
 	args[pos++] = std::to_string(exec.vrbClientIdOfController);
 	args[pos++] = exec.vrbCredentials.ipAddress;
 	args[pos++] = std::to_string(exec.vrbCredentials.tcpPort);
@@ -122,10 +120,9 @@ CRB_EXEC getExecFromCmdArgs(int argC, char* argV[]) {
 		adoptedChar(argV[4]), //moduleId
 		adoptedChar(argV[5]), //moduleIp
 		adoptedChar(argV[6]), //moduleHostName
-		adoptedChar(argV[7]), //displayIp
 		nullptr, //category
-		atoi(argV[8]), //vrbClientIdOfController
-		vrb::VrbCredentials{argV[9], static_cast<unsigned int>(atoi(argV[10])), static_cast<unsigned int>(atoi(argV[11]))},
+		atoi(argV[7]), //vrbClientIdOfController
+		vrb::VrbCredentials{argV[8], static_cast<unsigned int>(atoi(argV[9])), static_cast<unsigned int>(atoi(argV[10]))},
 		extraArgs); //params
 	return exec;
 }

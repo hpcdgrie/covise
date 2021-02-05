@@ -32,7 +32,6 @@ namespace covise{
      char *, moduleId,
      char *, moduleIp,
      char *, moduleHostName,
-     char *, displayIp,
      char *, category,
      int, vrbClientIdOfController,
      vrb::VrbCredentials, vrbCredentials,
