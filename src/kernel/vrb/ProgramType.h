@@ -14,11 +14,11 @@ namespace vrb{
 
 enum class Program
 {
-    Covise,
-    Cover,
+    covise,
+    opencover,
     VrbRemoteLauncher,
-    Controller,
-    ControllerProxy,
+    crb,
+    crbProxy,
     LAST_DUMMY
 };
 namespace detail{
@@ -27,8 +27,8 @@ namespace detail{
         "covise",
         "opencover",
         "VrbRemoteLauncher",
-        "ControllerProxy",
-        "crb"
+        "crb",
+        "crbProxy"
         };
 }
 
