@@ -58,7 +58,7 @@ bool Module::sendMessage(const UdpMessage *msg)
     return false;
 }
 
-bool AppModule::sendMessage(const Message *msg)
+bool AppModule::sendMessage(const Message *msg) const
 {
     if (conn)
         return conn->sendMessage(msg);
@@ -66,7 +66,7 @@ bool AppModule::sendMessage(const Message *msg)
         return false;
 }
 
-bool AppModule::sendMessage(const UdpMessage *msg)
+bool AppModule::sendMessage(const UdpMessage *msg) const
 {
     return false;
 }

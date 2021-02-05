@@ -396,8 +396,8 @@ protected:
     bool rendererIsPossible;
     bool rendererIsActive;
 
-    virtual bool sendMessage(const Message *msg) override;
-    virtual bool sendMessage(const UdpMessage *msg) override;
+    virtual bool sendMessage(const Message *msg) const override;
+    virtual bool sendMessage(const UdpMessage *msg) const override;
 
 public:
     userinterface();

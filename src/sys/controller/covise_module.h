@@ -95,8 +95,8 @@ public:
     }
 private:
     // forward message to the connection:
-    bool sendMessage(const Message *msg) override;
-    bool sendMessage(const UdpMessage *msg) override;
+    bool sendMessage(const Message *msg) const override;
+    bool sendMessage(const UdpMessage *msg) const override;
 
 public:
     // get message from the connection

@@ -1121,8 +1121,8 @@ void rhost_list::print()
 //
 //**********************************************************************
 
-bool userinterface::sendMessage(const Message *msg)
-{
+
+bool userinterface::sendMessage(const Message *msg) const {
     if (ui)
         return ui->send(msg);
 
@@ -1134,8 +1134,7 @@ bool userinterface::sendMessage(const Message *msg)
     return false;
 }
 
-bool userinterface::sendMessage(const UdpMessage *msg)
-{
+bool userinterface::sendMessage(const UdpMessage *msg) const{
     return false;
 }
 
