@@ -268,10 +268,7 @@ void MECSCWParam::accepted()
 {
     QStringList list;
 
-    if (MEMainHandler::instance()->getAddHostMode() == MEMainHandler::ADDHOST)
-        list << "ADD_HOST";
-    else
-        list << "ADD_PARTNER";
+
 
     std::string ip = covise::Host::lookupIpAddress(hostname->text().toLatin1().data());
     list << ip.c_str() << username->text();

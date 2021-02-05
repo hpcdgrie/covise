@@ -23,7 +23,7 @@ class ClientWidget : public QWidget
 public:
     ClientWidget(int clientID, const QString &clientInfo, QWidget *parent);
 
-    std::array<QCheckBox *, static_cast<int>(covise::LaunchStyle::LAST_DUMMY)> m_clients;
+    std::array<QCheckBox *, static_cast<int>(covise::LaunchStyle::LAST_DUMMY)> m_clientActions;
 signals:
     void partnerSelected(bool selected);
 
@@ -58,7 +58,7 @@ public:
     explicit MERemotePartner(QWidget *parent = nullptr);
     void setPartners(const std::vector<std::pair<int, std::string>> &partners);
 signals:
-    void takeAction(covise::LaunchStyle launchStyle, std::vector<int> clientIds, QString password, QString display);
+    void takeAction(covise::LaunchStyle launchStyle, std::vector<int> clientIds);
 
 private:
     Ui::MERemotePartner *m_ui;

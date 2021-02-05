@@ -43,7 +43,9 @@ enum class LaunchStyle : int;
 class coSendBuffer;
 class coRecvBuffer;
 class Message;
-}
+typedef std::vector<std::pair<int, std::string>> ClientList;
+
+} // namespace covise
 
 #include <config/coConfig.h>
 
@@ -128,7 +130,7 @@ public:
 
     int getAddHostMode()
     {
-        return m_hostMode;
+        return 0;
     };
     int isMaster();
     int getGridSize();
@@ -191,7 +193,7 @@ public:
     QColor getHostColor(int);
 
     void initNode(int nodeid, MEHost *host, covise::coRecvBuffer &tb);
-    void updateRemotePartners(const std::vector<std::pair<int, std::string>> &partners);
+    void updateRemotePartners(const covise::ClientList &partners);
 signals:
 
     void usingNode(const QString &);
@@ -214,9 +216,8 @@ public slots:
     void chatCB();
     void openNet();
     void saveNet();
-    void addHost();
     void saveAsNet();
-    void handlePartner();
+    void addPartner();
     void execNet();
     void settingXML();
     void deleteSelectedNodes();
@@ -257,7 +258,6 @@ private:
     MENode *m_currentNode, *m_newNode;
     MESessionSettings *m_settings;
     MERemotePartner *m_addPartnerDialog = nullptr;
-    MECSCW *m_addHostBox;
     MECSCWParam *m_CSCWParam;
     MEDeleteHostDialog *m_deleteHostBox;
     MEMirrorHostDialog *m_mirrorBox;
@@ -272,7 +272,7 @@ private:
     void embeddedRenderer();
     void saveMap();
     void setLocalHost(int id, const QString &name, const QString &user);
-    void requestPartnerAction(covise::LaunchStyle launchStyle, const std::vector<int> &clients, const QString &password, const QString &display);
+    void requestPartnerAction(covise::LaunchStyle launchStyle, const std::vector<int> &clients);
 private slots:
 
     void printCB();

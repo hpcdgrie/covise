@@ -17,10 +17,10 @@ ClientWidget::ClientWidget(int clientID, const QString &clientInfo, QWidget *par
     layout->setDirection(QVBoxLayout::LeftToRight);
     auto *content = new QLabel(s, this);
     layout->addWidget(content, 0, Qt::AlignTop);
-    for (size_t i = 0; i < m_clients.size(); i++)
+    for (size_t i = 0; i < m_clientActions.size(); i++)
     {
-        m_clients[i] = new QCheckBox(this);
-        layout->addWidget(m_clients[i]);
+        m_clientActions[i] = new QCheckBox(this);
+        layout->addWidget(m_clientActions[i]);
     }
 }
 
@@ -48,9 +48,9 @@ void ClientWidgetList::addClient(int clientID, const QString &clientInfo)
     m_layout->addWidget(cw);
     removeClient(clientID);
     m_clients[clientID] = cw;
-    for (size_t i = 0; i < cw->m_clients.size(); i++)
+    for (size_t i = 0; i < cw->m_clientActions.size(); i++)
     {
-        connect(cw->m_clients[i], &QCheckBox::stateChanged, this, [this, i]() {
+        connect(cw->m_clientActions[i], &QCheckBox::stateChanged, this, [this, i]() {
             checkClientsSelected(static_cast<covise::LaunchStyle>(i));
         });
     }
@@ -73,7 +73,7 @@ std::vector<int> ClientWidgetList::getSelectedClients(covise::LaunchStyle launch
     std::vector<int> retval;
     for (const auto &cl : m_clients)
     {
-        if (cl.second->m_clients[static_cast<int>(launchStyle)]->isChecked())
+        if (cl.second->m_clientActions[static_cast<int>(launchStyle)]->isChecked())
         {
             retval.push_back(cl.first);
         }
@@ -84,7 +84,7 @@ std::vector<int> ClientWidgetList::getSelectedClients(covise::LaunchStyle launch
 void ClientWidgetList::checkClientsSelected(covise::LaunchStyle launchStyle)
 {
     auto it = std::find_if(m_clients.begin(), m_clients.end(), [launchStyle](const std::pair<int, ClientWidget *> &cl) {
-        return cl.second->m_clients[static_cast<int>(launchStyle)]->isChecked();
+        return cl.second->m_clientActions[static_cast<int>(launchStyle)]->isChecked();
     });
     emit atLeastOneClientSelected(launchStyle, it != m_clients.end());
 }

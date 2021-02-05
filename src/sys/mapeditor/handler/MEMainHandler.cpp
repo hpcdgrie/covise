@@ -33,6 +33,7 @@
 #include <net/covise_host.h>
 #include <covise/covise_appproc.h>
 #include <util/covise_version.h>
+#include <comsg/NEW_UI.h>
 
 #include "MEFavoriteListHandler.h"
 #include "MEFileBrowser.h"
@@ -164,7 +165,6 @@ MEMainHandler::MEMainHandler(int argc, char *argv[])
     , m_currentNode(NULL)
     , m_newNode(NULL)
     , m_settings(NULL)
-    , m_addHostBox(NULL)
     , m_deleteHostBox(NULL)
     , m_mirrorBox(NULL)
     , m_requestingMaster(false)
@@ -372,7 +372,6 @@ MEMainHandler *MEMainHandler::instance()
 MEMainHandler::~MEMainHandler()
 //!
 {
-    delete m_addHostBox;
     delete messageHandler;
 }
 
@@ -1009,10 +1008,11 @@ void MEMainHandler::execNet()
 //!
 //! add a new partner
 //!
-void MEMainHandler::handlePartner()
+void MEMainHandler::addPartner()
 {
     m_remotePartnersUpdated = false;
-    messageHandler->sendMessage(covise::COVISE_MESSAGE_UI, "REQUEST_AVAILABLE_PARTNERS\n");
+    covise::NEW_UI_RequestAvailablePartners msg{0};
+    covise::sendCoviseMessage(msg, *messageHandler);
     std::chrono::milliseconds timeout{0};
     while (timeout <= std::chrono::milliseconds{10000})
     {
@@ -1033,13 +1033,14 @@ void MEMainHandler::handlePartner()
     if (!m_addPartnerDialog)
     {
         m_addPartnerDialog = new MERemotePartner();
-        connect(m_addPartnerDialog, &MERemotePartner::takeAction, this, [this](covise::LaunchStyle launchStyle, const std::vector<int> &clientIds, QString password, QString display) {
+        connect(m_addPartnerDialog, &MERemotePartner::takeAction, this, [this](covise::LaunchStyle launchStyle, const std::vector<int> &clientIds) {
             std::cerr << covise::launchStyleNames[launchStyle] << ": ";
             for(int i : clientIds)
             {
                 std::cerr << i << ", ";
             }
-            requestPartnerAction(launchStyle, clientIds, password, display);
+            requestPartnerAction(launchStyle, clientIds);
+            m_addPartnerDialog->hide();
 
         });
     }
@@ -1048,22 +1049,11 @@ void MEMainHandler::handlePartner()
     m_addPartnerDialog->show();
 }
 
-void MEMainHandler::requestPartnerAction(covise::LaunchStyle launchStyle, const std::vector<int> &clients, const QString &password, const QString &display){
-    QStringList list;
-    list << "HANDLE_PARTNERS";
-    list << QString::number(static_cast<int>(launchStyle));
-    const char *timeout = "30";
-    list << timeout;
-    list << QString::number(clients.size());
-    for (const int i : clients)
-    {
-        list << QString::number(i);
-    }
+void MEMainHandler::requestPartnerAction(covise::LaunchStyle launchStyle, const std::vector<int> &clients){
 
-    QString tmp = list.join("\n");
-
-    MEMessageHandler::instance()->sendMessage(covise::COVISE_MESSAGE_UI, tmp);
-
+    int timeout = 30;
+    covise::NEW_UI_HandlePartners msg{launchStyle, timeout, clients};
+    covise::sendCoviseMessage(msg, *MEMessageHandler::instance());
 }
 
 void MEMainHandler::deleteSelectedNodes()
@@ -1357,7 +1347,7 @@ QColor MEMainHandler::getHostColor(int entry)
     return color;
 }
 
-void MEMainHandler::updateRemotePartners(const std::vector<std::pair<int, std::string>> &partners){
+void MEMainHandler::updateRemotePartners(const covise::ClientList &partners){
     std::lock_guard<std::mutex> g{m_remotePartnerMutex};
     m_remotePartners = partners;
     m_remotePartnersUpdated = true;
@@ -1452,10 +1442,6 @@ void MEMainHandler::initHost(const QStringList &list)
 {
     MEHost *host = new MEHost(list[1], list[2]);
     host->addHostItems(list);
-    if (m_hostMode == ADDPARTNER)
-        host->setGUI(true);
-    else
-        host->setGUI(false);
 
     addNewHost(host);
 }
@@ -1697,8 +1683,7 @@ void MEMainHandler::removeHost(MEHost *host)
 
     // deactivate chat window if only one host is active
     // reactivate message line
-    if (MEHostListHandler::instance()->getNoOfHosts() == 1 && m_hostMode == MEMainHandler::ADDPARTNER)
-        mapEditor->resetStatusBar();
+
 
     // reset menu and tool bar
     mapEditor->setCollabItems(activeHosts, m_masterUI);
