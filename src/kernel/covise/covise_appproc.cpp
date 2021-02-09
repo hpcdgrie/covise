@@ -359,12 +359,12 @@ ApplicationProcess::ApplicationProcess(const char *n, int argc, char *argv[],
     auto crbExec = covise::getExecFromCmdArgs(argc, argv);
 
     id = crbExec.moduleCount;
-    tmphost = new Host(crbExec.localIp);
+    tmphost = new Host(crbExec.controllerIp);
 
     //fprintf(stderr,"---- contact_controller\n");
 
     datamanager = NULL;
-    contact_controller(crbExec.port, tmphost);
+    contact_controller(crbExec.controllerPort, tmphost);
     // darf ich das? Uwe WOessner delete tmphost;
     if (!is_connected())
         return;

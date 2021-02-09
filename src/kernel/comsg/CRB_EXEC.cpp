@@ -32,8 +32,8 @@ TokenBuffer& operator>>(TokenBuffer& tb, ExecFlag& flag) {
 IMPL_MESSAGE_CLASS(CRB_EXEC,
 	ExecFlag, flag,
 	char*, name,
-	int, port,
-	char*, localIp,
+	int, controllerPort,
+	char *, controllerIp,
 	int, moduleCount,
 	char*, moduleId,
 	char*, moduleIp,
@@ -65,8 +65,8 @@ std::vector<std::string> getCmdArgs(const CRB_EXEC& exec) {
 	std::vector<std::string> args(l);
 	size_t pos = 0;
 	args[pos++] = charToString(exec.name);
-	args[pos++] = std::to_string(exec.port);
-	args[pos++] = charToString(exec.localIp);
+	args[pos++] = std::to_string(exec.controllerPort);
+	args[pos++] = charToString(exec.controllerIp);
 	args[pos++] = std::to_string(exec.moduleCount);
 	args[pos++] = charToString(exec.moduleId);
 	args[pos++] = charToString(exec.moduleIp);
