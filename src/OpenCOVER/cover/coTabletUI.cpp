@@ -4239,8 +4239,6 @@ coTabletUI::~coTabletUI()
     if (tUI == this)
         tUI = nullptr;
 
-    delete serverConn;
-    delete conn;
     delete serverHost;
     delete localHost;
 }
@@ -4308,7 +4306,7 @@ bool coTabletUI::update()
                     }
                     if (nconn && nconn->is_connected())
                     {
-                        conn = nconn;
+                        conn.reset(nconn);
                         host = serverHost;
                     }
                     else if (nconn) // could not open server port
@@ -4328,7 +4326,7 @@ bool coTabletUI::update()
 
                         if (nconn->is_connected())
                         {
-                            conn = nconn;
+                            conn.reset(nconn);
                             host = localHost;
                         }
                         else
