@@ -4212,8 +4212,7 @@ bool coTabletUI::isConnected() const
 void coTabletUI::close()
 {
     connectedHost = NULL;
-    delete conn;
-    conn = NULL;
+    conn.reset(nullptr);
 
     delete sgConn;
     sgConn = NULL;
@@ -4353,9 +4352,7 @@ bool coTabletUI::update()
                     if (msg->type == COVISE_MESSAGE_SOCKET_CLOSED)
                     {
                         delete msg;
-
-                        delete conn;
-                        conn = NULL;
+                        conn.reset(nullptr);
 
                         delete sgConn;
                         sgConn = NULL;
@@ -4381,8 +4378,7 @@ bool coTabletUI::update()
 #else
                             fprintf(stderr, "Could not connect to TabletPC %s; port %d\n", connectedHost->getName(), sgPort);
 #endif
-                            delete conn;
-                            conn = NULL;
+                            conn.reset(nullptr);
 
                             delete cconn;
                             cconn = NULL;
@@ -4408,8 +4404,7 @@ bool coTabletUI::update()
 
                 if (!connectedHost)
                 {
-                    delete conn;
-                    conn = NULL;
+                    conn.reset(nullptr);
 
                     delete sgConn;
                     sgConn = NULL;
@@ -4432,8 +4427,6 @@ bool coTabletUI::update()
         if (conn)
         {
             connectedHost = nullptr;
-            delete conn;
-            conn = NULL;
 
             delete sgConn;
             sgConn = NULL;
@@ -4501,8 +4494,7 @@ bool coTabletUI::update()
             case COVISE_MESSAGE_CLOSE_SOCKET:
             {
                 connectedHost = nullptr;
-                delete conn;
-                conn = NULL;
+                conn.reset(nullptr);
 
                 delete sgConn;
                 sgConn = NULL;
