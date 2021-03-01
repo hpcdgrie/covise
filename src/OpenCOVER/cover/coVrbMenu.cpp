@@ -188,7 +188,7 @@ namespace opencover
         {
             if (partner->userInfo().userType == vrb::Program::VrbRemoteLauncher)
             {
-                remoteLauncher.push_back(partner->userInfo().name);
+                remoteLauncher.push_back(partner->userInfo().userName);
             }
         }
         m_remoteLauncher->setList(remoteLauncher);
