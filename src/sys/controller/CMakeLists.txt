@@ -9,53 +9,45 @@ IF(COVISE_BUILD_WEBSERVICE)
 ENDIF()
 
 SET(CONTROLLER_SOURCES
-    Token.cpp
-	CTRLMain.cpp
-	CTRLHandler.cpp
-	CTRLGlobal.cpp
-	covise_module.cpp
-	control_process.cpp
-	control_coviseconfig.cpp
-	control_modlist.cpp
-	control_module.cpp
-	control_netmod.cpp
-	control_object.cpp
-	control_port.cpp
-	control_remoteHost.cpp
-	control_uiManager.cpp
-	control_moduleManager.cpp
+  config.cpp #
+  exception.cpp #
+  util.cpp #
+  netLink.cpp #
+  object.cpp #list
+  port.cpp #object list
+  process.cpp #port
+  userinterface.cpp #process
+  controlProcess.cpp #config
+  module.cpp #process, netlink
+  crb.cpp #process
+  host.cpp #process config
+  renderModule.cpp #module ui
+  modui.cpp #ui, module, process
+  global.cpp #controlProcess, object, modui
+  handler.cpp #host, ui, config
+  main.cpp #
 )
 
 SET(CONTROLLER_HEADERS
-    Token.h
-	CTRLHandler.h
-	CTRLGlobal.h
-	covise_module.h
-	control_process.h
-	control_coviseconfig.h
-	control_modlist.h
-	control_module.h
-	control_netmod.h
-	control_object.h
-	control_port.h
-	control_remoteHost.h
-	control_uiManager.h
-	control_moduleManager.h
+  config.h #
+  exception.h #
+  list.h #
+  util.h #
+  netLink.h #
+  object.h #list
+  port.h #object list
+  process.h #port
+  userinterface.h #process
+  controlProcess.h #config
+  module.h #process, netlink
+  crb.h #process
+  host.h #process config
+  renderModule.h #module ui
+  modui.h #ui, module, process
+  global.h #controlProcess, object, modui
+  handler.h #host, ui, config
+
 )
-
-if(OPENSSL_FOUND)
-   INCLUDE_DIRECTORIES(
-      ../CoviseSSLDaemon/CoviseClient
-   )
-   ADD_DEFINITIONS(-DHAVE_OPENSSL)
-
-   set(CONTROLLER_HEADERS ${CONTROLLER_SOURCES} 
-      ../CoviseSSLDaemon/CoviseClient/SSLClient.cpp
-   )
-   set(CONTROLLER_HEADERS ${CONTROLLER_HEADERS} 
-      ../CoviseSSLDaemon/CoviseClient/SSLClient.h
-   )
-endif()
 
 ADD_COVISE_EXECUTABLE(covise ${CONTROLLER_SOURCES} ${CONTROLLER_HEADERS})
 TARGET_LINK_LIBRARIES(covise coAppl coApi coCore coConfig coUtil coVRBClient coMessages) 

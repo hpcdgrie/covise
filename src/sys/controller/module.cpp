@@ -1,0 +1,897 @@
+/* This file is part of COVISE.
+
+   You can use it under the terms of the GNU Lesser General Public License
+   version 2.1 or later, see lgpl-2.1.txt.
+
+ * License: LGPL 2+ */
+
+#include "config.h"
+#include "crb.h"
+#include "exception.h"
+#include "global.h"
+#include "handler.h"
+#include "host.h"
+#include "module.h"
+#include "renderModule.h"
+#include "util.h"
+
+#include <cassert>
+
+using namespace covise;
+using namespace covise::controller;
+
+Application::Application(const RemoteHost &host, const StaticModuleInfo &moduleInfo, int instance)
+    : Module(moduleType, host, sender_type::APPLICATIONMODULE, moduleInfo)
+{
+    if (instance == -1)
+    {
+        m_instance = moduleInfo.count++;
+    }
+    else
+    {
+        m_instance = moduleInfo.count = instance;
+    }
+}
+
+bool Application::isOnTop() const
+{
+    connectivity().forAllNetInterfaces([](const net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Input && interface.get_conn_state())
+        {
+            return false;
+        }
+    });
+    return true;
+}
+
+Application::~Application()
+{
+    for (Application *app : m_mirrors)
+    {
+        if (m_mirror != NOT_MIRR) //ist mirrored
+        {
+            app->m_mirror = NOT_MIRR;
+            app->m_mirrors.clear();
+        }
+        if (auto renderer = dynamic_cast<Renderer *>(app))
+        {
+            if (m_mirror == CPY_MIRR)
+            {
+                try
+                {
+                    renderer->addDisplayAndHandleConnections(dynamic_cast<const Userinterface &>(host.getModule(sender_type::USERINTERFACE)));
+                }
+                catch (const std::exception &e)
+                {
+                    std::cerr << e.what() << '\n';
+                }
+            }
+        }
+    }
+    // delete the netlinks
+    auto it = netLinks.begin();
+    while (it != netLinks.end())
+    {
+        it->del_link(info().name, std::to_string(instance()), host.userInfo().hostName);
+        it = netLinks.erase(it);
+    }
+}
+
+void Application::exec(NumRunning &numRunning)
+{
+    if (numRunning.apps == 0 || (!isOneRunningAbove(true)))
+    {
+        if (!isExecuting())
+        {
+            execute(numRunning);
+            if (numRunning.apps == 1) // switch to execution mode
+            {
+                Message ex_msg{COVISE_MESSAGE_UI, "INEXEC"};
+                host.hostManager.sendAll<Userinterface>(ex_msg);
+                host.hostManager.sendAll<Renderer>(ex_msg);
+            }
+
+            if (m_mirror == ORG_MIRR)
+            {
+                for (Application *mirror : m_mirrors)
+                {
+                    mirror->execute(numRunning);
+                }
+            }
+        }
+        else
+        {
+            numRunning.apps++;
+            Message err_msg{COVISE_MESSAGE_WARNING, "Controller\n \n \n Sorry: module is already running !"};
+            host.hostManager.sendAll<Userinterface>(err_msg);
+        }
+    }
+    else
+    {
+        Message err_msg{COVISE_MESSAGE_WARNING, "Controller\n \n \n Sorry: Is already one executing above!\n"};
+        host.hostManager.sendAll<Userinterface>(err_msg);
+    }
+}
+
+std::string Application::title() const
+{
+    return m_info.name + "_" + std::to_string(instance());
+}
+
+bool Application::startflag() const
+{
+    return m_isStarted;
+}
+
+void Application::resetStartFlag()
+{
+    m_isStarted = false;
+}
+
+void Application::setStartFlag()
+{
+    m_isStarted = true;
+}
+
+size_t Application::instance() const
+{
+    return m_instance;
+}
+
+void Application::setInstace(const std::string &titleString)
+{
+    assert(!titleString.rfind(info().name, 0));
+    int i = std::stoi(titleString.substr(info().name.size()));
+    std::stringstream ss;
+    ss << "MODULE_TITLE\n"
+       << info().name << "\n"
+       << instance() << "\n"
+       << host.userInfo().hostName << "\nSetModuleTitle\nString\n1\n";
+    m_instance = i;
+    ss << title();
+    Message msg{COVISE_MESSAGE_UI, ss.str()};
+    send(&msg);
+}
+
+void Application::init(const MapPosition &pos, int copy, ExecFlag flag, Application *mirror)
+{
+    m_position = pos;
+    if (!start(std::to_string(m_instance).c_str()) || !connect(host.getModule(sender_type::CRB)))
+    {
+        std::cerr << "Application::init failed to start module " << info().name << std::endl;
+        return;
+    }
+    if (copy == 4 && mirror)
+    {
+        this->mirror(mirror);
+    }
+    Message msg;
+    recv_msg(&msg);
+    if (!msg.data.data())
+    {
+        cerr << endl
+             << " Application::init() - NULL module description received\n";
+        exit(0);
+    }
+    m_info.readConnectivity(msg.data.data());
+    //create_netlink() //links to the mirror modules
+    initConnectivity();
+    if (mirror && copy == 3) // node created by moving
+    {
+        m_instance = mirror->m_instance;
+    }
+}
+
+void Application::mirror(Application *original)
+{
+    original->m_mirror = ORG_MIRR; //original
+    original->m_mirrors.emplace_back(this);
+
+    m_mirror = CPY_MIRR; //mirror
+    m_mirrors.emplace_back(original);
+}
+
+void Application::initConnectivity()
+{
+    // copy predefined connectivity for this kind of module StaticModuleInfo
+    m_connectivity = m_info.connectivity();
+    int outNum = 0;
+    for (auto &interface : m_connectivity.interfaces)
+    {
+        // generate data objectname for output port (ancient: DOCONN)
+        net_interface *netInterface = dynamic_cast<net_interface *>(&interface);
+        if (interface.get_direction() == controller::Direction::Output && netInterface)
+        {
+            ostringstream objName;
+            objName << m_info.name << "_" << m_instance << "(" << id << ")_OUT_" << outNum << "_";
+            object *obj = CTRLGlobal::getInstance()->objectList->select(objName.str());
+            if (!netInterface->get_conn_state() && !obj->check_from_connection(this, interface.get_name())) //no connection
+            {
+                netInterface->set_connect(obj);
+                obj->connect_from(this, *netInterface);
+            }
+            else if (!netInterface->get_conn_state() || !obj->check_from_connection(this, interface.get_name()))
+                print_comment(__LINE__, __FILE__, " ERROR: Connection between object and module destroyed!\n");
+        }
+    }
+}
+
+int Application::testOriginalcount(const string &interfaceName) const
+{
+    int org_count;
+
+    if (m_mirror == ORG_MIRR)
+    {
+        // Original -> Zaehler 1 zurueckgeben
+        return 1;
+    }
+    else
+    {
+        auto org = std::find_if(m_mirrors.begin(), m_mirrors.end(), [](const Application *mirror) {
+            return mirror->m_mirror == ORG_MIRR;
+        });
+        if (org != m_mirrors.end())
+        {
+            auto &interface = (*org)->m_connectivity.getInterface(interfaceName);
+            return dynamic_cast<net_interface &>(interface).get_object()->get_counter();
+        }
+    }
+}
+
+const ModuleNetConnectivity &Application::connectivity() const
+{
+    return m_connectivity;
+}
+
+ModuleNetConnectivity &Application::connectivity()
+{
+    return m_connectivity;
+}
+
+const Application::MapPosition &Application::pos() const
+{
+    return m_position;
+}
+
+void Application::move(const Application::MapPosition &pos)
+{
+    m_position = pos;
+}
+
+std::string Application::createBasicModuleDescription() const
+{
+    std::stringstream ss;
+    ss << info().name << "\n"
+       << instance() << "\n"
+       << host.userInfo().hostName << "\n";
+    return ss.str();
+}
+
+std::string Application::createDescription() const
+{
+    std::stringstream ss;
+    ss << info().name << "\n"
+       << info().category << "\n"
+       << host.userInfo().hostName << "\n"
+       << info().description() << "\n";
+
+    int numInputInterfaces = 0, numOutputInterfaces = 0;
+    for (const auto &interface : m_connectivity.interfaces)
+    {
+        interface.get_direction() == controller::Direction::Input ? numInputInterfaces++ : numOutputInterfaces++;
+    }
+    ss << numInputInterfaces << "\n"
+       << numOutputInterfaces << "\n"
+       << m_connectivity.inputParams.size() << "\n"
+       << m_connectivity.outputParams.size() << "\n";
+    for (const auto &interface : m_connectivity.interfaces)
+    {
+        ss << interface.get_name() << "\n"
+           << interface.get_type() << "\n"
+           << interface.get_text() << "\n"
+           << interface.get_demand() << "\n";
+    }
+    for (const parameter &param : m_connectivity.inputParams)
+    {
+        ss << param.getDescription();
+
+        ss << param.get_extension() << "\n";
+    }
+    for (const parameter &param : m_connectivity.outputParams)
+    {
+        ss << param.getDescription();
+    }
+    return ss.str();
+}
+
+bool Application::isOriginal() const
+{
+    return m_mirror != CPY_MIRR;
+}
+
+bool Application::isExecuting() const
+{
+    return m_status == Status::executing;
+}
+
+void Application::setExecuting(bool state)
+{
+    m_status = state ? Status::executing : Status::Idle;
+}
+
+Application::Status Application::status() const
+{
+    return m_status;
+}
+
+void Application::setStatus(Application::Status status)
+{
+    m_status = status;
+}
+
+void Application::setAlive(bool state)
+{
+    m_alive = state;
+}
+
+std::vector<std::string> &Application::errorsSentByModule()
+{
+    return m_errorsSentByModule;
+}
+
+const std::vector<std::string> &Application::errorsSentByModule() const
+{
+    return m_errorsSentByModule;
+}
+
+void Application::set_DO_status(int mode, const string &DO_name)
+{
+    bool found = false;
+    for (auto &interface : connectivity().interfaces)
+    {
+        if (interface.get_direction() == controller::Direction::Input)
+        {
+            if (auto appInterface = dynamic_cast<net_interface *>(&interface))
+            {
+                if (appInterface->get_conn_state())
+                {
+                    object *obj = appInterface->get_object();
+                    if (obj->test(DO_name))
+                    {
+                        found = true;
+                        obj->set_DO_status(DO_name, mode, *this, appInterface->get_name());
+                    }
+                }
+            }
+        }
+    }
+    if (found == false)
+    {
+        print_comment(__LINE__, __FILE__, "ERROR: Dataobject not found \n");
+        cerr << "\nERROR: Dataobject not found !!!\n";
+    }
+}
+
+void Application::sendFinish()
+{
+    string content = get_outparaobj();
+    if (!content.empty())
+    {
+        Message msg{COVISE_MESSAGE_FINISHED, content};
+        host.hostManager.sendAll<Userinterface>(msg);
+    }
+}
+
+void Application::delete_rez_objs()
+{
+    connectivity().forAllNetInterfaces([](net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
+        {
+            object *p_obj = interface.get_object();
+            if (p_obj != NULL)
+            {
+                p_obj->del_rez_DO();
+                p_obj->del_dep_data();
+            }
+        }
+    });
+}
+
+std::string Application::getStartMessage()
+{
+    std::stringstream buff;
+    buff << serialize();
+
+    int numOutputConnections = 0;
+    m_connectivity.forAllNetInterfaces([&numOutputConnections](const net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output || interface.get_conn_state())
+        {
+            ++numOutputConnections;
+        }
+    });
+    buff << numOutputConnections << "\n"
+         << m_connectivity.inputParams.size() << "\n";
+
+    m_connectivity.forAllNetInterfaces([&buff, this](const net_interface &interface) {
+        if (interface.get_conn_state())
+        {
+            const object *obj = interface.get_object();
+            assert(obj);
+            std::string obj_name = obj->get_current_name();
+            if (obj_name.empty())
+                return "";
+
+            buff << interface.get_name() << "\n"
+                 << obj_name << "\n"
+                 << obj->get_type() << "\n";
+
+            if (obj->get_to().empty())
+            {
+                buff << "UNCONNECTED"
+                     << "\n";
+            }
+            else
+            {
+                buff << "CONNECTED"
+                     << "\n";
+            }
+        }
+        else if (interface.get_direction() == controller::Direction::Output)
+        {
+            buff << interface.get_name() << "\nwrong_object_name\nwrong_object_type\n";
+            string buf = "ERROR old Network file, replace module " + info().name;
+            Message err_msg{COVISE_MESSAGE_COVISE_ERROR, buf};
+            host.hostManager.sendAll<Userinterface>(err_msg);
+            return "";
+        }
+        else if (interface.get_demand() == "req")
+        {
+            print_comment(__LINE__, __FILE__, "ERROR: get-startmessage. Interfaces not connected \n");
+            std::stringstream msg;
+            msg << "Warning: Required input port (" << interface.get_name() << ")" << info().name << "_" << id << "@" << host.userInfo().hostName;
+            msg << " is not connected !! ";
+            sendWarningMsgToMasterUi(msg.str());
+            return "";
+        }
+    });
+    for (const parameter &param : m_connectivity.inputParams)
+    {
+        buff << param.serialize();
+    }
+    return buff.str();
+}
+
+void Application::sendWarningMsgToMasterUi(const std::string &msg)
+{
+    std::string data = "Controller\n \n \n" + msg;
+    Message message{COVISE_MESSAGE_WARNING, data};
+    for (const Userinterface *ui : host.hostManager.getAllModules<Userinterface>())
+    {
+        if (ui->status() == Userinterface::Master)
+        {
+            ui->send(&message);
+        }
+    }
+}
+
+bool Application::delete_old_objs()
+{
+    m_connectivity.forAllNetInterfaces([](net_interface &interface) {
+        // is the Interface connected ?
+        if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
+        {
+            object *p_obj = interface.get_object();
+            if (p_obj && p_obj->isEmpty())
+            {
+                p_obj->del_old_DO();
+                return true;
+            }
+        }
+    });
+}
+
+void Application::new_obj_names()
+{
+    m_connectivity.forAllNetInterfaces([](net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
+        {
+            interface.get_object()->newDataObject();
+        }
+    });
+}
+
+std::string Application::get_outparaobj() const
+{
+    std::stringstream buff;
+    buff << serialize();
+
+    buff << m_connectivity.outputParams.size() << "\n";
+    for (const auto &param : m_connectivity.outputParams)
+    {
+        buff << param.serialize();
+    }
+
+    int intf_count = getNumInterfaces(controller::Direction::Output);
+
+    if (type == sender_type::RENDERER)
+        buff << "0\n";
+    else
+    {
+        buff << intf_count << "\n";
+
+        // get objects
+        m_connectivity.forAllNetInterfaces([&buff](const net_interface &interface) {
+            if (interface.get_direction() == controller::Direction::Output)
+            {
+                if (interface.get_conn_state())
+                {
+                    buff << interface.get_name() << "\n";
+
+                    string obj_name = interface.get_object()->get_current_name();
+                    if (!obj_name.empty())
+                        buff << obj_name << "\n";
+                    else
+                        buff << "NO_OBJ\n"; //DeletedModuleFinished");
+                }
+                else
+                {
+                    print_comment(__LINE__, __FILE__, "ERROR: send_finisCTRLGlobal::getInstance()-> Interfaces not connected \n");
+                    cerr << "\n ERROR: send_finisCTRLGlobal::getInstance()-> Interfaces not connected !!!\n";
+                    return "";
+                } // if state
+            }
+        });
+    } // !renderer
+    return buff.str();
+}
+
+std::string Application::get_inparaobj() const
+{
+    std::stringstream buffS;
+    buffS << serialize();
+
+    buffS << m_connectivity.inputParams.size() << "\n";
+    for (const auto &param : m_connectivity.inputParams)
+    {
+        buffS << param.serialize();
+    }
+
+    buffS << getNumInterfaces(controller::Direction::Input) << "\n";
+
+    m_connectivity.forAllNetInterfaces([&buffS, this](const net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Input)
+        {
+            buffS << serializeInputInterface(interface);
+        }
+    });
+    return buffS.str();
+}
+
+bool Application::startModuleWaitingAbove(NumRunning &numRunning)
+{
+    bool oneWaiting = false;
+    m_connectivity.forAllNetInterfaces([&numRunning, &oneWaiting, this](net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Input)
+        {
+            // is the interface connected?
+            if (interface.get_conn_state() == true)
+            {
+                auto mod = interface.get_object()->get_from().get_mod();
+                if (mod->startflag())
+                {
+                    oneWaiting = true;
+                    mod->resetStartFlag();
+                    if (!mod->isOneRunningAbove(1))
+                    {
+                        numRunning.apps++;
+                        mod->execute(numRunning);
+                    }
+                }
+            }
+        }
+    });
+    return oneWaiting;
+}
+
+int Application::numRunning() const
+{
+    return m_numRunning;
+}
+
+void Application::setStart()
+{
+    connectivity().forAllNetInterfaces([](net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output)
+        {
+            interface.get_object()->setStartFlagOnConnectedModules();
+        }
+    });
+}
+
+void Application::startModulesUnder(NumRunning &numRunning)
+{
+    connectivity().forAllNetInterfaces([&numRunning](net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output)
+        {
+            interface.get_object()->start_modules(numRunning);
+        }
+    });
+}
+
+bool Application::isOneRunningAbove(bool first) const
+{
+    for (const auto &inter : m_connectivity.interfaces)
+    {
+        if (auto interface = dynamic_cast<const net_interface *>(&inter))
+        {
+            if (interface->get_direction() == controller::Direction::Input &&
+                interface->get_conn_state() &&
+                interface->get_object()->is_one_running_above())
+            {
+                return true;
+            }
+        }
+    }
+    if (!first)
+    {
+        if (m_isStarted || isExecuting())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Application::is_one_running_under() const
+{
+    connectivity().forAllNetInterfaces([](const net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output &&
+            interface.get_object())
+        {
+            const auto &to = interface.get_object()->get_to();
+            for (const auto &conn : to)
+            {
+                const Application *app = conn.get_mod();
+                if (app &&
+                    !dynamic_cast<const Renderer *>(app) &&
+                    app->isExecuting())
+                {
+                    return true;
+                }
+            }
+        }
+    });
+    return false;
+}
+
+void Application::execute(NumRunning &numRunning)
+{
+    if (!m_alive)
+        return;
+
+    // set the Inputdataobjects to OLD
+    // set status of Module to RUNNING
+    m_numRunning = 0;
+
+    if (is_one_running_under())
+    {
+        m_isStarted = true;
+        numRunning.apps--;
+        return;
+    }
+    setExecuting(true);
+
+    //delete_all Objects if not saved
+    bool ret = delete_old_objs();
+    //give new Names to Output_objects
+    new_obj_names();
+    m_errorsSentByModule.clear();
+
+    string content = getStartMessage();
+    if (content.empty())
+    {
+        delete_rez_objs();
+        if (ret)
+            sendFinish();
+        --numRunning.apps;
+        setExecuting(false);
+        string text = "Sorry, can't execute module " + info().name + "_" + std::to_string(id) + "@" + host.userInfo().hostName;
+        Message err_msg{COVISE_MESSAGE_WARNING, text};
+        host.hostManager.sendAll<Userinterface>(err_msg);
+        return;
+    }
+
+    Message msg{COVISE_MESSAGE_START, content};
+    send(&msg);
+
+    content = this->get_inparaobj();
+    if (!content.empty())
+    {
+        msg = Message{COVISE_MESSAGE_START, content};
+        host.hostManager.sendAll<Userinterface>(msg);
+    }
+}
+
+int Application::overflowOfNextError() const
+{
+    constexpr int maxErrors = 25;
+    return std::max(static_cast<int>(m_errorsSentByModule.size()) + 1 - maxErrors, 0);
+}
+
+int Application::numMirrors() const
+{
+    return m_mirrors.size();
+}
+
+std::vector<Application *> &Application::getMirrors()
+{
+    return m_mirrors;
+}
+
+void Application::delete_dep_objs()
+{
+    bool objs_deleted = false;
+
+    m_connectivity.forAllNetInterfaces([&objs_deleted](net_interface &interface) {
+        if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
+        {
+            object *p_obj = interface.get_object();
+            if ((p_obj != NULL) && (!p_obj->isEmpty()))
+            {
+                p_obj->del_all_DO(0);
+                objs_deleted = true;
+                p_obj->del_dep_data();
+            }
+        }
+    });
+    // update the mapeditor with
+    if (objs_deleted)
+        sendFinish();
+}
+
+std::string Application::get_parameter(controller::Direction direction, bool forSaving) const
+{
+    const auto &params = direction == controller::Direction::Input ? connectivity().inputParams : connectivity().outputParams;
+    int i = 0;
+    std::stringstream ss;
+    ss << params.size() << "\n";
+    for (const auto &param : params)
+    {
+        ss << param.get_name() << "\n"
+           << param.get_type() << "\n"
+           << param.get_text() << "\n";
+        string value = param.get_val_list();
+        if (param.get_type() == "Browser" && forSaving)
+        {
+            auto fullPath = host.getModule(sender_type::CRB).as<CRBModule>()->covisePath;
+            string sep = fullPath.substr(0, 1);
+            fullPath.erase(0, 1);
+            auto pathList = splitString(fullPath, sep);
+            for (int i = 0; i < pathList.size(); i++)
+            {
+                const string &path = pathList[i];
+                int find = (int)value.find(path);
+                if (find != std::string::npos)
+                {
+                    value = value.substr(path.length());
+                    while (value.length() > 0 && value[0] == '/')
+                        value.erase(0, 1);
+                    break;
+                }
+            }
+        }
+        ss << value << "\n"
+           << "\n"
+           << param.get_addvalue() << "\n";
+    }
+    return ss.str();
+}
+
+std::string Application::get_interfaces(controller::Direction direction) const
+{
+    std::stringstream buffer;
+    int i = 0;
+    for (const auto &interface : connectivity().interfaces)
+    {
+        if (interface.get_direction() == direction)
+        {
+            ++i;
+            buffer << interface.get_name() << "\n"
+                   << interface.get_type() << "\n"
+                   << interface.get_text() << "\n"
+                   << interface.get_demand() << "\n"
+                   << "\n";
+        }
+    }
+    return std::to_string(i) + "\n" + buffer.str();
+}
+
+std::string Application::get_moduleinfo() const
+{
+    stringstream buffer;
+    buffer << info().name << "\n"
+           << instance() << "\n"
+           << (&host.hostManager.getLocalHost() == &host ? "LOCAL" : host.userInfo().hostName) << "\n"
+           << info().category << "\n"
+           << title() << "\n"
+           << pos().x << "\n"
+           << pos().y << "\n";
+    return buffer.str();
+}
+
+std::string Application::get_module(bool forSaving) const
+{
+    stringstream buffer;
+    buffer << "# Module " << info().name << "\n"
+           << get_moduleinfo()
+           << get_interfaces(controller::Direction::Input)
+           << get_interfaces(controller::Direction::Output)
+           << get_parameter(controller::Direction::Input, forSaving)
+           << get_parameter(controller::Direction::Output, forSaving);
+
+    return buffer.str();
+}
+
+void Application::setDeadFlag(int flag)
+{
+    connectivity().forAllNetInterfaces([flag](net_interface &interface) {
+        interface.setDeadFlag(flag);
+    });
+}
+
+void Application::writeScript(std::ofstream &of) const
+{
+    of << "#" << endl;
+    of << "# MODULE: " << info().name << endl;
+    of << "#" << endl;
+    of << title() << " = " << info().name << "()" << endl;
+
+    of << "network.add( " << title() << " )" << endl;
+
+    // get Position x y
+    of << title() << ".setPos( " << pos().x << ", " << pos().y << " )" << endl;
+
+    of << "#" << endl;
+    of << "# set parameter values" << endl;
+    of << "#" << endl;
+
+    for (const auto &param : connectivity().inputParams)
+    {
+        of << title() << ".set_" << param.get_name() << "( " << param.get_pyval_list() << " )" << endl;
+    }
+}
+
+std::string Application::serialize() const
+{
+    std::stringstream buff;
+    buff << info().name << "\n"
+         << id << "\n"
+         << host.userInfo().hostName << "\n";
+    return buff.str();
+}
+
+size_t Application::getNumInterfaces(controller::Direction direction) const
+{
+    size_t count = 0;
+    for (const auto &interface : m_connectivity.interfaces)
+    {
+        if (interface.get_direction() == direction)
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+std::string Application::serializeInputInterface(const net_interface &interface) const
+{
+    std::stringstream buff;
+    if (interface.get_conn_state())
+    {
+        buff << interface.get_name() << "\n"
+             << interface.get_object()->get_current_name() << "\n";
+    }
+    else
+        buff << interface.get_name() << "\nNOT CONNECTED>\n";
+    return buff.str();
+}
