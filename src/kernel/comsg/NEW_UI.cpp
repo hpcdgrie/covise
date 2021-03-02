@@ -14,8 +14,9 @@ IMPL_SUB_MESSAGE_CLASS(NEW_UI, NEW_UI_TYPE, HandlePartners,
     int, timeout,
     std::vector<int>, clients)
 
-IMPL_SUB_MESSAGE_CLASS(NEW_UI, NEW_UI_TYPE, RequestAvailablePartners, int, dummy)
+IMPL_SUB_MESSAGE_CLASS(NEW_UI, NEW_UI_TYPE, RequestAvailablePartners, std::string, dummy)
 IMPL_SUB_MESSAGE_CLASS(NEW_UI, NEW_UI_TYPE, AvailablePartners, ClientList, clients)
+IMPL_SUB_MESSAGE_CLASS(NEW_UI, NEW_UI_TYPE, RequestNewHost, char*, hostName, char*, userName, vrb::VrbCredentials, vrbCredentials)
 
 
 } //covise
