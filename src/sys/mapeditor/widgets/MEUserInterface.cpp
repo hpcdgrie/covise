@@ -1620,7 +1620,7 @@ void MEUserInterface::startRenderer(const covise::CRB_EXEC &arguments)
 
     // store render parameter
     m_renderName = arguments.name;
-    m_renderHost = arguments.localIp;
+    m_renderHost = arguments.controllerIp;
     m_renderInstance = arguments.moduleId;
 
     // create argumets for starting

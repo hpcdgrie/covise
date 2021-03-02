@@ -1011,7 +1011,7 @@ void MEMainHandler::execNet()
 void MEMainHandler::addPartner()
 {
     m_remotePartnersUpdated = false;
-    covise::NEW_UI_RequestAvailablePartners msg{0};
+    covise::NEW_UI_RequestAvailablePartners msg{std::string{}};
     covise::sendCoviseMessage(msg, *messageHandler);
     std::chrono::milliseconds timeout{0};
     while (timeout <= std::chrono::milliseconds{10000})

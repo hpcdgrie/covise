@@ -90,7 +90,7 @@ void MEMessageHandler::handleWork()
 {
     dataReceived(1);
 }
-bool MEMessageHandler::sendMessage(const covise::Message *msg){
+bool MEMessageHandler::sendMessage(const covise::Message *msg)const{
     if (m_userInterface)
     {
     m_userInterface->send_ctl_msg(msg);
@@ -99,7 +99,7 @@ bool MEMessageHandler::sendMessage(const covise::Message *msg){
     return false;
 }
 
-bool MEMessageHandler::sendMessage(const covise::UdpMessage *msg){
+bool MEMessageHandler::sendMessage(const covise::UdpMessage *msg) const{
     return false;
 }
 
@@ -1118,8 +1118,18 @@ void MEMessageHandler::receiveUIMessage(const covise::NEW_UI&msg){
         auto &subMsg = msg.unpackOrCast<covise::NEW_UI_AvailablePartners>();
         MEMainHandler::instance()->updateRemotePartners(subMsg.clients);
     }
-        break;
-    
+    break;
+    case covise::NEW_UI_TYPE::RequestNewHost:
+    {
+        auto &subMsg = msg.unpackOrCast<covise::NEW_UI_RequestNewHost>();
+        QString text = "Please start VrbRemoteLauncher on host " + QString{subMsg.hostName} +
+                       " as user " + QString(subMsg.userName) +
+                       "\nand connect to the VRB server running on " + QString(subMsg.vrbCredentials.ipAddress.c_str()) +
+                       " listening on port " + QString{subMsg.vrbCredentials.tcpPort} +
+                       " (udp-port: " + QString{subMsg.vrbCredentials.udpPort};
+        MEUserInterface::instance()->printMessage(text);
+        
+    }
     default:
         break;
     }

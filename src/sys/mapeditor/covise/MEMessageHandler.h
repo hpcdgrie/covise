@@ -53,8 +53,8 @@ public slots:
     void dataReceived(int);
     void handleWork();
 protected:
-    virtual bool sendMessage(const covise::Message *msg) override;
-    virtual bool sendMessage(const covise::UdpMessage *msg) override;
+    virtual bool sendMessage(const covise::Message *msg) const override;
+    virtual bool sendMessage(const covise::UdpMessage *msg) const override;
 private:
     static MEMessageHandler *singleton;
 
