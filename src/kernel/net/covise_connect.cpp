@@ -1398,10 +1398,10 @@ ConnectionList::~ConnectionList()
 
 const Connection *ConnectionList::add(std::unique_ptr<Connection> &&conn){
     auto connPtr = conn.get();
-    connlist.push_back(std::move(conn)); // field for the select call
     if (conn->get_id() > maxfd)
         maxfd = conn->get_id();
     FD_SET(conn->get_id(), &fdvar);
+    connlist.push_back(std::move(conn)); // field for the select call
     return connPtr;
 }
 
@@ -1436,13 +1436,13 @@ void ConnectionList::remove(const Connection *c) // remove a connection and upda
     auto it = std::find_if(connlist.begin(), connlist.end(), [c](const std::unique_ptr<Connection> &conn) {
         return &*conn == c;
     });
+    // the field for the select call
+    FD_CLR(c->get_id(), &fdvar);
     if (it != connlist.end())
         connlist.erase(it);
     //FIXME curidx
     if (curidx >= connlist.size())
         curidx = connlist.size();
-    // the field for the select call
-    FD_CLR(c->get_id(), &fdvar);
 }
 
 // aw 04/2000: Check whether PPID==1 or no sockets left: prevent hanging
