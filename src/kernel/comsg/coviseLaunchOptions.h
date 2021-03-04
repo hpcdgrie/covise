@@ -5,6 +5,7 @@ namespace covise
 {
 enum class LaunchStyle
 {
+    Local,
     Partner,
     Host,
     Disconnect,
@@ -13,8 +14,7 @@ enum class LaunchStyle
 constexpr int numLaunchStyles = static_cast < int>(LaunchStyle::LAST_DUMMY);
 namespace detail
 {
-
-    constexpr std::array<const char *, numLaunchStyles> LaunchStyleNames{"Partner", "Host", "Disconnect"};
+    constexpr std::array<const char *, numLaunchStyles> LaunchStyleNames{"Local", "Partner", "Host", "Disconnect"};
 }
 struct LaunchStyleNames{
     const char *operator[](LaunchStyle l)const{
