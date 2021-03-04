@@ -17,7 +17,9 @@ namespace controller
     class CTRLHandler;
     class Userinterface;
     std::string coviseBinDir();
-    std::vector<std::string> splitString(const std::string &str, const std::string &sep);
+    
+    //comments are substrings starting with #
+    std::vector<std::string> splitStringAndRemoveComments(const std::string &str, const std::string &sep);
     bool load_config(const std::string &filename, CTRLHandler &handler, const std::vector<const Userinterface *> &uis);
 
 } // namespace controller

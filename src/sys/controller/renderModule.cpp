@@ -21,7 +21,7 @@ using namespace covise::controller;
 //**********************************************************************
 
 Display::Display(Renderer &renderer, const controller::RemoteHost &host)
-: Module(moduleType, host, renderer.type, renderer.getInfo())
+: SubProcess(moduleType, host, renderer.type, renderer.getInfo())
 , m_renderer(renderer)
 {
 }
@@ -177,7 +177,7 @@ void Display::send_message(Message *msg)
 
 
 
-Renderer::Renderer(const RemoteHost &host, const StaticModuleInfo &moduleInfo, int instance)
+Renderer::Renderer(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance)
     : Application(host, moduleInfo, instance)
 {
     assert(moduleInfo.category == "Renderer");
@@ -240,7 +240,7 @@ bool containsDisplay(const std::vector<std::unique_ptr<Display>> &displays, cons
 
 bool Renderer::initDisplays(int copy)
 {
-    const Module *localUi = nullptr;
+    const SubProcess *localUi = nullptr;
     try
     {
         localUi = &host.getModule(sender_type::USERINTERFACE);
@@ -263,6 +263,7 @@ bool Renderer::initDisplays(int copy)
             Message msg;
             newDisplay->recv_msg(&msg);
             newDisplay->m_info.readConnectivity(msg.data.data());
+            m_info.readConnectivity(msg.data.data());
             std::string info_str = info().name + "\n" + std::to_string(instance()) + "\n" + ui->host.userInfo().hostName;
             newDisplay->send_status(info_str);
         }
@@ -283,7 +284,7 @@ bool Renderer::initDisplays(int copy)
     return 1;
 }
 
-StaticModuleInfo &Renderer::getInfo()
+ModuleInfo &Renderer::getInfo()
 {
     return m_info;
 }

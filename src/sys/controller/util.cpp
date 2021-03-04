@@ -40,11 +40,14 @@ std::string covise::controller::coviseBinDir()
     return binDir;
 }
 
-std::vector<std::string> covise::controller::splitString(const std::string &str, const std::string &sep){
+std::vector<std::string> covise::controller::splitStringAndRemoveComments(const std::string &str, const std::string &sep){
     std::vector<std::string> list;
     boost::split(list, str, boost::is_any_of(sep));
-    return list;
+    list.erase(std::remove_if(list.begin(), list.end(), [](const std::string &s) {
+        return s[0] == '#';
+    }), list.end());
 
+    return list;
 }
 
 constexpr size_t NET_FILE_VERSION = 632;

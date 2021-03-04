@@ -19,22 +19,22 @@ class CRBModule;
 struct UIOptions{
     enum Type
     {
-        python,
         gui,
+        python,
         miniGui,
         nogui
-    }type;
+    }type = gui;
     std::string pyFile;
     bool iconify = false;
     bool maximize = false;
 };
 
-class Userinterface : public Module
+class Userinterface : public SubProcess
 {
 
 public:
-    static const Module::Type moduleType = Module::Type::UI;
-    Userinterface(const RemoteHost& host, const StaticModuleInfo &info);
+    static const SubProcess::Type moduleType = SubProcess::Type::UI;
+    Userinterface(const RemoteHost& host, const ModuleInfo &info);
     virtual ~Userinterface();
     enum Status
     {
@@ -53,7 +53,7 @@ public:
 
     virtual bool start(const UIOptions &options, const CRBModule &crb, bool restart) = 0;
     bool restart(const UIOptions &options);
-    bool xstart(const UIOptions &options, const Module &crb);
+    bool xstart(const UIOptions &options, const SubProcess &crb);
     void quit();
 
 protected:
@@ -62,13 +62,13 @@ protected:
     bool rendererIsPossible;
     bool rendererIsActive;
     const CRBModule *m_crb = nullptr;
-    bool updateUI();
+    void updateUI();
 };
 
 
 struct MapEditor : Userinterface
 {
-    static StaticModuleInfo uiMapEditorInfo;
+    static ModuleInfo uiMapEditorInfo;
     MapEditor(const RemoteHost& host);
 
     bool start(const UIOptions &options, const CRBModule &crb, bool restart) override;
@@ -76,14 +76,14 @@ struct MapEditor : Userinterface
 
 struct WsInterface : Userinterface
 {
-    static StaticModuleInfo wsInterfaceInfo;
+    static ModuleInfo wsInterfaceInfo;
     WsInterface(const RemoteHost &host);
     bool start(const UIOptions &options, const CRBModule &crb, bool restart) override;
 };
 
 struct PythonInterface : Userinterface{
 
-    PythonInterface(const RemoteHost& host, const StaticModuleInfo &info);
+    PythonInterface(const RemoteHost& host, const ModuleInfo &info);
     bool start(const UIOptions &options, const CRBModule &crb, bool restart) override;
 
 };

@@ -206,7 +206,7 @@ void parameter::set_value_list(string strVal)
             return;
         }
 
-        vector<string> list = splitString(strVal, " ");
+        vector<string> list = splitStringAndRemoveComments(strVal, " ");
         for (int i = 0; i < list.size(); i++)
         {
             Value *tmp_val = new Value;
@@ -461,10 +461,6 @@ void net_interface::set_outputtype(const string & /*unused*/, const string &DO_t
     {
         obj->set_outputtype(DO_type);
     }
-}
-
-std::string net_interface::serialize() const
-{
 }
 
 //**********************************************************************

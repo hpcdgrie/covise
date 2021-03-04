@@ -223,7 +223,6 @@ public:
         m_alreadyDead = flag;
     }
     void set_outputtype(const std::string &DO_name, const std::string &DO_type);
-    std::string serialize() const;
 };
 
 /************************************************************************/

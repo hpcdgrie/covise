@@ -16,8 +16,8 @@
 
 using namespace covise::controller;
 
-Userinterface::Userinterface(const RemoteHost &h, const StaticModuleInfo &info)
-    : Module(moduleType, h, sender_type::USERINTERFACE, info)
+Userinterface::Userinterface(const RemoteHost &h, const ModuleInfo &info)
+    : SubProcess(moduleType, h, sender_type::USERINTERFACE, info)
     , m_status(Slave)
 {
 }
@@ -68,7 +68,7 @@ bool Userinterface::restart(const UIOptions &options)
         ostringstream oss;
         oss << "MODULE_TITLE\n"
             << mod->createBasicModuleDescription()
-            << mod->title() << "\n";
+            << mod->fullName() << "\n";
         msg = Message{COVISE_MESSAGE_UI, oss.str()};
         send(&msg);
 
@@ -155,19 +155,20 @@ void Userinterface::changeMaster(const RemoteHost &master)
 }
 
 
-bool Userinterface::updateUI(){
-for (const CRBModule *remoteCrb : host.hostManager.getAllModules<CRBModule>())
-{
-    if (remoteCrb->host.state() != LaunchStyle::Disconnect)
+void Userinterface::updateUI(){
+    for (const CRBModule *remoteCrb : host.hostManager.getAllModules<CRBModule>())
     {
-        Message ui_msg{remoteCrb->initMessage};
-        ui_msg.type = COVISE_MESSAGE_UI;
-        send(&ui_msg);
+        if (remoteCrb->host.state() != LaunchStyle::Disconnect)
+        {
+            Message ui_msg{remoteCrb->initMessage};
+            ui_msg.type = COVISE_MESSAGE_UI;
+            send(&ui_msg);
+        }
     }
-}
+
 }
 
-StaticModuleInfo MapEditor::uiMapEditorInfo{"mapeditor", "graphical userinterface with map editor"};
+ModuleInfo MapEditor::uiMapEditorInfo{"mapeditor", ""};
 
 
 MapEditor::MapEditor(const RemoteHost &h)
@@ -178,7 +179,7 @@ MapEditor::MapEditor(const RemoteHost &h)
 bool MapEditor::start(const UIOptions &options, const CRBModule &crb, bool restart) // if restart is true a restart was done
 {
     m_crb = &crb;
-    if (!Module::start("001"))
+    if (!SubProcess::start("001"))
         return false;
     if (!connect(crb))
         return false;
@@ -224,7 +225,7 @@ bool MapEditor::start(const UIOptions &options, const CRBModule &crb, bool resta
     return 0;
 }
 
-StaticModuleInfo WsInterface::wsInterfaceInfo{"wsinterface", "web-service interface"};
+ModuleInfo WsInterface::wsInterfaceInfo{"wsinterface", ""};
 
 
 WsInterface::WsInterface(const RemoteHost& host)
@@ -240,7 +241,7 @@ bool WsInterface::start(const UIOptions &options, const CRBModule &crb, bool res
     if (ws_enabled)
     {
         const char *instance = "ws001";
-        Module::start(instance);
+        SubProcess::start(instance);
     }
     else
     {
@@ -270,7 +271,7 @@ bool WsInterface::start(const UIOptions &options, const CRBModule &crb, bool res
 }
 
 
-PythonInterface::PythonInterface(const RemoteHost& host, const StaticModuleInfo &info)
+PythonInterface::PythonInterface(const RemoteHost& host, const ModuleInfo &info)
 :Userinterface(host, info)
 {
 }
@@ -279,7 +280,7 @@ bool PythonInterface::start(const UIOptions &options, const CRBModule &crb, bool
     m_crb = &crb;
     string instanz("001");
 
-    if (!Module::start("001"))
+    if (!SubProcess::start("001"))
         return false;
     if (!connect(crb))
         return false;

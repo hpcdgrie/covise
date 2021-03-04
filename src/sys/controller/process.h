@@ -20,7 +20,7 @@ namespace covise
 namespace controller{
 
 struct RemoteHost;
-
+//Holds the input and output ports of a module and their parameters
 struct ModuleNetConnectivity
 {
     std::vector<C_interface> interfaces;
@@ -42,16 +42,18 @@ const parameter *getParameter(const std::vector<parameter> &params, const std::s
 parameter *getParameter(std::vector<parameter> &params, const std::string &parameterName);
 
 //name, category and connectivity info of a module class
-struct StaticModuleInfo
+//and the module count wich is used to give each instance of a module its instance
+struct ModuleInfo
 {
-    StaticModuleInfo(const std::string &name, const std::string &category);
-    const std::string name, category;
+    ModuleInfo(const std::string &name, const std::string &category);
+    const std::string name;  //executable of the module must be under $COVISE_PATH/$ARCHSUFFIX/bin/name
+    const std::string category; //if set used as sub-directory in $COVISE_PATH/$ARCHSUFFIX/bin/category/name
     mutable size_t count = 0;
     const ModuleNetConnectivity connectivity() const;
     const std::string &description() const;
     void readConnectivity(const char *buff);
-    bool operator==(const StaticModuleInfo &other) const;
-    bool operator<(const StaticModuleInfo &other) const;
+    bool operator==(const ModuleInfo &other) const;
+    bool operator<(const ModuleInfo &other) const;
 
 
 private:
@@ -61,7 +63,7 @@ private:
 
 //representation of a connected covice process (crbs, uis and modules)
 //each host has exacly one CRBModule (if it is connected) and up to one Userinterface
-struct Module : MessageSenderInterface
+struct SubProcess : MessageSenderInterface
 {
     enum class Type
     {
@@ -70,12 +72,12 @@ struct Module : MessageSenderInterface
         App,
         Display
     };
-    Module(Type t, const RemoteHost&host, sender_type type, const StaticModuleInfo &moduleInfo);
-    virtual ~Module();
-    Module(const Module &) = delete;
-    Module(Module &&) = default;
-    Module &operator=(const Module &) = delete;
-    Module &operator=(Module &&) = default;
+    SubProcess(Type t, const RemoteHost&host, sender_type type, const ModuleInfo &moduleInfo);
+    virtual ~SubProcess();
+    SubProcess(const SubProcess &) = delete;
+    SubProcess(SubProcess &&) = default;
+    SubProcess &operator=(const SubProcess &) = delete;
+    SubProcess &operator=(SubProcess &&) = default;
 
 
     static void resetId(); //reset global module id
@@ -85,7 +87,7 @@ struct Module : MessageSenderInterface
     template <typename T>
     const T *as() const
     {
-        return const_cast<Module *>(this)->as<T>();
+        return const_cast<SubProcess *>(this)->as<T>();
     }
 
     template <typename T>
@@ -103,18 +105,18 @@ struct Module : MessageSenderInterface
     const Connection *conn() const;
     void recv_msg(Message *msg) const;
     bool start(const char* instance);
-    const StaticModuleInfo &info() const;
-    bool connect(const Module &crb);
+    const ModuleInfo &info() const;
+    bool connect(const SubProcess &crb);
     
 protected:
     virtual bool sendMessage(const Message *msg) const override;
     virtual bool sendMessage(const UdpMessage *msg) const override;
-    bool connect(const Module &crb, covise_msg_type type);
+    bool connect(const SubProcess &crb, covise_msg_type type);
     const Connection *m_conn; // connection to this other module managed by process::list_of_connections
-    StaticModuleInfo m_info;
+    ModuleInfo m_info; //
 private:
-    const Type m_type;
-    static size_t moduleCount;
+    const Type m_type; //type use to safely upcast
+    static size_t moduleCount; //global number of SubProcesses
     int port = 0;
 };
 } // namespace controller

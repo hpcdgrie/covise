@@ -20,7 +20,7 @@ namespace controller{
 
 struct NumRunning;
 //rename Application to module and module to ConnectedProcess
-struct Application : Module
+struct Application : SubProcess
 {
     enum class Status
     {
@@ -29,13 +29,14 @@ struct Application : Module
         starting,
         stopping
     };
-    static const Module::Type moduleType = Module::Type::App;
-    Application(const RemoteHost &host, const StaticModuleInfo &moduleInfo, int instance);
+    static const SubProcess::Type moduleType = SubProcess::Type::App;
+    Application(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance);
     virtual ~Application();
     bool isOnTop() const;
     virtual void exec(NumRunning &numRunning);
 
-    std::string title() const;
+    std::string fullName() const; //unambiguous name of a module consisting of name_id
+    const std::string &title() const;
 
     /// this flag is set if the module should be started
     bool startflag() const;
@@ -102,7 +103,7 @@ struct Application : Module
 
 private:
     std::string m_description;
-
+    std::string m_title; //the name that is shown in the map editor
     ModuleNetConnectivity m_connectivity;
 
     bool m_isStarted = false;

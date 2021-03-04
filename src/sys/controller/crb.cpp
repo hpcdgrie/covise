@@ -18,17 +18,17 @@ using namespace covise::controller;
 
 const std::array<const char *, static_cast<int>(Userinterface::Status::LASTDUMMY)> Userinterface::statusNames{"MASTER", "SLAVE"};
 
-StaticModuleInfo CRBModule::crbModuleInfo{"crb", "crb"};
-StaticModuleInfo CRBModule::crbProxyModuleInfo{"crbProxy", "crb"};
+ModuleInfo CRBModule::crbModuleInfo{"crb", ""};
+ModuleInfo CRBModule::crbProxyModuleInfo{"crbProxy", ""};
 
 CRBModule::CRBModule(const RemoteHost &host, bool proxy)
-    : Module(moduleType, host, sender_type::CRB, proxy ? crbProxyModuleInfo : crbModuleInfo)
+    : SubProcess(moduleType, host, sender_type::CRB, proxy ? crbProxyModuleInfo : crbModuleInfo)
 {
 }
 
 CRBModule::~CRBModule()
 {
-    if (CTRLHandler::instance()->Config->getshmMode(host.userInfo().hostName) != ShmMode::Default)
+    if (CTRLHandler::instance()->Config.getshmMode(host.userInfo().hostName) != ShmMode::Default)
     {
         Message msg{COVISE_MESSAGE_QUIT, ""};
         send(&msg);
@@ -39,7 +39,7 @@ bool CRBModule::init()
 {
     tryReceiveMessage(initMessage);
     if (!initMessage.data.data())
-        return 0;
+        return false;
     checkCoviseVersion(initMessage, host.userInfo().hostName);
     prepareInitMessageForUIs();
     tryReceiveMessage(interfaceMessage);
@@ -47,8 +47,12 @@ bool CRBModule::init()
 
     for (const auto crb : host.hostManager.getAllModules<CRBModule>())
     {
-        connectOtherCRB(*crb);
+        if (crb != this)
+        {
+            connectOtherCRB(*crb);
+        }
     }
+    return true;
 }
 
 bool CRBModule::checkCoviseVersion(const Message &versionMessage, const std::string &hostname)
@@ -131,7 +135,7 @@ void CRBModule::queryDataPath()
         covisePath = msg.data.data();
 }
 
-bool CRBModule::connectOtherCRB(const Module &crb)
+bool CRBModule::connectOtherCRB(const SubProcess &crb)
 {
     return connect(crb, COVISE_MESSAGE_DM_CONTACT_DM);
 }

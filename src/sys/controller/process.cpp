@@ -121,25 +121,25 @@ parameter *controller::getParameter(std::vector<parameter> &params, const std::s
     return const_cast<parameter *>(getParameter(const_cast<const std::vector<parameter> &>(params), parameterName));
 }
 
-StaticModuleInfo::StaticModuleInfo(const std::string &name, const std::string &category)
+ModuleInfo::ModuleInfo(const std::string &name, const std::string &category)
     : name(name), category(category) {}
 
-const ModuleNetConnectivity StaticModuleInfo::connectivity() const
+const ModuleNetConnectivity ModuleInfo::connectivity() const
 {
     return m_connectivity;
 }
 
-const std::string &StaticModuleInfo::description() const
+const std::string &ModuleInfo::description() const
 {
     return m_description;
 }
 
-void StaticModuleInfo::readConnectivity(const char *data)
+void ModuleInfo::readConnectivity(const char *data)
 {
     m_connectivity.interfaces.clear();
     m_connectivity.inputParams.clear();
     m_connectivity.outputParams.clear();
-    auto list = splitString(data, "\n");
+    auto list = splitStringAndRemoveComments(data, "\n");
     int iel = 3;
     m_description = list[iel++];
     std::array<int, 4> interfaceAndParamCounts; //in_interface, out_interface, in_param, out_param
@@ -169,39 +169,39 @@ void StaticModuleInfo::readConnectivity(const char *data)
     }
 }
 
-bool StaticModuleInfo::operator==(const StaticModuleInfo &other) const
+bool ModuleInfo::operator==(const ModuleInfo &other) const
 {
     return name ==other.name;
 }
 
-bool StaticModuleInfo::operator<(const StaticModuleInfo &other) const
+bool ModuleInfo::operator<(const ModuleInfo &other) const
 {
     return name <other.name;
 }
 
 
-size_t controller::Module::moduleCount = 0;
+size_t controller::SubProcess::moduleCount = 0;
 
-Module::Module(Type t, const RemoteHost &h, sender_type type, const StaticModuleInfo &moduleInfo)
+SubProcess::SubProcess(Type t, const RemoteHost &h, sender_type type, const ModuleInfo &moduleInfo)
     : host(h), type(type), m_info(moduleInfo), id(moduleCount++), m_type(t)
 {
 }
 
-Module::~Module()
+SubProcess::~SubProcess()
 {
     CTRLGlobal::getInstance()->controller->getConnectionList()->remove(m_conn);
 }
 
-void Module::resetId(){
+void SubProcess::resetId(){
     moduleCount = 0;
 }
 
-const Connection *Module::conn() const
+const Connection *SubProcess::conn() const
 {
     return &*m_conn;
 }
 
-void Module::recv_msg(Message *msg) const
+void SubProcess::recv_msg(Message *msg) const
 {
     if (m_conn)
     {
@@ -209,24 +209,24 @@ void Module::recv_msg(Message *msg) const
     }
 };
 
-bool Module::sendMessage(const Message *msg) const
+bool SubProcess::sendMessage(const Message *msg) const
 {
     if (m_conn)
         return m_conn->sendMessage(msg);
     return false;
 }
 
-bool Module::sendMessage(const UdpMessage *msg) const
+bool SubProcess::sendMessage(const UdpMessage *msg) const
 {
     return false;
 }
 
-bool Module::connect(const Module &crb)
+bool SubProcess::connect(const SubProcess &crb)
 {
     return connect(crb, COVISE_MESSAGE_APP_CONTACT_DM);
 }
 
-bool Module::connect(const Module &crb, covise_msg_type type)
+bool SubProcess::connect(const SubProcess &crb, covise_msg_type type)
 {
     if (&crb == this)
     {
@@ -270,7 +270,7 @@ bool Module::connect(const Module &crb, covise_msg_type type)
     } while (true);
 }
 
-bool Module::setupConn(std::function<bool(int)> sendConnMessage)
+bool SubProcess::setupConn(std::function<bool(int)> sendConnMessage)
 {
     int port = 0;
     auto conn = createListeningConn<ServerConnection>(&port, id, (int)CONTROLLER);
@@ -283,26 +283,27 @@ bool Module::setupConn(std::function<bool(int)> sendConnMessage)
             return false;
         }
         conn->set_peer(id, type);
-        m_conn = covise::Process::this_process->getConnectionList()->add(std::move(conn));
+    
+        m_conn = CTRLGlobal::getInstance()->controller->getConnectionList()->add(std::move(conn));
         return true;
     }
     return false;
 }
 
-bool Module::start(const char *instance)
+bool SubProcess::start(const char *instance)
 {
-    setupConn([this, instance](int port) {
+    return setupConn([this, instance](int port) {
         auto &controllerHost = host.hostManager.getLocalHost();
         CRB_EXEC crbExec{covise::ExecFlag::Normal, info().name.c_str(), port, controllerHost.userInfo().ipAdress.c_str(), static_cast<int>(id), instance,
                          host.userInfo().ipAdress.c_str(), host.userInfo().userName.c_str(),
-                         nullptr, host.ID(), vrb::VrbCredentials{}, std::vector<std::string>{}};
+                         info().category.c_str(), host.ID(), vrb::VrbCredentials{}, std::vector<std::string>{}};
 
         host.launchProcess(crbExec);
         return true;
     });
 }
 
-const StaticModuleInfo &Module::info() const
+const ModuleInfo &SubProcess::info() const
 {
     return m_info;
 }

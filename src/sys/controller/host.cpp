@@ -32,12 +32,12 @@
 using namespace covise;
 using namespace covise::controller;
 
-const Module &RemoteHost::getModule(sender_type type) const
+const SubProcess &RemoteHost::getModule(sender_type type) const
 {
     return const_cast<RemoteHost *>(this)->getModule(type);
 }
 
-Module &RemoteHost::getModule(sender_type type)
+SubProcess &RemoteHost::getModule(sender_type type)
 {
     auto it = std::find_if(m_modules.begin(), m_modules.end(), [type](const ProcessList::value_type &m) {
         return m->type == type;
@@ -56,11 +56,12 @@ const Application &RemoteHost::getApplication(const std::string &name, int insta
 
 Application &RemoteHost::getApplication(const std::string &name, int instance)
 {
-    auto app = std::find_if(begin(), end(), [&name, &instance](const std::unique_ptr<Module> &mod) {
+    auto app = std::find_if(begin(), end(), [&name, &instance](const std::unique_ptr<SubProcess> &mod) {
         if (const auto app = dynamic_cast<const Application *>(&*mod))
         {
             return app->info().name == name && app->instance() == instance;
         }
+        return false;
     });
     if (app != end())
     {
@@ -72,7 +73,7 @@ Application &RemoteHost::getApplication(const std::string &name, int instance)
 void RemoteHost::removeApplication(Application &app, int alreadyDead)
 {
     app.setDeadFlag(alreadyDead);
-    m_modules.erase(std::remove_if(m_modules.begin(), m_modules.end(), [&app](const std::unique_ptr<Module> &mod) {
+    m_modules.erase(std::remove_if(m_modules.begin(), m_modules.end(), [&app](const std::unique_ptr<SubProcess> &mod) {
                         return &*mod == &app;
                     }),
                     m_modules.end());
@@ -117,7 +118,6 @@ bool RemoteHost::startCrb(ShmMode shmMode)
             std::cerr << "startCrb failed to spawn CRB connection" << std::endl;
             return false;
         }
-        connectShm(*crbModule);
         if (!crbModule->init())
         {
             return false;
@@ -126,13 +126,14 @@ bool RemoteHost::startCrb(ShmMode shmMode)
         Message msg = crbModule->initMessage;
         msg.type = COVISE_MESSAGE_UI;
         hostManager.sendAll<Userinterface>(msg);
+        connectShm(*crbModule);
 
         return true;
     }
-    catch (const std::exception &e)
+    catch (const Exception &e)
     {
         std::cerr << e.what() << '\n';
-        std::cerr << "startCrb called on host" << userInfo().hostName << " but crb is already running!" << std::endl;
+        std::cerr << "startCrb called on host " << userInfo().hostName << " but crb is already running!" << std::endl;
         return false;
     }
 }
@@ -149,7 +150,7 @@ void RemoteHost::determineAvailableModules(const CRBModule &crb)
     //HOST      1
     //USER      2
     //NUMBER    3
-    auto list = splitString(crb.initMessage.data.data(), "\n");
+    auto list = splitStringAndRemoveComments(crb.initMessage.data.data(), "\n");
     int mod_count = std::stoi(list[3]);
     int iel = 4;
     for (int i = 0; i < mod_count; i++)
@@ -182,7 +183,7 @@ bool RemoteHost::startUI(const UIOptions &options, const RemoteHost &master)
     {
     case UIOptions::python:
     {
-        m_pythonUiInfo.reset(new StaticModuleInfo{detail::PythonInterfaceExecutable + options.pyFile, "python based command line interface"});
+        m_pythonUiInfo.reset(new ModuleInfo{detail::PythonInterfaceExecutable + options.pyFile, ""});
         auto modInfo = *m_availableModules.emplace(m_availableModules.end(), &*m_pythonUiInfo);
         ui.reset(new PythonInterface{*this, *modInfo});
     }
@@ -212,7 +213,7 @@ bool RemoteHost::startUI(std::unique_ptr<Userinterface> &&ui, const UIOptions &o
     }
     try
     {
-        if (ui->start(options, dynamic_cast<const CRBModule&>(master.getModule(CRB)), false))
+        if (ui->start(options, dynamic_cast<const CRBModule &>(master.getModule(CRB)), false))
         {
             m_modules.push_back(std::move(ui));
             return true;
@@ -222,8 +223,8 @@ bool RemoteHost::startUI(std::unique_ptr<Userinterface> &&ui, const UIOptions &o
     {
         std::cerr << e.what() << '\n';
         std::cerr << "startUI failed: no CRB running on master" << std::endl;
-        return false;
     }
+    return false;
 }
 
 void RemoteHost::launchProcess(const CRB_EXEC &exec) const
@@ -242,15 +243,15 @@ void RemoteHost::launchProcess(const CRB_EXEC &exec) const
 
 bool RemoteHost::isModuleAvailable(const std::string &moduleName) const
 {
-    auto it = std::find_if(m_availableModules.begin(), m_availableModules.end(), [&moduleName](const StaticModuleInfo *info) { return info->name == moduleName; });
+    auto it = std::find_if(m_availableModules.begin(), m_availableModules.end(), [&moduleName](const ModuleInfo *info) { return info->name == moduleName; });
     return it != m_availableModules.end();
 }
 
 Application &RemoteHost::startApplicationModule(const string &name, const string &instanz,
-                                                      int posx, int posy, int copy, ExecFlag flags, Application *mirror)
+                                                int posx, int posy, int copy, ExecFlag flags, Application *mirror)
 {
     // check the Category of the Module
-    auto moduleInfo = std::find_if(m_availableModules.begin(), m_availableModules.end(), [&name](const StaticModuleInfo *info) {
+    auto moduleInfo = std::find_if(m_availableModules.begin(), m_availableModules.end(), [&name](const ModuleInfo *info) {
         return info->name == name;
     });
     if (moduleInfo == m_availableModules.end())
@@ -258,7 +259,7 @@ Application &RemoteHost::startApplicationModule(const string &name, const string
         throw Exception{"failed to start " + name + "on " + userInfo().hostName + ": module not available!"};
     }
     int nr = std::stoi(instanz);
-    Module *module = nullptr;
+    SubProcess *module = nullptr;
     if ((*moduleInfo)->category == "Renderer")
     {
         module = &**m_modules.emplace(m_modules.end(), new Renderer{*this, **moduleInfo, nr});
@@ -310,6 +311,12 @@ void LocalHost::launchCrb(vrb::Program exec, const std::vector<std::string> &cmd
 {
     auto execPath = coviseBinDir() + vrb::programNames[exec];
     spawnProgram(execPath, cmdArgs);
+}
+
+LocalHost::LocalHost(const HostManager &manager, vrb::Program type, const std::string &sessionName)
+    : RemoteHost(manager, type, sessionName)
+{
+    m_state = LaunchStyle::Local;
 }
 
 void LocalHost::connectShm(const CRBModule &crbModule)
@@ -381,7 +388,7 @@ void RemoteHost::handleAction(covise::LaunchStyle action)
 
 void RemoteHost::addPartner()
 {
-    startCrb(CTRLHandler::instance()->Config->getshmMode(userInfo().hostName));
+    startCrb(CTRLHandler::instance()->Config.getshmMode(userInfo().hostName));
     startUI(CTRLHandler::instance()->uiOptions(), hostManager.getMasterUi().host);
 }
 
@@ -393,7 +400,6 @@ HostManager::HostManager()
           handleVrb();
       })
 {
-    m_localHost->second->startCrb(CTRLHandler::instance()->Config->getshmMode(m_localHost->second->userInfo().hostName));
 }
 
 HostManager::~HostManager()
@@ -402,7 +408,7 @@ HostManager::~HostManager()
     m_thread.join();
 }
 
-covise::Message HostManager::sendPartnerList()
+void HostManager::sendPartnerList()
 {
     std::lock_guard<std::mutex> g{m_mutex};
     std::cerr << "vrb remote launchers requested:" << std::endl;
@@ -490,9 +496,9 @@ const RemoteHost &HostManager::findHost(const std::string &hostName) const
     return const_cast<HostManager *>(this)->findHost(hostName);
 }
 
-std::vector<const Module *> HostManager::getAllModules(sender_type type) const
+std::vector<const SubProcess *> HostManager::getAllModules(sender_type type) const
 {
-    std::vector<const Module *> modules;
+    std::vector<const SubProcess *> modules;
     for (const auto &host : m_hosts)
     {
         for (const auto &module : *host.second)
@@ -511,7 +517,7 @@ HostManager::HostMap::const_iterator HostManager::begin() const
     return m_hosts.begin();
 }
 
-HostManager::HostMap::iterator HostManager::begin() 
+HostManager::HostMap::iterator HostManager::begin()
 {
     return m_hosts.begin();
 }
@@ -526,7 +532,7 @@ HostManager::HostMap::iterator HostManager::end()
     return m_hosts.end();
 }
 
-Module *HostManager::findModule(int peerID)
+SubProcess *HostManager::findModule(int peerID)
 {
     for (auto &host : m_hosts)
     {
@@ -626,9 +632,9 @@ std::string HostManager::getHostsInfo() const
     return buffer.str();
 }
 
-const StaticModuleInfo &HostManager::registerModuleInfo(const std::string &name, const std::string &category) const
+const ModuleInfo &HostManager::registerModuleInfo(const std::string &name, const std::string &category) const
 {
-    return *m_availableModules.insert(StaticModuleInfo{name, category}).first;
+    return *m_availableModules.insert(ModuleInfo{name, category}).first;
 }
 
 void HostManager::resetModuleInstances()

@@ -14,25 +14,16 @@
 #include <functional>
 #include <boost/program_options.hpp>
 
-#include <appl/CoviseBase.h>
 #include <comsg/CRB_EXEC.h>
 #include <comsg/NEW_UI.h>
 #include <comsg/coviseLaunchOptions.h>
 #include <config/CoviseConfig.h>
-#include <config/coConfig.h>
-#include <covise/covise.h>
-#include <covise/covise_msg.h>
-#include <net/covise_connect.h>
 #include <net/covise_host.h>
-#include <net/tokenbuffer.h>
-#include <net/tokenbuffer_serializer.h>
-#include <util/coFileUtil.h>
-#include <util/coTimer.h>
+#include <util/coSignal.h>
 #include <util/covise_version.h>
-#include <util/unixcompat.h>
-#include <vrb/VrbSetUserInfoMessage.h>
-#include <vrb/client/LaunchRequest.h>
-#include <vrb/client/VRBClient.h>
+#include <config/coConfig.h>
+#include <appl/CoviseBase.h>
+#include <util/coTimer.h>
 
 #include "controlProcess.h"
 #include "exception.h"
@@ -168,7 +159,7 @@ CTRLHandler *CTRLHandler::singleton = nullptr;
 CTRLHandler::CTRLHandler(int argc, char *argv[])
     : m_autosavefile(autosaveFile())
 {
-
+    std::cerr << "starting covise" << std::endl;
     singleton = this;
 
     preventBrokenPipe();
@@ -184,8 +175,7 @@ CTRLHandler::CTRLHandler(int argc, char *argv[])
     lookupSiblings();
     printWelcomeMessage();
     // read covise.config
-    Config = new ControlConfig;
-    m_hostManager.getLocalHost().startCrb(Config->getshmMode(m_hostManager.getLocalHost().userInfo().hostName));
+    m_hostManager.getLocalHost().startCrb(Config.getshmMode(m_hostManager.getLocalHost().userInfo().hostName));
     m_hostManager.getLocalHost().startUI(m_options.uiOptions, m_hostManager.getLocalHost());
 
     loadNetworkFile();
@@ -375,7 +365,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
 
         // handle message, change parameter
         int iel = 0;
-        vector<string> list = splitString(copyMessageData, "\n");
+        vector<string> list = splitStringAndRemoveComments(copyMessageData, "\n");
         const string &name = list[iel++];
         const string &nr = list[iel++];
         const string &host = list[iel++];
@@ -428,7 +418,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
     case COVISE_MESSAGE_COVISE_ERROR:
     {
         int iel = 0;
-        vector<string> list = splitString(copyMessageData, "\n");
+        vector<string> list = splitStringAndRemoveComments(copyMessageData, "\n");
         const string &name = list[iel++];
         const string &nr = list[iel++];
         const string &host = list[iel++];
@@ -473,7 +463,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
     {
 
         int iel = 0;
-        vector<string> list = splitString(copyMessageData, "\n");
+        vector<string> list = splitStringAndRemoveComments(copyMessageData, "\n");
         const string &name = list[iel++];
         const string &nr = list[iel++];
         const string &host = list[iel++];
@@ -508,7 +498,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
 
          */
         int iel = 0;
-        vector<string> list = splitString(copyMessageData, "\n");
+        vector<string> list = splitStringAndRemoveComments(copyMessageData, "\n");
         string key = list[iel++];
         string action = list[iel++];
 
@@ -557,7 +547,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
     {
 
         int iel = 0;
-        vector<string> list = splitString(copyMessageData, "\n");
+        vector<string> list = splitStringAndRemoveComments(copyMessageData, "\n");
         const string &name = list[iel++];
         const string &instanz = list[iel++];
         const string &host = list[iel++];
@@ -671,7 +661,7 @@ void CTRLHandler::handleClosedMsg(const std::unique_ptr<Message> &msg)
         {
             del_mod = true;
             std::stringstream ss;
-            ss << "Module " << p_app->title() << "@" << p_app->host.userInfo().hostName << " crashed !!!";
+            ss << "Module " << p_app->fullName() << "@" << p_app->host.userInfo().hostName << " crashed !!!";
             msg_txt = ss.str();
             instance = p_app->instance();
         }
@@ -945,7 +935,7 @@ void CTRLHandler::handleFinall(const std::unique_ptr<Message> &msg, string copyM
 {
 
     int iel = 0;
-    vector<string> list = splitString(copyMessageData, "\n");
+    vector<string> list = splitStringAndRemoveComments(copyMessageData, "\n");
     const string &name = list[iel++];
     const string &instance = list[iel++];
     const string &hostName = list[iel++];
@@ -1069,7 +1059,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
 {
 
     int iel = 0;
-    vector<string> list = splitString(copyData, "\n");
+    vector<string> list = splitStringAndRemoveComments(copyData, "\n");
 
     //  get Message-Keyword
     const string &key = list[iel++];
@@ -1114,7 +1104,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         sendCollaborativeState();
     }
 
-    else if (key == "INIT" || key == "INIT_DEBUG" || key == "INIT_MEMCHECK" || "COPY")
+    else if (key == "INIT" || key == "INIT_DEBUG" || key == "INIT_MEMCHECK" || key == "COPY")
     {
         const string &name = list[iel++];
         const string &nr = list[iel++];
@@ -1191,7 +1181,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
                 catch (const std::exception &e)
                 {
                     ostringstream os;
-                    os << "Failing to start " << app->title() << "@" << host.first << "!!!";
+                    os << "Failing to start " << app->fullName() << "@" << host.first << "!!!";
                     Message err{COVISE_MESSAGE_COVISE_ERROR, os.str()};
                     m_hostManager.sendAll<Userinterface>(err);
                 }
@@ -1225,7 +1215,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             std::string buffer = app.get_parameter(controller::Direction::Input, false);
             if (!buffer.empty())
             {
-                from_param = splitString(buffer, "\n");
+                from_param = splitStringAndRemoveComments(buffer, "\n");
                 numOldInputParams = app.connectivity().inputParams.size();
             }
         }
@@ -1255,7 +1245,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             string buffer = newApp->get_parameter(controller::Direction::Input, false);
             if (!buffer.empty())
             {
-                to_param = splitString(buffer, "\n");
+                to_param = splitStringAndRemoveComments(buffer, "\n");
                 istringstream npl2(to_param[0]);
                 npl2 >> npnew;
 
@@ -1409,16 +1399,10 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         }
 
         //  no of moved/copied modules
-        istringstream s1(list[iel]);
-        iel++;
-        int no;
-        s1 >> no;
+        int no = std::stoi(list[iel++]);
 
         //  MOVE = 2, COPY = 3
-        istringstream s2(list[iel]);
-        iel++;
-        int action;
-        s2 >> action;
+        int action = std::stoi(list[iel++]);
 
         //  allocate memory
         vector<string> oldmod(no), oldinst(no), oldhost(no), oldparam(no), oldtitle(no);
@@ -1441,7 +1425,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             {
                 Application &oldApp = m_hostManager.findHost(oldhost[ll]).getApplication(oldmod[ll], std::stoi(oldinst[ll]));
                 moduleList.push_back(&oldApp);
-                oldtitle[ll] = oldApp.title();
+                oldtitle[ll] = oldApp.fullName();
                 oldparam[ll] = oldApp.get_parameter(controller::Direction::Input, false);
             }
             catch (const std::exception &e)
@@ -1486,7 +1470,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             newinst[ll] = std::to_string(app->instance());
 
             string myparam = oldparam[ll];
-            vector<string> parameter = splitString(myparam, "\n");
+            vector<string> parameter = splitStringAndRemoveComments(myparam, "\n");
 
             int ipl = 0;
             int np = std::stoi(parameter[ipl++]);
@@ -1680,7 +1664,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             {
                 std::cerr << e.what() << '\n';
                 cerr << endl
-                     << "---Controller : module : " << list[iel] << "_" << list[iel + 1] << "@" << list[iel + 2] << " not found !!!\n";
+                     << "---Controller : module : " << name << "_" << nr << "@" << host << " not found !!!\n";
             }
         }
         delModuleNode(moduleList);
@@ -1717,9 +1701,9 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         vector<Application *> appList;
         for (int i = 0; i < no; i++)
         {
-            const string &from_name = list[iel];
-            const string &from_nr = list[iel];
-            const string &from_host = list[iel];
+            const string &from_name = list[iel++];
+            const string &from_nr = list[iel++];
+            const string &from_host = list[iel++];
 
             int posx = std::stoi(list[iel++]);
             int posy = std::stoi(list[iel++]);
@@ -1948,8 +1932,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         const string &name = list[iel++];
         const string &nr = list[iel++];
         const string &host = list[iel++];
-        const string &portname = list[iel];
-        const string &porttype = list[iel];
+        const string &portname = list[iel++];
+        const string &porttype = list[iel++];
         try
         {
             auto &app = m_hostManager.findHost(host).getApplication(name, std::stoi(nr));
@@ -1966,7 +1950,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             }
             string value;
             if (iel < list.size()) // otherwise empty string
-                value = list[iel];
+                value = list[iel++];
             param.set_value_list(value);
             //update siblings
             for (slist::iterator it = siblings.begin(); it != siblings.end(); it++)
@@ -2039,8 +2023,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         string hostname = list[iel++];
         if (!hostname.empty())
         {
-            ExecType exectype = Config->getexectype(hostname);
-            int timeout = Config->gettimeout(hostname);
+            ExecType exectype = Config.getexectype(hostname);
+            int timeout = Config.gettimeout(hostname);
             ostringstream buffer;
             buffer << "HOSTINFO\n"
                    << static_cast<int>(exectype) << "\n"
@@ -2316,7 +2300,7 @@ void CTRLHandler::resetLists()
     m_numRunning.renderer = 0;
     // reset module counter & global id counter
     m_hostManager.resetModuleInstances();
-    Module::resetId();
+    SubProcess::resetId();
 }
 
 //!
@@ -2468,7 +2452,7 @@ const Application *CTRLHandler::initModuleNode(const string &name, const string 
              << name << "\n"
              << app.instance() << "\n"
              << hostName << "\n"
-             << app.title();
+             << app.fullName();
         tmp_msg = Message{COVISE_MESSAGE_UI, osss.str()};
         m_hostManager.sendAll<Userinterface>(tmp_msg);
         return &app;
@@ -2607,7 +2591,7 @@ void CTRLHandler::sendNewParam(const string &name, const string &nr, const strin
         std::cerr << e.what() << '\n';
     }
     // split value parameter
-    vector<string> parList = splitString(newVal, " ");
+    vector<string> parList = splitStringAndRemoveComments(newVal, " ");
 
     //  send parameter to modules & UIF
     ostringstream stream;
@@ -2647,7 +2631,7 @@ string CTRLHandler::handleBrowserPath(const string &name, const string &nr, cons
             string path = crb->covisePath;
             string sep = path.substr(0, 1);
             path.erase(0, 1);
-            vector<string> pathList = splitString(path, sep);
+            vector<string> pathList = splitStringAndRemoveComments(path, sep);
 
             for (int i = 0; i < pathList.size(); i++)
             {
@@ -2687,7 +2671,7 @@ string CTRLHandler::handleBrowserPath(const string &name, const string &nr, cons
         crb->recv_msg(&rmsg);
         if (rmsg.type == COVISE_MESSAGE_UI)
         {
-            vector<string> revList = splitString(rmsg.data.data(), "\n");
+            vector<string> revList = splitStringAndRemoveComments(rmsg.data.data(), "\n");
             value = revList[7];
         }
     }
@@ -2717,7 +2701,7 @@ bool CTRLHandler::recreate(const string &content, readMode mode)
     vector<string> mmodList; // list of obsolete modules
 
     int iel = 0;
-    vector<string> list = splitString(content, "\n");
+    vector<string> list = splitStringAndRemoveComments(content, "\n");
 
     // read host information
     istringstream s3(list[iel]);
@@ -2738,7 +2722,7 @@ bool CTRLHandler::recreate(const string &content, readMode mode)
         if (hostname == "LOCAL")
             hostname = localname;
 
-        vector<string> token = splitString(username, " ");
+        vector<string> token = splitStringAndRemoveComments(username, " ");
         if (token[0] == "LUSER")
             username = localuser;
 
@@ -2756,7 +2740,7 @@ bool CTRLHandler::recreate(const string &content, readMode mode)
             }
             catch (const Exception &e)
             {
-                if (!tmp_host.startCrb(Config->getshmMode(tmp_host.userInfo().hostName)))
+                if (!tmp_host.startCrb(Config.getshmMode(tmp_host.userInfo().hostName)))
                 {
                     return false;
                 }
@@ -3175,7 +3159,7 @@ void CTRLHandler::getAllConnections()
 
     if (!connections.empty())
     {
-        vector<string> token = splitString(connections, "\n");
+        vector<string> token = splitStringAndRemoveComments(connections, "\n");
         int itl = 0;
 
         //  rearrange temporary connection list

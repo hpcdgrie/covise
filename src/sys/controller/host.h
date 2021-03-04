@@ -31,7 +31,7 @@ namespace controller{
 
 class HostManager;
 struct UIOptions;
-struct StaticModuleInfo;
+struct ModuleInfo;
 class Userinterface;
 
 struct RemoteHost : vrb::RemoteClient
@@ -48,14 +48,14 @@ struct RemoteHost : vrb::RemoteClient
     void setTimeout(int seconds);
     bool startCrb(ShmMode shmMode);
     bool startUI(const UIOptions &options, const RemoteHost& crb);
-    const Module &getModule(sender_type type) const;
-    Module &getModule(sender_type type);
+    const SubProcess &getModule(sender_type type) const;
+    SubProcess &getModule(sender_type type);
     
     const Application &getApplication(const std::string &name, int instance) const;
     Application &getApplication(const std::string&name, int instance);
 
     void removeApplication(Application &app, int alreadyDead);
-    typedef std::vector<std::unique_ptr<Module>> ProcessList;
+    typedef std::vector<std::unique_ptr<SubProcess>> ProcessList;
 
     ProcessList::const_iterator begin() const;
     ProcessList::iterator begin();
@@ -78,23 +78,23 @@ private:
     bool startUI(std::unique_ptr<Userinterface> &&ui, const UIOptions &options, const RemoteHost &master);
     void determineAvailableModules(const CRBModule &crb);
 
-    covise::LaunchStyle m_state = covise::LaunchStyle::Disconnect;
     ExecType m_exectype = ExecType::VRB;
     ProcessList m_modules;
-    std::vector<const StaticModuleInfo*> m_availableModules; //contains references to hostmanagers available modules
-    std::unique_ptr<StaticModuleInfo> m_pythonUiInfo;
+    std::vector<const ModuleInfo*> m_availableModules; //contains references to hostmanagers available modules
+    std::unique_ptr<ModuleInfo> m_pythonUiInfo;
     int m_shmID;
     int m_timeout = 30;
     bool m_saveInfo = false;
 
 protected:
+    covise::LaunchStyle m_state = covise::LaunchStyle::Disconnect;
     virtual void connectShm(const CRBModule &crbModule);
 
     virtual void launchCrb(vrb::Program exec, const std::vector<std::string> &cmdArgs);
 };
 
 struct LocalHost : RemoteHost{
-    using RemoteHost::RemoteHost;
+    LocalHost(const HostManager& manager, vrb::Program type, const std::string& sessionName = "");
     virtual void connectShm(const CRBModule &crbModule) override;
     virtual void launchCrb(vrb::Program exec, const std::vector<std::string> &cmdArgs) override;
 };
@@ -108,7 +108,7 @@ public:
         int masterRequestSenderId = 0;
     } uiState;
 
-    covise::Message sendPartnerList();
+    void sendPartnerList();
     void handleAction(const covise::NEW_UI_HandlePartners &msg);
     void setOnConnectCallBack(std::function<void(void)> cb);
     int vrbClientID() const;
@@ -123,7 +123,7 @@ public:
     RemoteHost &findHost(const std::string &hostName);
     const RemoteHost &findHost(const std::string &hostName) const;
 
-    std::vector<const Module *> getAllModules(sender_type type) const;
+    std::vector<const SubProcess *> getAllModules(sender_type type) const;
     template<typename T>
     std::vector<const T*> getAllModules() const{
             auto v =  const_cast<HostManager *>(this)->getAllModules<T>();
@@ -159,13 +159,13 @@ public:
     HostMap::const_iterator end() const;
     HostMap::iterator end();
 
-    Module *findModule(int peerID);
+    SubProcess *findModule(int peerID);
     bool slaveUpdate();
     mutable bool m_slaveUpdate = false;
     const Userinterface &getMasterUi() const;
     Userinterface &getMasterUi();
     std::string getHostsInfo() const; //get info string with all hosts
-    const StaticModuleInfo &registerModuleInfo(const std::string &name, const std::string &category) const;
+    const ModuleInfo &registerModuleInfo(const std::string &name, const std::string &category) const;
     void resetModuleInstances();
 
 private:
@@ -178,7 +178,7 @@ private:
     std::atomic_int m_moduleCount{0};
     covise::ConnectionList m_connList;
     covise::ServerConnection *m_crbConn = nullptr;
-    mutable std::set<StaticModuleInfo> m_availableModules; //every module that is available on at leaset one host. This manages the instance ids of the modules.
+    mutable std::set<ModuleInfo> m_availableModules; //every module that is available on at leaset one host. This manages the instance ids of the modules.
     void handleVrb();
 
 };

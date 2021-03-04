@@ -29,7 +29,7 @@ class uif
     std::string passwd;
     Userinterface::Status  status;
 
-    std::unique_ptr<controller::StaticModuleInfo> appInfo;
+    std::unique_ptr<controller::ModuleInfo> appInfo;
     std::unique_ptr<controller::Application> applmod;
     int proc_id;
 

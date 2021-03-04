@@ -46,7 +46,7 @@ void uif::start(const controller::CRBModule &crb, const string &execname, const 
     try
     {
         auto &h = crb.host.hostManager.findHost(host);
-        appInfo.reset(new StaticModuleInfo{execname, category});
+        appInfo.reset(new ModuleInfo{execname, category});
         applmod.reset(new Application{h, *appInfo, std::stoi(instanz)});
         applmod->start(instanz.c_str());
         applmod->connect(crb);

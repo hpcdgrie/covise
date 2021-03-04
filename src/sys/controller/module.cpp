@@ -20,8 +20,8 @@
 using namespace covise;
 using namespace covise::controller;
 
-Application::Application(const RemoteHost &host, const StaticModuleInfo &moduleInfo, int instance)
-    : Module(moduleType, host, sender_type::APPLICATIONMODULE, moduleInfo)
+Application::Application(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance)
+    : SubProcess(moduleType, host, sender_type::APPLICATIONMODULE, moduleInfo)
 {
     if (instance == -1)
     {
@@ -35,13 +35,14 @@ Application::Application(const RemoteHost &host, const StaticModuleInfo &moduleI
 
 bool Application::isOnTop() const
 {
-    connectivity().forAllNetInterfaces([](const net_interface &interface) {
+    bool onTop = true;
+    connectivity().forAllNetInterfaces([&onTop](const net_interface &interface) {
         if (interface.get_direction() == controller::Direction::Input && interface.get_conn_state())
         {
-            return false;
+            onTop = false;
         }
     });
-    return true;
+    return onTop;
 }
 
 Application::~Application()
@@ -113,7 +114,7 @@ void Application::exec(NumRunning &numRunning)
     }
 }
 
-std::string Application::title() const
+std::string Application::fullName() const
 {
     return m_info.name + "_" + std::to_string(instance());
 }
@@ -148,7 +149,7 @@ void Application::setInstace(const std::string &titleString)
        << instance() << "\n"
        << host.userInfo().hostName << "\nSetModuleTitle\nString\n1\n";
     m_instance = i;
-    ss << title();
+    ss << fullName();
     Message msg{COVISE_MESSAGE_UI, ss.str()};
     send(&msg);
 }
@@ -236,6 +237,7 @@ int Application::testOriginalcount(const string &interfaceName) const
             return dynamic_cast<net_interface &>(interface).get_object()->get_counter();
         }
     }
+    return -1;
 }
 
 const ModuleNetConnectivity &Application::connectivity() const
@@ -412,14 +414,18 @@ std::string Application::getStartMessage()
     buff << numOutputConnections << "\n"
          << m_connectivity.inputParams.size() << "\n";
 
-    m_connectivity.forAllNetInterfaces([&buff, this](const net_interface &interface) {
+    bool err = false;
+    m_connectivity.forAllNetInterfaces([&err, &buff, this](const net_interface &interface) {
         if (interface.get_conn_state())
         {
             const object *obj = interface.get_object();
             assert(obj);
             std::string obj_name = obj->get_current_name();
             if (obj_name.empty())
-                return "";
+            {
+                err = true;
+                return;
+            }
 
             buff << interface.get_name() << "\n"
                  << obj_name << "\n"
@@ -442,7 +448,7 @@ std::string Application::getStartMessage()
             string buf = "ERROR old Network file, replace module " + info().name;
             Message err_msg{COVISE_MESSAGE_COVISE_ERROR, buf};
             host.hostManager.sendAll<Userinterface>(err_msg);
-            return "";
+            err = true;
         }
         else if (interface.get_demand() == "req")
         {
@@ -451,9 +457,11 @@ std::string Application::getStartMessage()
             msg << "Warning: Required input port (" << interface.get_name() << ")" << info().name << "_" << id << "@" << host.userInfo().hostName;
             msg << " is not connected !! ";
             sendWarningMsgToMasterUi(msg.str());
-            return "";
+            err = true;
         }
     });
+    if(err)
+        return "";
     for (const parameter &param : m_connectivity.inputParams)
     {
         buff << param.serialize();
@@ -476,7 +484,8 @@ void Application::sendWarningMsgToMasterUi(const std::string &msg)
 
 bool Application::delete_old_objs()
 {
-    m_connectivity.forAllNetInterfaces([](net_interface &interface) {
+    bool deleted = false;
+    m_connectivity.forAllNetInterfaces([&deleted](net_interface &interface) {
         // is the Interface connected ?
         if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
         {
@@ -484,10 +493,12 @@ bool Application::delete_old_objs()
             if (p_obj && p_obj->isEmpty())
             {
                 p_obj->del_old_DO();
-                return true;
+                deleted = true;
+                return;
             }
         }
     });
+    return deleted;
 }
 
 void Application::new_obj_names()
@@ -513,6 +524,7 @@ std::string Application::get_outparaobj() const
 
     int intf_count = getNumInterfaces(controller::Direction::Output);
 
+    bool err = false;
     if (type == sender_type::RENDERER)
         buff << "0\n";
     else
@@ -520,7 +532,7 @@ std::string Application::get_outparaobj() const
         buff << intf_count << "\n";
 
         // get objects
-        m_connectivity.forAllNetInterfaces([&buff](const net_interface &interface) {
+        m_connectivity.forAllNetInterfaces([&err, &buff](const net_interface &interface) {
             if (interface.get_direction() == controller::Direction::Output)
             {
                 if (interface.get_conn_state())
@@ -537,12 +549,13 @@ std::string Application::get_outparaobj() const
                 {
                     print_comment(__LINE__, __FILE__, "ERROR: send_finisCTRLGlobal::getInstance()-> Interfaces not connected \n");
                     cerr << "\n ERROR: send_finisCTRLGlobal::getInstance()-> Interfaces not connected !!!\n";
-                    return "";
+                    err = true;
+                    return;
                 } // if state
             }
         });
     } // !renderer
-    return buff.str();
+    return err ? "" : buff.str();
 }
 
 std::string Application::get_inparaobj() const
@@ -644,7 +657,8 @@ bool Application::isOneRunningAbove(bool first) const
 
 bool Application::is_one_running_under() const
 {
-    connectivity().forAllNetInterfaces([](const net_interface &interface) {
+    bool oneRunningUnder = false;
+    connectivity().forAllNetInterfaces([&oneRunningUnder](const net_interface &interface) {
         if (interface.get_direction() == controller::Direction::Output &&
             interface.get_object())
         {
@@ -656,12 +670,13 @@ bool Application::is_one_running_under() const
                     !dynamic_cast<const Renderer *>(app) &&
                     app->isExecuting())
                 {
-                    return true;
+                    oneRunningUnder = true;
+                    return;
                 }
             }
         }
     });
-    return false;
+    return oneRunningUnder;
 }
 
 void Application::execute(NumRunning &numRunning)
@@ -766,7 +781,7 @@ std::string Application::get_parameter(controller::Direction direction, bool for
             auto fullPath = host.getModule(sender_type::CRB).as<CRBModule>()->covisePath;
             string sep = fullPath.substr(0, 1);
             fullPath.erase(0, 1);
-            auto pathList = splitString(fullPath, sep);
+            auto pathList = splitStringAndRemoveComments(fullPath, sep);
             for (int i = 0; i < pathList.size(); i++)
             {
                 const string &path = pathList[i];
@@ -813,7 +828,7 @@ std::string Application::get_moduleinfo() const
            << instance() << "\n"
            << (&host.hostManager.getLocalHost() == &host ? "LOCAL" : host.userInfo().hostName) << "\n"
            << info().category << "\n"
-           << title() << "\n"
+           << fullName() << "\n"
            << pos().x << "\n"
            << pos().y << "\n";
     return buffer.str();
@@ -844,12 +859,12 @@ void Application::writeScript(std::ofstream &of) const
     of << "#" << endl;
     of << "# MODULE: " << info().name << endl;
     of << "#" << endl;
-    of << title() << " = " << info().name << "()" << endl;
+    of << fullName() << " = " << info().name << "()" << endl;
 
-    of << "network.add( " << title() << " )" << endl;
+    of << "network.add( " << fullName() << " )" << endl;
 
     // get Position x y
-    of << title() << ".setPos( " << pos().x << ", " << pos().y << " )" << endl;
+    of << fullName() << ".setPos( " << pos().x << ", " << pos().y << " )" << endl;
 
     of << "#" << endl;
     of << "# set parameter values" << endl;
@@ -857,7 +872,7 @@ void Application::writeScript(std::ofstream &of) const
 
     for (const auto &param : connectivity().inputParams)
     {
-        of << title() << ".set_" << param.get_name() << "( " << param.get_pyval_list() << " )" << endl;
+        of << fullName() << ".set_" << param.get_name() << "( " << param.get_pyval_list() << " )" << endl;
     }
 }
 

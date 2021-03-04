@@ -56,7 +56,7 @@ public:
     bool slaveUpdate = false;
     bool m_miniGUI = false, m_rgbTextOpen = false;
 
-    ControlConfig *Config;
+    ControlConfig Config;
 
     void handleClosedMsg(const std::unique_ptr<Message>& msg);
 

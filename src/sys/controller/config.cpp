@@ -179,7 +179,9 @@ void ControlConfig::addhostinfo_from_config(const HostMap::iterator &host)
         strcasecmp(exec_mode.c_str(), "remoteDaemon") == 0 ||
         strcasecmp(exec_mode.c_str(), "globus_gram") == 0)
     {
-        std::cerr << exec_mode << "is no longer supported" << std::endl;
+        std::cerr << "exec mode " << exec_mode << " is no longer supported" << std::endl
+                  << "exec mode is set to default(VRB)" << std::endl;
+        host->second.exectype = ExecType::VRB;
     }
     else if (strcasecmp(exec_mode.c_str(), "manual") == 0)
     {

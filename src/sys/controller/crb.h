@@ -18,11 +18,11 @@ namespace controller
 {
 struct RemoteHost;
 
-class CRBModule : public Module{
+class CRBModule : public SubProcess{
 public:
-    static const Module::Type moduleType = Module::Type::Crb;
-    static StaticModuleInfo crbModuleInfo;
-    static StaticModuleInfo crbProxyModuleInfo;
+    static const SubProcess::Type moduleType = SubProcess::Type::Crb;
+    static ModuleInfo crbModuleInfo;
+    static ModuleInfo crbProxyModuleInfo;
     CRBModule(const RemoteHost &host, bool proxy);
     virtual ~CRBModule();
     Message initMessage, interfaceMessage;
@@ -35,7 +35,7 @@ private:
     bool tryReceiveMessage(Message &msg);
     void prepareInitMessageForUIs();
     void queryDataPath();
-    bool connectOtherCRB(const Module &crb);
+    bool connectOtherCRB(const SubProcess &crb);
 };
 
 } // namespace controller

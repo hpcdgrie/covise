@@ -15,9 +15,9 @@ namespace covise
 namespace controller
 {
 
-class Display : public Module
+class Display : public SubProcess
 {
-    static const Module::Type moduleType = Module::Type::Display;
+    static const SubProcess::Type moduleType = SubProcess::Type::Display;
     controller::Userinterface::Status excovise_status = Userinterface::Status::Init;
     bool DISPLAY_READY = false;
     bool NEXT_DEL = false;
@@ -27,8 +27,8 @@ class Display : public Module
 
 public:
     Display(controller::Renderer &renderer, const controller::RemoteHost &ui);
-    using Module::connect;
-    using Module::m_info;
+    using SubProcess::connect;
+    using SubProcess::m_info;
     void set_helper(int hlp)
     {
         m_helper = hlp;
@@ -60,11 +60,11 @@ public:
 
 struct Renderer : Application
 {
-    Renderer(const RemoteHost &host, const StaticModuleInfo &moduleInfo, int instance);
+    Renderer(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance);
     virtual void exec(NumRunning &numRunning) override;
     virtual std::string serializeInputInterface(const net_interface &interface) const override;
     virtual void init(const MapPosition &pos, int copy, ExecFlag flag, Application *mirror) override;
-    StaticModuleInfo &getInfo();
+    ModuleInfo &getInfo();
     typedef std::vector<std::unique_ptr<Display>> DisplayList;
     DisplayList::iterator begin();
     DisplayList::const_iterator begin() const;
