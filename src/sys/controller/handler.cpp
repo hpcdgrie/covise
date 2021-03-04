@@ -150,8 +150,6 @@ void printWelcomeMessage()
     \brief Covise controller main handling   
 */
 
-
-
 // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
 
 CTRLHandler *CTRLHandler::singleton = nullptr;
@@ -449,7 +447,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
                 sendGenericInfoToRenderer("ERROR", *msg);
             }
             //  change Modulestatus to STOP
-            app.setStatus(Application::Status::stopping);
+            app.setStatus(NetModule::Status::stopping);
         }
         catch (const std::exception &e)
         {
@@ -471,7 +469,7 @@ void CTRLHandler::handleMsg(const std::unique_ptr<Message> &msg)
         try
         {
             auto &app = m_hostManager.findHost(host).getApplication(name, std::stoi(nr));
-            app.setStatus(Application::Status::stopping);
+            app.setStatus(NetModule::Status::stopping);
         }
         catch (const Exception &e)
         {
@@ -636,7 +634,7 @@ void CTRLHandler::handleClosedMsg(const std::unique_ptr<Message> &msg)
             break;
         }
 
-        auto p_app = p_mod->as<Application>();
+        auto p_app = p_mod->as<NetModule>();
         if (!p_app)
         {
             std::cerr << "crb or userinterface crashed " << std::endl;
@@ -672,7 +670,7 @@ void CTRLHandler::handleClosedMsg(const std::unique_ptr<Message> &msg)
         {
             std::stringstream ss;
             ss << "DIED\n"
-               << p_mod->info().name << "\n"
+               << p_app->info().name << "\n"
                << instance << "\n"
                << p_mod->host.userInfo().hostName;
             Message msg{COVISE_MESSAGE_UI, ss.str()};
@@ -852,7 +850,7 @@ void CTRLHandler::loadNetworkFile()
 
     if (m_globalLoadReady && m_executeOnLoad)
     {
-        for (Application *app : m_hostManager.getAllModules<Application>())
+        for (NetModule *app : m_hostManager.getAllModules<NetModule>())
         {
             if (app->isOnTop())
             {
@@ -883,10 +881,13 @@ void CTRLHandler::handleQuit(const std::unique_ptr<Message> &msg)
             auto mod = m_hostManager.findModule(msg->conn->get_peer_id());
             if (mod)
             {
-                const string &name = mod->info().name;
+                if (auto renderer = dynamic_cast<const Renderer *>(mod))
+                {
+                    const string &name = renderer->info().name;
 
-                if (name == "VRRenderer" || name == "OpenCOVER" || name == "COVER" || name == "COVER_VRML")
-                    terminateForCover = true;
+                    if (name == "VRRenderer" || name == "OpenCOVER" || name == "COVER" || name == "COVER_VRML")
+                        terminateForCover = true;
+                }
             }
         }
     }
@@ -900,7 +901,7 @@ void CTRLHandler::handleQuit(const std::unique_ptr<Message> &msg)
     {
         Message msg{COVISE_MESSAGE_NEW_DESK, ""};
         m_hostManager.sendAll<CRBModule>(msg);
-        for (Application *app : m_hostManager.getAllModules<Application>())
+        for (NetModule *app : m_hostManager.getAllModules<NetModule>())
         {
             app->setAlive(false);
             CTRLGlobal::getInstance()->modUIList->delete_mod(app->info().name, std::to_string(app->instance()), app->host.userInfo().hostName);
@@ -996,7 +997,7 @@ void CTRLHandler::handleFinall(const std::unique_ptr<Message> &msg, string copyM
         {
             //  check if the module which has just finished
             //  has not been started again
-            if (stat != Application::Status::stopping)
+            if (stat != NetModule::Status::stopping)
             {
                 if (app.numRunning() == 0)
                 {
@@ -1080,7 +1081,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         }
         else
         {
-            for (Application *app : m_hostManager.getAllModules<Application>())
+            for (NetModule *app : m_hostManager.getAllModules<NetModule>())
             {
                 if (app->isOnTop() && app->isOriginal())
                 {
@@ -1156,13 +1157,13 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
 
     else if (key == "MIRROR_ALL")
     {
-        auto apps = m_hostManager.getAllModules<Application>();
+        auto apps = m_hostManager.getAllModules<NetModule>();
         for (auto &host : m_hostManager)
         {
-            for (Application *app : apps)
+            for (NetModule *app : apps)
             {
                 int instance = app->instance() + 1000 * (app->numMirrors() + 1);
-                Application::MapPosition pos{(app->pos().x + (app->numMirrors() + 1) * 400), app->pos().y};
+                NetModule::MapPosition pos{(app->pos().x + (app->numMirrors() + 1) * 400), app->pos().y};
                 try
                 {
                     auto &copy = host.second->startApplicationModule(app->info().name, std::to_string(instance), pos.x + (app->numMirrors() + 1) * 400, pos.y, 4, ExecFlag::Normal, app);
@@ -1205,7 +1206,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
 
         //  store the current parameters of the module to be replaced
         int numOldInputParams = 0;
-        vector<Application *> appList;
+        vector<NetModule *> appList;
         vector<string> from_param;
 
         try
@@ -1344,7 +1345,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         //  no of modules
         int no = std::stoi(list[iel++]);
         //  allocate memory for module
-        vector<Application *> moduleList;
+        vector<NetModule *> moduleList;
         for (int i = 0; i < no; i++)
         {
             const string &name = list[iel++];
@@ -1409,7 +1410,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         vector<string> newmod(no), newinst(no), newhost(no), newxpos(no), newypos(no);
 
         //  get old modules && store some stuff
-        vector<Application *> moduleList;
+        vector<NetModule *> moduleList;
         for (int ll = 0; ll < no; ll++)
         {
             newmod[ll] = list[iel++];
@@ -1423,7 +1424,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             oldhost[ll] = list[iel++];
             try
             {
-                Application &oldApp = m_hostManager.findHost(oldhost[ll]).getApplication(oldmod[ll], std::stoi(oldinst[ll]));
+                NetModule &oldApp = m_hostManager.findHost(oldhost[ll]).getApplication(oldmod[ll], std::stoi(oldinst[ll]));
                 moduleList.push_back(&oldApp);
                 oldtitle[ll] = oldApp.fullName();
                 oldparam[ll] = oldApp.get_parameter(controller::Direction::Input, false);
@@ -1463,7 +1464,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             int posx = std::stoi(newxpos[ll]);
             int posy = std::stoi(newypos[ll]);
 
-            const Application *app = initModuleNode(name, nr, host, posx, posy, title, action, flags);
+            const NetModule *app = initModuleNode(name, nr, host, posx, posy, title, action, flags);
             if (app)
                 continue;
 
@@ -1615,13 +1616,13 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         m_hostManager.sendAll<Userinterface>(*msg);
 
         // get modules
-        vector<Application *> moduleList;
+        vector<NetModule *> moduleList;
         const string &name = list[iel++];
         const string &nr = list[iel++];
         const string &host = list[iel++];
         try
         {
-            Application &app = m_hostManager.findHost(host).getApplication(name, std::stoi(nr));
+            NetModule &app = m_hostManager.findHost(host).getApplication(name, std::stoi(nr));
             moduleList.push_back(&app);
             if (app.info().name == "OpenCOVER" &&
                 msg->send_type == sender_type::RENDERER &&
@@ -1649,7 +1650,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         //  no of deleted modules
         int no = std::stoi(list[iel++]);
         // get modules
-        vector<Application *> moduleList;
+        vector<NetModule *> moduleList;
         for (int i = 0; i < no; i++)
         {
             const string &name = list[iel++];
@@ -1697,8 +1698,8 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         int no = std::stoi(list[iel++]);
 
         // get modules && store old positions
-        vector<Application::MapPosition> old_pos;
-        vector<Application *> appList;
+        vector<NetModule::MapPosition> old_pos;
+        vector<NetModule *> appList;
         for (int i = 0; i < no; i++)
         {
             const string &from_name = list[iel++];
@@ -1905,7 +1906,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
         const string &title = list[iel++];
         try
         {
-            m_hostManager.findHost(host).getApplication(name, std::stoi(nr)).setInstace(title);
+            m_hostManager.findHost(host).getApplication(name, std::stoi(nr)).setTitle(title);
             ostringstream buffer;
             buffer << "MODULE_TITLE\n"
                    << name << "\n"
@@ -1971,7 +1972,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             //  update param for mirrored modules
             if (app.isOriginal())
             {
-                for (Application *cpy : app.getMirrors())
+                for (NetModule *cpy : app.getMirrors())
                 {
                     cpy->connectivity().getParam(portname).set_value_list(value);
                 }
@@ -2100,7 +2101,7 @@ void CTRLHandler::handleUI(Message *msg, string copyData)
             if (m_executeOnLoad)
             {
                 m_executeOnLoad = false;
-                for (Application *app : m_hostManager.getAllModules<Application>())
+                for (NetModule *app : m_hostManager.getAllModules<NetModule>())
                 {
                     if (app->isOnTop())
                         app->exec(m_numRunning);
@@ -2158,10 +2159,10 @@ void CTRLHandler::sendSlave(const Message &msg)
     });
 }
 
-void CTRLHandler::finishExecuteIfLastRunning(const Application &app)
+void CTRLHandler::finishExecuteIfLastRunning(const NetModule &app)
 {
     //  the last running module to delete = >finished exec
-    if (app.status() != Application::Status::Idle && m_numRunning.apps == 1)
+    if (app.status() != NetModule::Status::Idle && m_numRunning.apps == 1)
     {
         Message mapmsg{COVISE_MESSAGE_UI, "FINISHED\n"};
         m_hostManager.sendAll<Userinterface>(mapmsg);
@@ -2213,7 +2214,7 @@ void CTRLHandler::saveCurrentNetworkFile(const std::string &filename)
                 << "network = net()" << endl;
 
         // store all modules
-        for (const Application *app : m_hostManager.getAllModules<Application>())
+        for (const NetModule *app : m_hostManager.getAllModules<NetModule>())
         {
             app->writeScript(outFile);
         }
@@ -2256,13 +2257,13 @@ bool CTRLHandler::loadNetworkFile(const std::string &filename)
 
 std::string CTRLHandler::createApplicationsAndConnectionsData()
 {
-    auto apps = m_hostManager.getAllModules<Application>();
+    auto apps = m_hostManager.getAllModules<NetModule>();
     if (apps.empty())
         return std::string{};
     stringstream moduleData;
     moduleData << "#numModules\n"
                << apps.size() << "\n";
-    for (const Application *app : apps)
+    for (const NetModule *app : apps)
     {
         moduleData << app->get_module(true);
     }
@@ -2278,13 +2279,13 @@ std::string CTRLHandler::createApplicationsAndConnectionsData()
 //!
 void CTRLHandler::resetLists()
 {
-    auto apps = m_hostManager.getAllModules<Application>();
+    auto apps = m_hostManager.getAllModules<NetModule>();
     if (!apps.empty())
     {
         Message msg{COVISE_MESSAGE_NEW_DESK, ""};
         m_hostManager.sendAll<CRBModule>(msg);
     }
-    for (Application *app : apps)
+    for (NetModule *app : apps)
     {
         //  go through the net_module_list and remove all modules
         //  and connections to modules
@@ -2292,7 +2293,7 @@ void CTRLHandler::resetLists()
         finishExecuteIfLastRunning(*app);
         CTRLGlobal::getInstance()->modUIList->delete_mod(app->info().name, std::to_string(app->instance()), app->host.userInfo().hostName);
     }
-    for (Application *app : apps)
+    for (NetModule *app : apps)
     {
         m_hostManager.findHost(app->host.userInfo().hostName).removeApplication(*app, -1);
     }
@@ -2374,7 +2375,7 @@ void CTRLHandler::makeConnection(const string &from_mod, const string &from_nr, 
 //!
 //! delete a module
 //!
-void CTRLHandler::delModuleNode(const vector<Application *> &moduleList)
+void CTRLHandler::delModuleNode(const vector<NetModule *> &moduleList)
 {
 
     // write to undo buffer
@@ -2407,8 +2408,8 @@ void CTRLHandler::delModuleNode(const vector<Application *> &moduleList)
 //!
 //! init a module
 //!
-const Application *CTRLHandler::initModuleNode(const string &name, const string &nr, const string &hostName,
-                                               int posx, int posy, const string &title, int action, ExecFlag flags)
+const NetModule *CTRLHandler::initModuleNode(const string &name, const string &nr, const string &hostName,
+                                             int posx, int posy, const string &title, int action, ExecFlag flags)
 {
     try
     {
@@ -2445,7 +2446,7 @@ const Application *CTRLHandler::initModuleNode(const string &name, const string 
         //  0 use stored title
         //  -1 dont"t send title
         if (action == 2)
-            app.setInstace(title);
+            app.setTitle(title);
         // send TITLE message
         ostringstream osss;
         osss << "MODULE_TITLE\n"
@@ -2468,16 +2469,18 @@ const Application *CTRLHandler::initModuleNode(const string &name, const string 
     }
 }
 
-Application *CTRLHandler::findApplication(const std::string &hostName, const std::string &name, int instance)
+NetModule *CTRLHandler::findApplication(const std::string &hostName, const std::string &name, int instance)
 {
     try
     {
         for (auto &app : m_hostManager.findHost(hostName))
         {
-            auto tmpApp = dynamic_cast<Application *>(&*app);
-            if (tmpApp->instance() == instance && tmpApp->info().name == name)
+            if (auto tmpApp = dynamic_cast<NetModule *>(&*app))
             {
-                return tmpApp;
+                if (tmpApp->instance() == instance && tmpApp->info().name == name)
+                {
+                    return tmpApp;
+                }
             }
         }
         return nullptr;
@@ -2498,7 +2501,7 @@ void CTRLHandler::sendNewParam(const string &name, const string &nr, const strin
                                const string &oldhost, bool init)
 {
 
-    Application *application = findApplication(hostName, name, std::stoi(nr));
+    NetModule *application = findApplication(hostName, name, std::stoi(nr));
 
     if (!application)
         return;
@@ -2998,7 +3001,7 @@ bool CTRLHandler::checkModule(const string &modname, const string &modhost)
     return true;
 }
 
-string CTRLHandler::writeClipboard(const string &keyword, const vector<Application *> &moduleList, bool all)
+string CTRLHandler::writeClipboard(const string &keyword, const vector<NetModule *> &moduleList, bool all)
 {
     // prepare buffer for return to UIF
     string buffer = keyword + "\n";
@@ -3011,7 +3014,7 @@ string CTRLHandler::writeClipboard(const string &keyword, const vector<Applicati
     ostringstream temp;
     temp << moduleList.size();
     buffer = buffer + temp.str() + "\n";
-    for (const Application *app : moduleList)
+    for (const NetModule *app : moduleList)
     {
         string erg = app->get_parameter(controller::Direction::Input, false);
         if (!app->isOriginal()) //old code checked of app is also in m_hostManager.getLocalHost<Application>()
@@ -3116,7 +3119,7 @@ string CTRLHandler::writeClipboard(const string &keyword, const vector<Applicati
                     for (const auto &conn_tmp : tmp_obj->get_to())
                     {
                         const auto to_mod = conn_tmp.get_mod();
-                        auto result = find_if(moduleList.begin(), moduleList.end(), [to_mod](const Application *a) { return a == to_mod; });
+                        auto result = find_if(moduleList.begin(), moduleList.end(), [to_mod](const NetModule *a) { return a == to_mod; });
                         if (result != moduleList.end())
                         {
                             i++;

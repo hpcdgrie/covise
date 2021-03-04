@@ -51,10 +51,10 @@ struct RemoteHost : vrb::RemoteClient
     const SubProcess &getModule(sender_type type) const;
     SubProcess &getModule(sender_type type);
     
-    const Application &getApplication(const std::string &name, int instance) const;
-    Application &getApplication(const std::string&name, int instance);
+    const NetModule &getApplication(const std::string &name, int instance) const;
+    NetModule &getApplication(const std::string&name, int instance);
 
-    void removeApplication(Application &app, int alreadyDead);
+    void removeApplication(NetModule &app, int alreadyDead);
     typedef std::vector<std::unique_ptr<SubProcess>> ProcessList;
 
     ProcessList::const_iterator begin() const;
@@ -64,8 +64,8 @@ struct RemoteHost : vrb::RemoteClient
     ProcessList::iterator end();
     void launchProcess(const CRB_EXEC& exec) const;
     bool isModuleAvailable(const std::string &moduleName) const;
-    Application &startApplicationModule(const string &name, const string &instanz, 
-                          int posx, int posy, int copy, ExecFlag flags, Application *mirror = nullptr);
+    NetModule &startApplicationModule(const string &name, const string &instanz, 
+                          int posx, int posy, int copy, ExecFlag flags, NetModule *mirror = nullptr);
     bool get_mark() const;
     void reset_mark();
     void mark_save();
@@ -81,7 +81,6 @@ private:
     ExecType m_exectype = ExecType::VRB;
     ProcessList m_modules;
     std::vector<const ModuleInfo*> m_availableModules; //contains references to hostmanagers available modules
-    std::unique_ptr<ModuleInfo> m_pythonUiInfo;
     int m_shmID;
     int m_timeout = 30;
     bool m_saveInfo = false;

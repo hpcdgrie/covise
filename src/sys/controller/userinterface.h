@@ -9,6 +9,7 @@
 #define CONTROLLER_USERINTERFACE_H
 
 #include "process.h"
+#include "moduleInfo.h"
 
 namespace covise{
 namespace controller{
@@ -34,7 +35,7 @@ class Userinterface : public SubProcess
 
 public:
     static const SubProcess::Type moduleType = SubProcess::Type::UI;
-    Userinterface(const RemoteHost& host, const ModuleInfo &info);
+    Userinterface(const RemoteHost& host, const std::string &execName);
     virtual ~Userinterface();
     enum Status
     {
@@ -68,7 +69,6 @@ protected:
 
 struct MapEditor : Userinterface
 {
-    static ModuleInfo uiMapEditorInfo;
     MapEditor(const RemoteHost& host);
 
     bool start(const UIOptions &options, const CRBModule &crb, bool restart) override;
@@ -83,7 +83,7 @@ struct WsInterface : Userinterface
 
 struct PythonInterface : Userinterface{
 
-    PythonInterface(const RemoteHost& host, const ModuleInfo &info);
+    PythonInterface(const RemoteHost& host, const std::string &execName);
     bool start(const UIOptions &options, const CRBModule &crb, bool restart) override;
 
 };

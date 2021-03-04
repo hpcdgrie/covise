@@ -24,166 +24,16 @@ const int SIZEOF_IEEE_INT = 4;
 using namespace covise;
 using namespace covise::controller;
 
-void ModuleNetConnectivity::addInterface(const string &name, const string &type, controller::Direction direction, const string &text, const string &demand)
-{
-    auto inter = interfaces.emplace(interfaces.end());
-    inter->set_name(name);
-    inter->set_type(type);
-    inter->set_direction(direction);
-    inter->set_text(text);
-    inter->set_demand(demand);
-}
-
-void ModuleNetConnectivity::addParameter(const string &name, const string &type, const string &text, const string &value, const string ext, Direction dir)
-{
-    parameter *param;
-    if (dir == Direction::Input)
-        param = &*inputParams.emplace(inputParams.end());
-    else if (dir == Direction::Output)
-        param = &*outputParams.emplace(outputParams.end());
-
-    param->set_name(name);
-    param->set_type(type);
-    param->set_text(text);
-    param->set_extension(ext);
-    param->set_value_list(value);
-}
-
-const parameter &ModuleNetConnectivity::getParam(const std::string &paramName) const
-{
-    return const_cast<ModuleNetConnectivity *>(this)->getParam(paramName);
-}
-
-parameter &ModuleNetConnectivity::getParam(const std::string &paramName)
-{
-    auto param = getParameter(inputParams, paramName);
-    if (!param)
-    {
-        param = getParameter(outputParams, paramName);
-    }
-    if (!param)
-    {
-        throw Exception{"ModuleNetConnectivity did not find parameter " + paramName};
-    }
-    return *param;
-}
-
-const net_interface &ModuleNetConnectivity::getInterface(const std::string &interfaceName) const
-{
-    return const_cast<ModuleNetConnectivity *>(this)->getInterface(interfaceName);
-}
-
-net_interface &ModuleNetConnectivity::getInterface(const std::string &interfaceName)
-{
-    auto it = std::find_if(interfaces.begin(), interfaces.end(), [&interfaceName](const C_interface &inter) {
-        return inter.get_name() == interfaceName;
-    });
-    if (it != interfaces.end())
-    {
-        if (auto netInter = dynamic_cast<net_interface *>(&*it))
-            return *netInter;
-    }
-    throw Exception{"ModuleNetConnectivity did not find interface " + interfaceName};
-}
-
-void ModuleNetConnectivity::forAllNetInterfaces(const std::function<void(net_interface &)> &func)
-{
-    for (auto &inter : interfaces)
-    {
-        if (auto netInter = dynamic_cast<net_interface *>(&inter))
-            func(*netInter);
-    }
-}
-
-void ModuleNetConnectivity::forAllNetInterfaces(const std::function<void(const net_interface &)> &func) const
-{
-    for (auto &inter : interfaces)
-    {
-        if (auto netInter = dynamic_cast<const net_interface *>(&inter))
-            func(*netInter);
-    }
-}
-
-const parameter *controller::getParameter(const std::vector<parameter> &params, const std::string &parameterName)
-{
-    auto it = std::find_if(params.begin(), params.end(), [&parameterName](const parameter &param) {
-        return param.get_name() == parameterName;
-    });
-    if (it != params.end())
-    {
-        return &*it;
-    }
-    return nullptr;
-}
-
-parameter *controller::getParameter(std::vector<parameter> &params, const std::string &parameterName)
-{
-    return const_cast<parameter *>(getParameter(const_cast<const std::vector<parameter> &>(params), parameterName));
-}
-
-ModuleInfo::ModuleInfo(const std::string &name, const std::string &category)
-    : name(name), category(category) {}
-
-const ModuleNetConnectivity ModuleInfo::connectivity() const
-{
-    return m_connectivity;
-}
-
-const std::string &ModuleInfo::description() const
-{
-    return m_description;
-}
-
-void ModuleInfo::readConnectivity(const char *data)
-{
-    m_connectivity.interfaces.clear();
-    m_connectivity.inputParams.clear();
-    m_connectivity.outputParams.clear();
-    auto list = splitStringAndRemoveComments(data, "\n");
-    int iel = 3;
-    m_description = list[iel++];
-    std::array<int, 4> interfaceAndParamCounts; //in_interface, out_interface, in_param, out_param
-    for (size_t i = 0; i < 4; i++)
-    {
-        interfaceAndParamCounts[i] = std::stoi(list[iel++]);
-    }
-    for (size_t i = 0; i < interfaceAndParamCounts[0]; i++) // read the input -interfaces
-    {
-        m_connectivity.addInterface(list[iel], list[iel + 1], Direction::Input, list[iel + 2], list[iel + 3]);
-        iel += 4;
-    }
-    for (size_t i = 0; i < interfaceAndParamCounts[1]; i++) // read the output -interfaces
-    {
-        m_connectivity.addInterface(list[iel], list[iel + 1], Direction::Output, list[iel + 2], list[iel + 3]);
-        iel += 4;
-    }
-    for (size_t i = 0; i < interfaceAndParamCounts[2]; i++) // read the output -interfaces
-    {
-        m_connectivity.addParameter(list[iel], list[iel + 1], list[iel + 2], list[iel + 3], list[iel + 4], Direction::Input);
-        iel += 5;
-    }
-    for (size_t i = 0; i < interfaceAndParamCounts[3]; i++) // read the output -interfaces
-    {
-        m_connectivity.addParameter(list[iel], list[iel + 1], list[iel + 2], list[iel + 3], list[iel + 4], Direction::Output);
-        iel += 5;
-    }
-}
-
-bool ModuleInfo::operator==(const ModuleInfo &other) const
-{
-    return name ==other.name;
-}
-
-bool ModuleInfo::operator<(const ModuleInfo &other) const
-{
-    return name <other.name;
-}
 
 
 size_t controller::SubProcess::moduleCount = 0;
 
-SubProcess::SubProcess(Type t, const RemoteHost &h, sender_type type, const ModuleInfo &moduleInfo)
-    : host(h), type(type), m_info(moduleInfo), id(moduleCount++), m_type(t)
+SubProcess::SubProcess(Type t, const RemoteHost &h, sender_type type, const std::string &executableName)
+    : host(h)
+    , type(type)
+    , id(moduleCount++)
+    , m_type(t)
+    , m_executableName(executableName)
 {
 }
 
@@ -279,7 +129,7 @@ bool SubProcess::setupConn(std::function<bool(int)> sendConnMessage)
         int timeout = 0; // do not timeout
         if (conn->acceptOne(timeout) < 0)
         {
-            cerr << "* timelimit in accept for module " << info().name << " exceeded!!" << endl;
+            cerr << "* timelimit in accept for module " << m_executableName << " exceeded!!" << endl;
             return false;
         }
         conn->set_peer(id, type);
@@ -290,20 +140,18 @@ bool SubProcess::setupConn(std::function<bool(int)> sendConnMessage)
     return false;
 }
 
-bool SubProcess::start(const char *instance)
+bool SubProcess::start(const char *instance, const char* category)
 {
-    return setupConn([this, instance](int port) {
+    std::cerr << "starting " << m_executableName << " category: " << (category ? category : "not set") << std::endl;
+    return setupConn([this, instance, category](int port) {
         auto &controllerHost = host.hostManager.getLocalHost();
-        CRB_EXEC crbExec{covise::ExecFlag::Normal, info().name.c_str(), port, controllerHost.userInfo().ipAdress.c_str(), static_cast<int>(id), instance,
+        CRB_EXEC crbExec{covise::ExecFlag::Normal, m_executableName.c_str(), port, controllerHost.userInfo().ipAdress.c_str(), static_cast<int>(id), instance,
                          host.userInfo().ipAdress.c_str(), host.userInfo().userName.c_str(),
-                         info().category.c_str(), host.ID(), vrb::VrbCredentials{}, std::vector<std::string>{}};
+                         category, host.ID(), vrb::VrbCredentials{}, std::vector<std::string>{}};
 
         host.launchProcess(crbExec);
         return true;
     });
 }
 
-const ModuleInfo &SubProcess::info() const
-{
-    return m_info;
-}
+

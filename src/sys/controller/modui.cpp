@@ -47,8 +47,8 @@ void uif::start(const controller::CRBModule &crb, const string &execname, const 
     {
         auto &h = crb.host.hostManager.findHost(host);
         appInfo.reset(new ModuleInfo{execname, category});
-        applmod.reset(new Application{h, *appInfo, std::stoi(instanz)});
-        applmod->start(instanz.c_str());
+        applmod.reset(new NetModule{h, *appInfo, std::stoi(instanz)});
+        applmod->start(instanz.c_str(), applmod->info().category.c_str());
         applmod->connect(crb);
 
         // im normalen Module: receive Module description
@@ -134,7 +134,7 @@ Userinterface::Status uif::get_status() const
     return status;
 }
 
-const Application *uif::get_app() const
+const NetModule *uif::get_app() const
 {
     return &*applmod;
 }
@@ -161,7 +161,7 @@ uiflist::uiflist()
     count = 0;
 }
 
-void uiflist::create_uifs(const Application& app, const string &execname, const string &key)
+void uiflist::create_uifs(const NetModule& app, const string &execname, const string &key)
 {
 
     Userinterface *ui;
@@ -202,7 +202,7 @@ void modui::set_execname(const string &tmp)
     execname = tmp;
 }
 
-void modui::set_application(const Application *tmp)
+void modui::set_application(const NetModule *tmp)
 {
     app = tmp;
 }
@@ -228,7 +228,7 @@ const string &modui::get_execname() const
     return execname;
 }
 
-const Application *modui::get_application() const
+const NetModule *modui::get_application() const
 {
     return app;
 }
@@ -360,7 +360,7 @@ modui *modui_list::get(const string &name, const string &nr, const string &host)
 *   - die ui_list, aus die Infos bzgl. host auf denen ein UI gestartet wird, 
 *     ausgelesen wird
 */
-void modui_list::create_mod(const Application& app, const string &key, const string &executable)
+void modui_list::create_mod(const NetModule& app, const string &key, const string &executable)
 {
 
     modui *tmp = new modui;

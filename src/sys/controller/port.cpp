@@ -412,7 +412,7 @@ const object *net_interface::get_object() const
 //    returns OLD
 //----------------------------------------------------------------------
 
-int net_interface::get_state(const controller::Application *mod) const
+int net_interface::get_state(const controller::NetModule *mod) const
 {
     int tmp;
 
@@ -592,7 +592,7 @@ int render_interface::check_conn()
 //    returns OLD
 // falls mindestens in einer Connection neue Daten vorhanden sind, NEW
 //----------------------------------------------------------------------
-int render_interface::get_state(const controller::Application *mod) const
+int render_interface::get_state(const controller::NetModule *mod) const
 {
     int state;
     string tmp_state;

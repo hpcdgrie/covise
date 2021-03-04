@@ -28,7 +28,6 @@ class Display : public SubProcess
 public:
     Display(controller::Renderer &renderer, const controller::RemoteHost &ui);
     using SubProcess::connect;
-    using SubProcess::m_info;
     void set_helper(int hlp)
     {
         m_helper = hlp;
@@ -58,13 +57,12 @@ public:
     void send_message(Message *msg);
 };
 
-struct Renderer : Application
+struct Renderer : NetModule
 {
     Renderer(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance);
     virtual void exec(NumRunning &numRunning) override;
     virtual std::string serializeInputInterface(const net_interface &interface) const override;
-    virtual void init(const MapPosition &pos, int copy, ExecFlag flag, Application *mirror) override;
-    ModuleInfo &getInfo();
+    virtual void init(const MapPosition &pos, int copy, ExecFlag flag, NetModule *mirror) override;
     typedef std::vector<std::unique_ptr<Display>> DisplayList;
     DisplayList::iterator begin();
     DisplayList::const_iterator begin() const;
@@ -86,6 +84,8 @@ struct Renderer : Application
     void setSenderStatus();
     void send_del(const std::string &name);
     virtual void execute(NumRunning &numRunning) override;
+protected:
+    virtual bool sendMessage(const covise::Message *msg) const override;
 
 private:
     DisplayList::iterator addDisplay(const Userinterface &ui);

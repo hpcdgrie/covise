@@ -13,7 +13,6 @@
 
 using namespace covise::controller;
 
-
 //**********************************************************************
 //
 // 			DISPLAY
@@ -21,8 +20,7 @@ using namespace covise::controller;
 //**********************************************************************
 
 Display::Display(Renderer &renderer, const controller::RemoteHost &host)
-: SubProcess(moduleType, host, renderer.type, renderer.getInfo())
-, m_renderer(renderer)
+    : SubProcess(moduleType, host, renderer.type, renderer.info().name), m_renderer(renderer)
 {
 }
 
@@ -40,7 +38,6 @@ bool Display::get_DISPLAY()
 {
     return DISPLAY_READY;
 }
-
 
 #ifdef NEW_RENDER_MSG
 
@@ -103,7 +100,6 @@ void Display::send_add(const string &DO_name)
 
     if (!is_helper())
         m_renderer.send(&msg);
-
 }
 
 void Display::send_add()
@@ -115,7 +111,6 @@ void Display::send_del(const string &DO_old_name, const string &DO_new_name)
 {
     CTRLHandler::instance()->numRunning().apps++;
     CTRLHandler::instance()->numRunning().renderer++;
-
 
     NEXT_DEL = true; // DEL or REPLACE possible after REPLACE
 
@@ -164,21 +159,17 @@ void Display::send_del(const string &DO_old_name, const string &DO_new_name)
 #endif
     }
 
-// else REPLACE
-
+    // else REPLACE
 }
 
 void Display::send_message(Message *msg)
 {
     if (!is_helper())
         m_renderer.send(msg);
-
 }
 
-
-
 Renderer::Renderer(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance)
-    : Application(host, moduleInfo, instance)
+    : NetModule(host, moduleInfo, instance)
 {
     assert(moduleInfo.category == "Renderer");
 }
@@ -203,7 +194,7 @@ std::string Renderer::serializeInputInterface(const net_interface &interface) co
     return buff.str();
 }
 
-void Renderer::init(const MapPosition &pos, int copy, ExecFlag flag, Application *mirror)
+void Renderer::init(const MapPosition &pos, int copy, ExecFlag flag, NetModule *mirror)
 {
     m_position = pos;
 
@@ -262,7 +253,6 @@ bool Renderer::initDisplays(int copy)
             // status dem Rendermodule mitteilen
             Message msg;
             newDisplay->recv_msg(&msg);
-            newDisplay->m_info.readConnectivity(msg.data.data());
             m_info.readConnectivity(msg.data.data());
             std::string info_str = info().name + "\n" + std::to_string(instance()) + "\n" + ui->host.userInfo().hostName;
             newDisplay->send_status(info_str);
@@ -276,17 +266,12 @@ bool Renderer::initDisplays(int copy)
         Display &newDisplay = **m_displays.emplace(m_displays.end(), new Display{*this, host});
         newDisplay.set_execstat(Userinterface::Mirror);
         std::string info_str = info().name + "\n" + std::to_string(instance()) + "\n" + host.userInfo().hostName;
-        if (!newDisplay.start(std::to_string(instance()).c_str()))
+        if (!newDisplay.start(std::to_string(instance()).c_str(), info().category.c_str()))
         {
             return false;
         }
     }
     return 1;
-}
-
-ModuleInfo &Renderer::getInfo()
-{
-    return m_info;
 }
 
 Renderer::DisplayList::iterator Renderer::begin()
@@ -337,7 +322,7 @@ Renderer::DisplayList::iterator Renderer::addDisplay(const Userinterface &ui)
     newDisplay->get()->set_execstat(ui.status());
 
     auto &crb = ui.host.getModule(sender_type::CRB);
-    newDisplay->get()->start(std::to_string(instance()).c_str());
+    newDisplay->get()->start(std::to_string(instance()).c_str(), info().category.c_str());
     newDisplay->get()->connect(host.getModule(sender_type::CRB));
 
     return newDisplay;
@@ -429,7 +414,7 @@ bool Renderer::isMirrorOf(int moduleID) const
 
     case ORG_MIRR:
     {
-        auto m = std::find_if(m_mirrors.begin(), m_mirrors.end(), [moduleID](const Application *app) {
+        auto m = std::find_if(m_mirrors.begin(), m_mirrors.end(), [moduleID](const NetModule *app) {
             return app->id == moduleID;
         });
         return m != m_mirrors.end();
@@ -439,7 +424,7 @@ bool Renderer::isMirrorOf(int moduleID) const
         const Renderer *org = dynamic_cast<Renderer *>(m_mirrors[0]);
         if (org->id == moduleID)
             return true;
-        auto m = std::find_if(org->m_mirrors.begin(), org->m_mirrors.end(), [moduleID](const Application *app) {
+        auto m = std::find_if(org->m_mirrors.begin(), org->m_mirrors.end(), [moduleID](const NetModule *app) {
             return app->id == moduleID;
         });
         return m != m_mirrors.end();
@@ -531,6 +516,19 @@ void Renderer::execute(NumRunning &numRunning)
         Message msg{COVISE_MESSAGE_START, content};
         host.hostManager.sendAll<Userinterface>(msg);
     }
+}
+
+bool Renderer::sendMessage(const covise::Message *msg) const
+{
+    bool err = false;
+    for (const auto &display : m_displays)
+    {
+        if (!display->send(msg))
+        {
+            err = true;
+        }
+    }
+    return !err;
 }
 
 void Renderer::send_add(const object &obj, obj_conn &connection)

@@ -30,7 +30,7 @@ class uif
     Userinterface::Status  status;
 
     std::unique_ptr<controller::ModuleInfo> appInfo;
-    std::unique_ptr<controller::Application> applmod;
+    std::unique_ptr<controller::NetModule> applmod;
     int proc_id;
 
 public:
@@ -42,7 +42,7 @@ public:
     const std::string &get_host() const;
     const std::string &get_userid() const;
     Userinterface::Status get_status() const;
-    const Application *get_app() const;
+    const NetModule *get_app() const;
 
     int get_procid() const;
     void send_msg(const Message *msg) const;
@@ -64,7 +64,7 @@ class uiflist : public Liste<uif>
 
 public:
     uiflist();
-    void create_uifs(const Application& app, const std::string &execname, const std::string &key);
+    void create_uifs(const NetModule& app, const std::string &execname, const std::string &key);
 };
 
 //************************************************************************/
@@ -77,19 +77,19 @@ class modui
     std::string key;
     std::string execname;
     int nodeid;
-    const Application *app;
+    const NetModule *app;
     uiflist *uif_list;
 
 public:
     void set_key(const std::string &tmp);
     void set_execname(const std::string &tmp);
-    void set_application(const Application *tmp);
+    void set_application(const NetModule *tmp);
     void set_nodeid(int id);
 
     const std::string &get_key() const;
     const std::string &get_execname() const;
     int get_nodeid() const;
-    const Application *get_application() const;
+    const NetModule *get_application() const;
 
     void create_uifs();
     void delete_uif();
@@ -111,7 +111,7 @@ public:
     modui_list();
     ~modui_list(){};
 
-    void create_mod(const Application& app, const std::string &key, const std::string &executable);
+    void create_mod(const NetModule& app, const std::string &key, const std::string &executable);
 
     void delete_mod(const std::string &key);
     void delete_mod(int nodeid);

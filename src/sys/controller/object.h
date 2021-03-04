@@ -14,7 +14,7 @@ namespace covise
 {
 namespace controller{
 
-struct Application;
+struct NetModule;
 struct NumRunning;
 class CRBModule;
 class net_interface;
@@ -29,24 +29,24 @@ extern void handleClosedMsg(Message *msg);
 
 class obj_from_conn
 {
-    Application *module; /* link to the module */
+    NetModule *module; /* link to the module */
     std::string mod_intf;                 /* name of the interface */
     std::string type;                     /* type of the interface */
     std::string state;
 
 public:
     obj_from_conn();
-    void conn_module(Application *mod)
+    void conn_module(NetModule *mod)
     {
         module = mod;
     };
 
-    Application *get_mod()
+    NetModule *get_mod()
     {
         return module;
     };
 
-    const Application *get_mod() const
+    const NetModule *get_mod() const
     {
         return module;
     };
@@ -167,7 +167,7 @@ public:
 
 class obj_conn
 {
-    Application *mod;
+    NetModule *mod;
     std::string mod_intf;
     std::string old_name;
     data_list *datalist;
@@ -181,9 +181,9 @@ public:
         return old_name;
     };
     void set_old_name(const std::string &name);
-    void connect_module(Application *module);
-    const Application *get_mod() const;
-    Application *get_mod();
+    void connect_module(NetModule *module);
+    const NetModule *get_mod() const;
+    NetModule *get_mod();
 
 
     void set_mod_intf(const std::string &str);
@@ -279,8 +279,8 @@ public:
         return dataobj;
     };
 
-    obj_conn *connect_to(controller::Application *module, const std::string &intfname);
-    void connect_from(controller::Application *module, const net_interface& interface);
+    obj_conn *connect_to(controller::NetModule *module, const std::string &intfname);
+    void connect_from(controller::NetModule *module, const net_interface& interface);
 
     void del_from_connection();
     void del_to_connection(const std::string &name, const std::string &nr, const std::string &host, const std::string &intf);
@@ -296,13 +296,13 @@ public:
     void del_old_data();
     void del_dep_data();
 
-    void change_NEW_to_OLD(const controller::Application *mod, const std::string &intf);
+    void change_NEW_to_OLD(const controller::NetModule *mod, const std::string &intf);
     void set_to_NEW();
 
-    bool check_from_connection(const controller::Application * mod, const std::string &interfaceName) const;
-    std::string get_conn_state(const controller::Application *mod, const std::string &port);
+    bool check_from_connection(const controller::NetModule * mod, const std::string &interfaceName) const;
+    std::string get_conn_state(const controller::NetModule *mod, const std::string &port);
 
-    void set_DO_status(const std::string &DO_name, int mode, const controller::Application& mod, const std::string &intf_name);
+    void set_DO_status(const std::string &DO_name, int mode, const controller::NetModule& mod, const std::string &intf_name);
     void print_states();
 
     bool test(const std::string &DO_name);

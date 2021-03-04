@@ -20,8 +20,9 @@
 using namespace covise;
 using namespace covise::controller;
 
-Application::Application(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance)
-    : SubProcess(moduleType, host, sender_type::APPLICATIONMODULE, moduleInfo)
+NetModule::NetModule(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance)
+    : SubProcess(moduleType, host, sender_type::APPLICATIONMODULE, moduleInfo.name)
+    , m_info(moduleInfo)
 {
     if (instance == -1)
     {
@@ -33,7 +34,7 @@ Application::Application(const RemoteHost &host, const ModuleInfo &moduleInfo, i
     }
 }
 
-bool Application::isOnTop() const
+bool NetModule::isOnTop() const
 {
     bool onTop = true;
     connectivity().forAllNetInterfaces([&onTop](const net_interface &interface) {
@@ -45,9 +46,9 @@ bool Application::isOnTop() const
     return onTop;
 }
 
-Application::~Application()
+NetModule::~NetModule()
 {
-    for (Application *app : m_mirrors)
+    for (NetModule *app : m_mirrors)
     {
         if (m_mirror != NOT_MIRR) //ist mirrored
         {
@@ -78,7 +79,12 @@ Application::~Application()
     }
 }
 
-void Application::exec(NumRunning &numRunning)
+const ModuleInfo &NetModule::info() const
+{
+    return m_info;
+}
+
+void NetModule::exec(NumRunning &numRunning)
 {
     if (numRunning.apps == 0 || (!isOneRunningAbove(true)))
     {
@@ -94,7 +100,7 @@ void Application::exec(NumRunning &numRunning)
 
             if (m_mirror == ORG_MIRR)
             {
-                for (Application *mirror : m_mirrors)
+                for (NetModule *mirror : m_mirrors)
                 {
                     mirror->execute(numRunning);
                 }
@@ -114,50 +120,55 @@ void Application::exec(NumRunning &numRunning)
     }
 }
 
-std::string Application::fullName() const
+std::string NetModule::fullName() const
 {
     return m_info.name + "_" + std::to_string(instance());
 }
 
-bool Application::startflag() const
+const std::string &NetModule::title() const
 {
-    return m_isStarted;
+    if(m_title.empty())
+        m_title = info().name + "_" + std::to_string(instance());
+    return m_title;
 }
 
-void Application::resetStartFlag()
+void NetModule::setTitle(const std::string &t)
 {
-    m_isStarted = false;
-}
-
-void Application::setStartFlag()
-{
-    m_isStarted = true;
-}
-
-size_t Application::instance() const
-{
-    return m_instance;
-}
-
-void Application::setInstace(const std::string &titleString)
-{
-    assert(!titleString.rfind(info().name, 0));
-    int i = std::stoi(titleString.substr(info().name.size()));
+    m_title = t;
     std::stringstream ss;
     ss << "MODULE_TITLE\n"
        << info().name << "\n"
        << instance() << "\n"
        << host.userInfo().hostName << "\nSetModuleTitle\nString\n1\n";
-    m_instance = i;
-    ss << fullName();
+    ss << title();
     Message msg{COVISE_MESSAGE_UI, ss.str()};
     send(&msg);
 }
 
-void Application::init(const MapPosition &pos, int copy, ExecFlag flag, Application *mirror)
+bool NetModule::startflag() const
+{
+    return m_isStarted;
+}
+
+void NetModule::resetStartFlag()
+{
+    m_isStarted = false;
+}
+
+void NetModule::setStartFlag()
+{
+    m_isStarted = true;
+}
+
+size_t NetModule::instance() const
+{
+    return m_instance;
+}
+
+void NetModule::init(const MapPosition &pos, int copy, ExecFlag flag, NetModule *mirror)
 {
     m_position = pos;
-    if (!start(std::to_string(m_instance).c_str()) || !connect(host.getModule(sender_type::CRB)))
+    if (!start(std::to_string(m_instance).c_str(), info().category.c_str()) || !connect(host.getModule(sender_type::CRB)))
     {
         std::cerr << "Application::init failed to start module " << info().name << std::endl;
         return;
@@ -183,7 +194,7 @@ void Application::init(const MapPosition &pos, int copy, ExecFlag flag, Applicat
     }
 }
 
-void Application::mirror(Application *original)
+void NetModule::mirror(NetModule *original)
 {
     original->m_mirror = ORG_MIRR; //original
     original->m_mirrors.emplace_back(this);
@@ -192,7 +203,7 @@ void Application::mirror(Application *original)
     m_mirrors.emplace_back(original);
 }
 
-void Application::initConnectivity()
+void NetModule::initConnectivity()
 {
     // copy predefined connectivity for this kind of module StaticModuleInfo
     m_connectivity = m_info.connectivity();
@@ -217,7 +228,7 @@ void Application::initConnectivity()
     }
 }
 
-int Application::testOriginalcount(const string &interfaceName) const
+int NetModule::testOriginalcount(const string &interfaceName) const
 {
     int org_count;
 
@@ -228,7 +239,7 @@ int Application::testOriginalcount(const string &interfaceName) const
     }
     else
     {
-        auto org = std::find_if(m_mirrors.begin(), m_mirrors.end(), [](const Application *mirror) {
+        auto org = std::find_if(m_mirrors.begin(), m_mirrors.end(), [](const NetModule *mirror) {
             return mirror->m_mirror == ORG_MIRR;
         });
         if (org != m_mirrors.end())
@@ -240,27 +251,27 @@ int Application::testOriginalcount(const string &interfaceName) const
     return -1;
 }
 
-const ModuleNetConnectivity &Application::connectivity() const
+const ModuleNetConnectivity &NetModule::connectivity() const
 {
     return m_connectivity;
 }
 
-ModuleNetConnectivity &Application::connectivity()
+ModuleNetConnectivity &NetModule::connectivity()
 {
     return m_connectivity;
 }
 
-const Application::MapPosition &Application::pos() const
+const NetModule::MapPosition &NetModule::pos() const
 {
     return m_position;
 }
 
-void Application::move(const Application::MapPosition &pos)
+void NetModule::move(const NetModule::MapPosition &pos)
 {
     m_position = pos;
 }
 
-std::string Application::createBasicModuleDescription() const
+std::string NetModule::createBasicModuleDescription() const
 {
     std::stringstream ss;
     ss << info().name << "\n"
@@ -269,7 +280,7 @@ std::string Application::createBasicModuleDescription() const
     return ss.str();
 }
 
-std::string Application::createDescription() const
+std::string NetModule::createDescription() const
 {
     std::stringstream ss;
     ss << info().name << "\n"
@@ -306,47 +317,47 @@ std::string Application::createDescription() const
     return ss.str();
 }
 
-bool Application::isOriginal() const
+bool NetModule::isOriginal() const
 {
     return m_mirror != CPY_MIRR;
 }
 
-bool Application::isExecuting() const
+bool NetModule::isExecuting() const
 {
     return m_status == Status::executing;
 }
 
-void Application::setExecuting(bool state)
+void NetModule::setExecuting(bool state)
 {
     m_status = state ? Status::executing : Status::Idle;
 }
 
-Application::Status Application::status() const
+NetModule::Status NetModule::status() const
 {
     return m_status;
 }
 
-void Application::setStatus(Application::Status status)
+void NetModule::setStatus(NetModule::Status status)
 {
     m_status = status;
 }
 
-void Application::setAlive(bool state)
+void NetModule::setAlive(bool state)
 {
     m_alive = state;
 }
 
-std::vector<std::string> &Application::errorsSentByModule()
+std::vector<std::string> &NetModule::errorsSentByModule()
 {
     return m_errorsSentByModule;
 }
 
-const std::vector<std::string> &Application::errorsSentByModule() const
+const std::vector<std::string> &NetModule::errorsSentByModule() const
 {
     return m_errorsSentByModule;
 }
 
-void Application::set_DO_status(int mode, const string &DO_name)
+void NetModule::set_DO_status(int mode, const string &DO_name)
 {
     bool found = false;
     for (auto &interface : connectivity().interfaces)
@@ -374,7 +385,7 @@ void Application::set_DO_status(int mode, const string &DO_name)
     }
 }
 
-void Application::sendFinish()
+void NetModule::sendFinish()
 {
     string content = get_outparaobj();
     if (!content.empty())
@@ -384,7 +395,7 @@ void Application::sendFinish()
     }
 }
 
-void Application::delete_rez_objs()
+void NetModule::delete_rez_objs()
 {
     connectivity().forAllNetInterfaces([](net_interface &interface) {
         if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
@@ -399,7 +410,7 @@ void Application::delete_rez_objs()
     });
 }
 
-std::string Application::getStartMessage()
+std::string NetModule::getStartMessage()
 {
     std::stringstream buff;
     buff << serialize();
@@ -469,7 +480,7 @@ std::string Application::getStartMessage()
     return buff.str();
 }
 
-void Application::sendWarningMsgToMasterUi(const std::string &msg)
+void NetModule::sendWarningMsgToMasterUi(const std::string &msg)
 {
     std::string data = "Controller\n \n \n" + msg;
     Message message{COVISE_MESSAGE_WARNING, data};
@@ -482,7 +493,7 @@ void Application::sendWarningMsgToMasterUi(const std::string &msg)
     }
 }
 
-bool Application::delete_old_objs()
+bool NetModule::delete_old_objs()
 {
     bool deleted = false;
     m_connectivity.forAllNetInterfaces([&deleted](net_interface &interface) {
@@ -501,7 +512,7 @@ bool Application::delete_old_objs()
     return deleted;
 }
 
-void Application::new_obj_names()
+void NetModule::new_obj_names()
 {
     m_connectivity.forAllNetInterfaces([](net_interface &interface) {
         if (interface.get_direction() == controller::Direction::Output && interface.get_conn_state())
@@ -511,7 +522,7 @@ void Application::new_obj_names()
     });
 }
 
-std::string Application::get_outparaobj() const
+std::string NetModule::get_outparaobj() const
 {
     std::stringstream buff;
     buff << serialize();
@@ -558,7 +569,7 @@ std::string Application::get_outparaobj() const
     return err ? "" : buff.str();
 }
 
-std::string Application::get_inparaobj() const
+std::string NetModule::get_inparaobj() const
 {
     std::stringstream buffS;
     buffS << serialize();
@@ -580,7 +591,7 @@ std::string Application::get_inparaobj() const
     return buffS.str();
 }
 
-bool Application::startModuleWaitingAbove(NumRunning &numRunning)
+bool NetModule::startModuleWaitingAbove(NumRunning &numRunning)
 {
     bool oneWaiting = false;
     m_connectivity.forAllNetInterfaces([&numRunning, &oneWaiting, this](net_interface &interface) {
@@ -606,12 +617,12 @@ bool Application::startModuleWaitingAbove(NumRunning &numRunning)
     return oneWaiting;
 }
 
-int Application::numRunning() const
+int NetModule::numRunning() const
 {
     return m_numRunning;
 }
 
-void Application::setStart()
+void NetModule::setStart()
 {
     connectivity().forAllNetInterfaces([](net_interface &interface) {
         if (interface.get_direction() == controller::Direction::Output)
@@ -621,7 +632,7 @@ void Application::setStart()
     });
 }
 
-void Application::startModulesUnder(NumRunning &numRunning)
+void NetModule::startModulesUnder(NumRunning &numRunning)
 {
     connectivity().forAllNetInterfaces([&numRunning](net_interface &interface) {
         if (interface.get_direction() == controller::Direction::Output)
@@ -631,7 +642,7 @@ void Application::startModulesUnder(NumRunning &numRunning)
     });
 }
 
-bool Application::isOneRunningAbove(bool first) const
+bool NetModule::isOneRunningAbove(bool first) const
 {
     for (const auto &inter : m_connectivity.interfaces)
     {
@@ -655,7 +666,7 @@ bool Application::isOneRunningAbove(bool first) const
     return false;
 }
 
-bool Application::is_one_running_under() const
+bool NetModule::is_one_running_under() const
 {
     bool oneRunningUnder = false;
     connectivity().forAllNetInterfaces([&oneRunningUnder](const net_interface &interface) {
@@ -665,7 +676,7 @@ bool Application::is_one_running_under() const
             const auto &to = interface.get_object()->get_to();
             for (const auto &conn : to)
             {
-                const Application *app = conn.get_mod();
+                const NetModule *app = conn.get_mod();
                 if (app &&
                     !dynamic_cast<const Renderer *>(app) &&
                     app->isExecuting())
@@ -679,7 +690,7 @@ bool Application::is_one_running_under() const
     return oneRunningUnder;
 }
 
-void Application::execute(NumRunning &numRunning)
+void NetModule::execute(NumRunning &numRunning)
 {
     if (!m_alive)
         return;
@@ -727,23 +738,23 @@ void Application::execute(NumRunning &numRunning)
     }
 }
 
-int Application::overflowOfNextError() const
+int NetModule::overflowOfNextError() const
 {
     constexpr int maxErrors = 25;
     return std::max(static_cast<int>(m_errorsSentByModule.size()) + 1 - maxErrors, 0);
 }
 
-int Application::numMirrors() const
+int NetModule::numMirrors() const
 {
     return m_mirrors.size();
 }
 
-std::vector<Application *> &Application::getMirrors()
+std::vector<NetModule *> &NetModule::getMirrors()
 {
     return m_mirrors;
 }
 
-void Application::delete_dep_objs()
+void NetModule::delete_dep_objs()
 {
     bool objs_deleted = false;
 
@@ -764,7 +775,7 @@ void Application::delete_dep_objs()
         sendFinish();
 }
 
-std::string Application::get_parameter(controller::Direction direction, bool forSaving) const
+std::string NetModule::get_parameter(controller::Direction direction, bool forSaving) const
 {
     const auto &params = direction == controller::Direction::Input ? connectivity().inputParams : connectivity().outputParams;
     int i = 0;
@@ -802,7 +813,7 @@ std::string Application::get_parameter(controller::Direction direction, bool for
     return ss.str();
 }
 
-std::string Application::get_interfaces(controller::Direction direction) const
+std::string NetModule::get_interfaces(controller::Direction direction) const
 {
     std::stringstream buffer;
     int i = 0;
@@ -821,20 +832,20 @@ std::string Application::get_interfaces(controller::Direction direction) const
     return std::to_string(i) + "\n" + buffer.str();
 }
 
-std::string Application::get_moduleinfo() const
+std::string NetModule::get_moduleinfo() const
 {
     stringstream buffer;
     buffer << info().name << "\n"
            << instance() << "\n"
            << (&host.hostManager.getLocalHost() == &host ? "LOCAL" : host.userInfo().hostName) << "\n"
            << info().category << "\n"
-           << fullName() << "\n"
+           << title() << "\n"
            << pos().x << "\n"
            << pos().y << "\n";
     return buffer.str();
 }
 
-std::string Application::get_module(bool forSaving) const
+std::string NetModule::get_module(bool forSaving) const
 {
     stringstream buffer;
     buffer << "# Module " << info().name << "\n"
@@ -847,14 +858,14 @@ std::string Application::get_module(bool forSaving) const
     return buffer.str();
 }
 
-void Application::setDeadFlag(int flag)
+void NetModule::setDeadFlag(int flag)
 {
     connectivity().forAllNetInterfaces([flag](net_interface &interface) {
         interface.setDeadFlag(flag);
     });
 }
 
-void Application::writeScript(std::ofstream &of) const
+void NetModule::writeScript(std::ofstream &of) const
 {
     of << "#" << endl;
     of << "# MODULE: " << info().name << endl;
@@ -876,7 +887,7 @@ void Application::writeScript(std::ofstream &of) const
     }
 }
 
-std::string Application::serialize() const
+std::string NetModule::serialize() const
 {
     std::stringstream buff;
     buff << info().name << "\n"
@@ -885,7 +896,7 @@ std::string Application::serialize() const
     return buff.str();
 }
 
-size_t Application::getNumInterfaces(controller::Direction direction) const
+size_t NetModule::getNumInterfaces(controller::Direction direction) const
 {
     size_t count = 0;
     for (const auto &interface : m_connectivity.interfaces)
@@ -898,7 +909,7 @@ size_t Application::getNumInterfaces(controller::Direction direction) const
     return count;
 }
 
-std::string Application::serializeInputInterface(const net_interface &interface) const
+std::string NetModule::serializeInputInterface(const net_interface &interface) const
 {
     std::stringstream buff;
     if (interface.get_conn_state())

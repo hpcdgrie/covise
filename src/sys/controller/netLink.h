@@ -15,14 +15,14 @@ namespace covise
 class Message;
 namespace controller
 {
-struct Application;
+struct NetModule;
 
 class netlink
 {
     std::string name;
     std::string instanz;
     std::string host;
-    const controller::Application *mptr;
+    const controller::NetModule *mptr;
     /* evtl weitere Eintraege bzgl. synchro. */
 
 public:
@@ -42,11 +42,11 @@ public:
     void set_name(const std::string &str);
     void set_instanz(const std::string &str);
     void set_host(const std::string &str);
-    void set_mod(const Application *ptr)
+    void set_mod(const NetModule *ptr)
     {
         mptr = ptr;
     };
-    const Application *get_mod()
+    const NetModule *get_mod()
     {
         return mptr;
     };

@@ -15,7 +15,7 @@ namespace covise
 {
 namespace controller{
 
-struct Application;
+struct NetModule;
 struct Renderer;
 class Display;
 class C_interface;
@@ -212,7 +212,7 @@ public:
     void del_connect();
     object *get_object();
     const object *get_object() const;
-    int get_state(const Application *mod) const;
+    int get_state(const NetModule *mod) const;
 
     bool get_conn_state() const
     {
@@ -248,7 +248,7 @@ public:
     void set_connect(object *obj);
     void del_connect(object *obj, std::vector<Display>& displays);
 
-    int get_state(const Application *mod) const;
+    int get_state(const NetModule *mod) const;
     bool get_conn_state();
     int check_conn();
     void count_init(const Renderer *mod);

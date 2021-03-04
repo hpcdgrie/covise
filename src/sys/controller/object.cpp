@@ -267,17 +267,17 @@ void obj_conn::set_old_name(const string &str)
     old_name = str;
 }
 
-void obj_conn::connect_module(controller::Application *module)
+void obj_conn::connect_module(controller::NetModule *module)
 {
     mod = module;
 }
 
-const controller::Application *obj_conn::get_mod() const
+const controller::NetModule *obj_conn::get_mod() const
 {
     return mod;
 }
 
-controller::Application *obj_conn::get_mod()
+controller::NetModule *obj_conn::get_mod()
 {
     return mod;
 }
@@ -431,7 +431,7 @@ obj_conn *obj_conn_list::get(const string &name, const string &nr, const string 
     this->reset();
     while (obj_conn *tmp = this->next())
     {
-        controller::Application *mod = tmp->get_mod();
+        controller::NetModule *mod = tmp->get_mod();
         if (mod->info().name == name && mod->host.userInfo().hostName == host && tmp->get_mod_intf() == intf && mod->instance() == std::stoi(nr))
         {
             return tmp;
@@ -499,7 +499,7 @@ string object::get_current_name() const
 // connect_to adds a new to-connection into the to-list
 //----------------------------------------------------------------------
 
-obj_conn *object::connect_to(controller::Application *module, const string &intfname)
+obj_conn *object::connect_to(controller::NetModule *module, const string &intfname)
 {
 
     auto it = std::find_if(to.begin(), to.end(), [&module](const obj_conn &conn) {
@@ -530,7 +530,7 @@ obj_conn *object::connect_to(controller::Application *module, const string &intf
 // connect_from connects the object with the writing module
 //----------------------------------------------------------------------
 
-void object::connect_from(controller::Application *module, const net_interface &interface)
+void object::connect_from(controller::NetModule *module, const net_interface &interface)
 {
 
     from.conn_module(module);
@@ -593,7 +593,7 @@ void object::setStartFlagOnConnectedModules()
 {
     obj_conn *tmp_conn;
     std::for_each(to.begin(), to.end(), [](obj_conn &conn) {
-        controller::Application *app = conn.get_mod();
+        controller::NetModule *app = conn.get_mod();
         app->setStartFlag();
     });
 }
@@ -730,7 +730,7 @@ void object::del_dep_data()
 // is set to OLD
 //------------------------------------------------------------------------
 
-void object::change_NEW_to_OLD(const controller::Application *mod, const string &intf)
+void object::change_NEW_to_OLD(const controller::NetModule *mod, const string &intf)
 {
     // change substate from NEW to OLD
 
@@ -783,7 +783,7 @@ void object::set_to_NEW()
 // if the connection exists, it returns 1, else 0
 //----------------------------------------------------------------------
 
-bool object::check_from_connection(const controller::Application *mod, const string &interfaceName) const
+bool object::check_from_connection(const controller::NetModule *mod, const string &interfaceName) const
 {
     return (mod == from.get_mod() && interfaceName == from.get_intf());
 }
@@ -794,7 +794,7 @@ bool object::check_from_connection(const controller::Application *mod, const str
 // if the connection doesn't exist, it returns INIT
 // if the connections exits, it returns NEW or OLD or INIT
 //----------------------------------------------------------------------
-string object::get_conn_state(const controller::Application *mod, const string &intf)
+string object::get_conn_state(const controller::NetModule *mod, const string &intf)
 {
     // get substate for connected modules
     auto conn = std::find_if(to.begin(), to.end(), [&mod, &intf](const obj_conn &c) {
@@ -806,7 +806,7 @@ string object::get_conn_state(const controller::Application *mod, const string &
         return conn->get_status();
 }
 
-void object::set_DO_status(const string &DO_name, int mode, const controller::Application &mod, const string &intf_name)
+void object::set_DO_status(const string &DO_name, int mode, const controller::NetModule &mod, const string &intf_name)
 {
     auto conn = std::find_if(to.begin(), to.end(), [&mod](const obj_conn &conn) {
         return conn.get_mod() == &mod;

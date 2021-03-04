@@ -16,8 +16,8 @@
 
 using namespace covise::controller;
 
-Userinterface::Userinterface(const RemoteHost &h, const ModuleInfo &info)
-    : SubProcess(moduleType, h, sender_type::USERINTERFACE, info)
+Userinterface::Userinterface(const RemoteHost &h, const std::string &execName)
+    : SubProcess(moduleType, h, sender_type::USERINTERFACE, execName)
     , m_status(Slave)
 {
 }
@@ -48,14 +48,14 @@ bool Userinterface::restart(const UIOptions &options)
     Message msg{COVISE_MESSAGE_UI, "START_READING\n"};
     send(&msg);
 
-    for(const Application *mod : host.hostManager.getAllModules<Application>())
+    for (const NetModule *mod : host.hostManager.getAllModules<NetModule>())
     {
         cerr << mod->info().name << endl;
         ostringstream mybuf;
         mybuf << "INIT\n"
-                << mod->createBasicModuleDescription()
-                << mod->pos().x << "\n"
-                << mod->pos().y << "\n";
+              << mod->createBasicModuleDescription()
+              << mod->pos().x << "\n"
+              << mod->pos().y << "\n";
         msg = Message{COVISE_MESSAGE_UI, mybuf.str()};
         send(&msg);
 
@@ -75,10 +75,8 @@ bool Userinterface::restart(const UIOptions &options)
         // send current parameter
         // only input parameter
 
-
-
         // loop over all input parameters
-        for(const parameter& param: mod->connectivity().inputParams)
+        for (const parameter &param : mod->connectivity().inputParams)
         {
             std::string value = param.get_val_list();
             if (param.get_type() == "Browser")
@@ -115,8 +113,8 @@ bool Userinterface::restart(const UIOptions &options)
         {
             ostringstream mybuf2;
             mybuf2 << "OBJCONN2\n"
-                    << i << "\n"
-                    << buffer;
+                   << i << "\n"
+                   << buffer;
             msg = Message{COVISE_MESSAGE_UI, mybuf2.str()};
             send(&msg);
         }
@@ -128,7 +126,6 @@ bool Userinterface::restart(const UIOptions &options)
 
     return true;
 }
-
 
 void Userinterface::setStatus(Status status)
 {
@@ -154,8 +151,8 @@ void Userinterface::changeMaster(const RemoteHost &master)
     send(&msg);
 }
 
-
-void Userinterface::updateUI(){
+void Userinterface::updateUI()
+{
     for (const CRBModule *remoteCrb : host.hostManager.getAllModules<CRBModule>())
     {
         if (remoteCrb->host.state() != LaunchStyle::Disconnect)
@@ -165,14 +162,10 @@ void Userinterface::updateUI(){
             send(&ui_msg);
         }
     }
-
 }
 
-ModuleInfo MapEditor::uiMapEditorInfo{"mapeditor", ""};
-
-
 MapEditor::MapEditor(const RemoteHost &h)
-    : Userinterface(h, uiMapEditorInfo)
+    : Userinterface(h, "mapeditor")
 {
 }
 
@@ -225,11 +218,8 @@ bool MapEditor::start(const UIOptions &options, const CRBModule &crb, bool resta
     return 0;
 }
 
-ModuleInfo WsInterface::wsInterfaceInfo{"wsinterface", ""};
-
-
-WsInterface::WsInterface(const RemoteHost& host)
-    : Userinterface(host, wsInterfaceInfo)
+WsInterface::WsInterface(const RemoteHost &host)
+    : Userinterface(host, "wsinterface")
 {
 }
 
@@ -270,13 +260,13 @@ bool WsInterface::start(const UIOptions &options, const CRBModule &crb, bool res
     return 0;
 }
 
-
-PythonInterface::PythonInterface(const RemoteHost& host, const ModuleInfo &info)
-:Userinterface(host, info)
+PythonInterface::PythonInterface(const RemoteHost &host, const std::string &execName)
+    : Userinterface(host, execName)
 {
 }
 
-bool PythonInterface::start(const UIOptions &options, const CRBModule &crb, bool restart){
+bool PythonInterface::start(const UIOptions &options, const CRBModule &crb, bool restart)
+{
     m_crb = &crb;
     string instanz("001");
 
@@ -284,7 +274,6 @@ bool PythonInterface::start(const UIOptions &options, const CRBModule &crb, bool
         return false;
     if (!connect(crb))
         return false;
-
 
     // send status-Message
     string tmp = statusNames[m_status];

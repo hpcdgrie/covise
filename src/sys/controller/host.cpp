@@ -49,15 +49,15 @@ SubProcess &RemoteHost::getModule(sender_type type)
     throw Exception{"RemoteHost did not find module of type " + std::to_string(type)};
 }
 
-const Application &RemoteHost::getApplication(const std::string &name, int instance) const
+const NetModule &RemoteHost::getApplication(const std::string &name, int instance) const
 {
     return const_cast<RemoteHost *>(this)->getApplication(name, instance);
 }
 
-Application &RemoteHost::getApplication(const std::string &name, int instance)
+NetModule &RemoteHost::getApplication(const std::string &name, int instance)
 {
     auto app = std::find_if(begin(), end(), [&name, &instance](const std::unique_ptr<SubProcess> &mod) {
-        if (const auto app = dynamic_cast<const Application *>(&*mod))
+        if (const auto app = dynamic_cast<const NetModule *>(&*mod))
         {
             return app->info().name == name && app->instance() == instance;
         }
@@ -65,12 +65,12 @@ Application &RemoteHost::getApplication(const std::string &name, int instance)
     });
     if (app != end())
     {
-        return *dynamic_cast<Application *>(&**app);
+        return *dynamic_cast<NetModule *>(&**app);
     }
     throw Exception{"RemoteHost did not find application module " + name + "_" + std::to_string(instance)};
 }
 
-void RemoteHost::removeApplication(Application &app, int alreadyDead)
+void RemoteHost::removeApplication(NetModule &app, int alreadyDead)
 {
     app.setDeadFlag(alreadyDead);
     m_modules.erase(std::remove_if(m_modules.begin(), m_modules.end(), [&app](const std::unique_ptr<SubProcess> &mod) {
@@ -159,21 +159,6 @@ void RemoteHost::determineAvailableModules(const CRBModule &crb)
         iel = iel + 2;
     }
 }
-namespace covise
-{
-    namespace controller
-    {
-        namespace detail
-        {
-
-#ifdef _WIN32
-            const char *PythonInterfaceExecutable = "..\\..\\Python\\scriptInterface.bat ";
-#else
-            const char *PythonInterfaceExecutable = "scriptInterface ";
-#endif
-        }
-    }
-}
 
 bool RemoteHost::startUI(const UIOptions &options, const RemoteHost &master)
 {
@@ -183,9 +168,13 @@ bool RemoteHost::startUI(const UIOptions &options, const RemoteHost &master)
     {
     case UIOptions::python:
     {
-        m_pythonUiInfo.reset(new ModuleInfo{detail::PythonInterfaceExecutable + options.pyFile, ""});
-        auto modInfo = *m_availableModules.emplace(m_availableModules.end(), &*m_pythonUiInfo);
-        ui.reset(new PythonInterface{*this, *modInfo});
+
+#ifdef _WIN32
+        const char *PythonInterfaceExecutable = "..\\..\\Python\\scriptInterface.bat ";
+#else
+        const char *PythonInterfaceExecutable = "scriptInterface ";
+#endif
+        ui.reset(new PythonInterface{*this, PythonInterfaceExecutable + options.pyFile});
     }
     break;
     case UIOptions::gui:
@@ -247,8 +236,8 @@ bool RemoteHost::isModuleAvailable(const std::string &moduleName) const
     return it != m_availableModules.end();
 }
 
-Application &RemoteHost::startApplicationModule(const string &name, const string &instanz,
-                                                int posx, int posy, int copy, ExecFlag flags, Application *mirror)
+NetModule &RemoteHost::startApplicationModule(const string &name, const string &instanz,
+                                                int posx, int posy, int copy, ExecFlag flags, NetModule *mirror)
 {
     // check the Category of the Module
     auto moduleInfo = std::find_if(m_availableModules.begin(), m_availableModules.end(), [&name](const ModuleInfo *info) {
@@ -266,10 +255,10 @@ Application &RemoteHost::startApplicationModule(const string &name, const string
     }
     else
     {
-        module = &**m_modules.emplace(m_modules.end(), new Application{*this, **moduleInfo, nr});
+        module = &**m_modules.emplace(m_modules.end(), new NetModule{*this, **moduleInfo, nr});
     }
     // set initial values
-    auto &app = dynamic_cast<Application &>(*module);
+    auto &app = dynamic_cast<NetModule &>(*module);
     app.init({posx, posy}, copy, flags, mirror);
     return app;
 }

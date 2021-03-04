@@ -10,7 +10,7 @@
 
 #include "process.h"
 #include "netLink.h"
-
+#include "moduleInfo.h"
 #include <comsg/CRB_EXEC.h>
 
 #include <vector>
@@ -20,7 +20,7 @@ namespace controller{
 
 struct NumRunning;
 //rename Application to module and module to ConnectedProcess
-struct Application : SubProcess
+struct NetModule : SubProcess
 {
     enum class Status
     {
@@ -30,14 +30,17 @@ struct Application : SubProcess
         stopping
     };
     static const SubProcess::Type moduleType = SubProcess::Type::App;
-    Application(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance);
-    virtual ~Application();
+
+    NetModule(const RemoteHost &host, const ModuleInfo &moduleInfo, int instance);
+    virtual ~NetModule();
+
+    const ModuleInfo &info() const;
     bool isOnTop() const;
     virtual void exec(NumRunning &numRunning);
 
     std::string fullName() const; //unambiguous name of a module consisting of name_id
     const std::string &title() const;
-
+    void setTitle(const std::string &title);
     /// this flag is set if the module should be started
     bool startflag() const;
     void resetStartFlag();
@@ -52,14 +55,13 @@ struct Application : SubProcess
         int y = 0;
     };
     size_t instance() const;
-    void setInstace(const std::string &titleString);
 
-    virtual void init(const MapPosition &pos, int copy, ExecFlag flag, Application *mirror);
+    virtual void init(const MapPosition &pos, int copy, ExecFlag flag, NetModule *mirror);
     int testOriginalcount(const string &intfname) const;
     const ModuleNetConnectivity &connectivity() const;
     ModuleNetConnectivity &connectivity();
     const MapPosition &pos() const;
-    void move(const Application::MapPosition &pos);
+    void move(const NetModule::MapPosition &pos);
 
     std::string createBasicModuleDescription() const; //name + instance + host
     std::string createDescription() const;
@@ -88,7 +90,7 @@ struct Application : SubProcess
     virtual void execute(NumRunning &numRunning);
     int overflowOfNextError() const;
     int numMirrors() const;
-    std::vector<Application *> &getMirrors();
+    std::vector<NetModule *> &getMirrors();
     void delete_dep_objs();
     std::string get_parameter(controller::Direction direction, bool forSaving) const;
     std::string get_interfaces(controller::Direction direction) const;
@@ -99,11 +101,11 @@ struct Application : SubProcess
 
 
     mutable std::vector<netlink> netLinks;
-    mutable std::vector<const Application *> to_c_connections, from_c_connections; //unclear what this is good for
+    mutable std::vector<const NetModule *> to_c_connections, from_c_connections; //unclear what this is good for
 
 private:
     std::string m_description;
-    std::string m_title; //the name that is shown in the map editor
+    mutable std::string m_title; //the name that is shown in the map editor
     ModuleNetConnectivity m_connectivity;
 
     bool m_isStarted = false;
@@ -123,14 +125,15 @@ protected:
         ORG_MIRR,
         CPY_MIRR
     } m_mirror = NOT_MIRR;
-    std::vector<Application *> m_mirrors;
+    std::vector<NetModule *> m_mirrors;
     std::vector<std::string> m_errorsSentByModule;
     int m_numRunning = 0; /// number of startmessages sent to module
     Status m_status = Status::Idle; 
+    ModuleInfo m_info; 
     MapPosition m_position;
     std::string serialize() const;
     size_t getNumInterfaces(controller::Direction direction) const;
-    void mirror(Application *original);
+    void mirror(NetModule *original);
     void initConnectivity();
 
     virtual std::string serializeInputInterface(const net_interface &interface) const;

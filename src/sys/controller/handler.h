@@ -96,9 +96,9 @@ void handleQuit(const std::unique_ptr<Message> &msg);
 void handleUI(Message *msg, string data);
 void handleNewUi(const NEW_UI &msg);
 void handleFinall(const std::unique_ptr<Message>& msg, string data);
-void delModuleNode(const vector<Application *> &liste);
-const Application * initModuleNode(const string &name, const string &nr, const string &host, int, int, const string &, int, ExecFlag flags);
-Application *findApplication(const std::string &hostName, const std::string &name, int instance);
+void delModuleNode(const vector<NetModule *> &liste);
+const NetModule * initModuleNode(const string &name, const string &nr, const string &host, int, int, const string &, int, ExecFlag flags);
+NetModule *findApplication(const std::string &hostName, const std::string &name, int instance);
 void makeConnection(const string &from_mod, const string &from_nr, const string &from_host, const string &from_port,
                     const string &to_mod, const string &to_nr, const string &to_host, const string &to_port);
 
@@ -112,7 +112,7 @@ void vrbClientsUpdate(const Message &userInfoMessage);
 void getAllConnections();
 std::string createApplicationsAndConnectionsData();
 void resetLists(); //delete all application modules
-string writeClipboard(const string &keyword, const vector<Application *> &liste, bool all = false);
+string writeClipboard(const string &keyword, const vector<NetModule *> &liste, bool all = false);
 void addBuffer(const QString &text);
 void sendCollaborativeState();
 void addHost(const vrb::RemoteClient &rc);
@@ -120,7 +120,7 @@ void addPartner(const vrb::RemoteClient &rc);
 void removeClient(const vrb::RemoteClient &rc);
 void sendGenericInfoToRenderer(const std::string& prefix, const Message &msg);
 void sendSlave(const Message &msg);
-void finishExecuteIfLastRunning(const Application&app);
+void finishExecuteIfLastRunning(const NetModule&app);
 void saveCurrentNetworkFile(const std::string &filename);
 bool loadNetworkFile(const std::string &filename);
 

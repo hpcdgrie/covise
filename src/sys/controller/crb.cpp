@@ -18,11 +18,8 @@ using namespace covise::controller;
 
 const std::array<const char *, static_cast<int>(Userinterface::Status::LASTDUMMY)> Userinterface::statusNames{"MASTER", "SLAVE"};
 
-ModuleInfo CRBModule::crbModuleInfo{"crb", ""};
-ModuleInfo CRBModule::crbProxyModuleInfo{"crbProxy", ""};
-
 CRBModule::CRBModule(const RemoteHost &host, bool proxy)
-    : SubProcess(moduleType, host, sender_type::CRB, proxy ? crbProxyModuleInfo : crbModuleInfo)
+    : SubProcess(moduleType, host, sender_type::CRB, proxy ? "crb" : "crbProxy")
 {
 }
 
