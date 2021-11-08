@@ -324,6 +324,10 @@ void opencover::coVRPartnerList::receiveAvatarMessage(covise::TokenBuffer &tb)
         }
     }
     tb >> *av;
+    auto headPos = av->headTransform->getMatrix() * cover->getBaseMat();
+    std::cerr << "paterner transform updated: " << std::endl;
+    cerr << headPos.getTrans().x() << " " << headPos.getTrans().y() << headPos.getTrans().z() << std::endl;
+
 
 
 }
