@@ -352,6 +352,8 @@ if(COVISE_BUILD_TESTS)
 ADD_SUBDIRECTORY(tests)
 endif()
 
+OPTION(COVISE_BUILD_VRB_ONLY "only build vrb client" OFF)
+
 # Install
 
 SET(install_files_exclude "(/CVS/|/\\.svn/|/\\.hg/|/\\.git/|\\.swp$|\\.#|/#|/\\.gitignore|/\\.hgignore|\\.html\\.in$|\\.tex\\.in$|\\.tex$")
