@@ -143,25 +143,10 @@ void covise::shutdownSocket(int socketDescriptor)
 }
 
 
-FirewallConfig *FirewallConfig::theFirewallConfig = NULL;
+static FirewallConfig theFirewallConfig;
 
-FirewallConfig::FirewallConfig()
-{
-    sourcePort = coCoviseConfig::getInt("sourcePort", "System.Network", 31000);
-    setSourcePort = coCoviseConfig::isOn("setSourcePort", "System.Network", false, 0);
-    destinationPort = coCoviseConfig::getInt("covisePort", "System.Network", 31000);
-}
-
-FirewallConfig::~FirewallConfig()
-{
-}
-
-FirewallConfig *FirewallConfig::the()
-{
-    if (!theFirewallConfig)
-        theFirewallConfig = new FirewallConfig();
-
-    return theFirewallConfig;
+static void covise::initFirewallConfig(int sourcePort, int destinationPort, bool setSourcePort) {
+    theFirewallConfig = FirewallConfig{ sourcePort, destinationPort, setSourcePort };
 }
 
 void Socket::initialize()
@@ -243,12 +228,12 @@ Socket::Socket(const Host *h, int p, int retries, double timeout)
 
     setTCPOptions();
 
-    if (FirewallConfig::the()->setSourcePort)
+    if (theFirewallConfig.setSourcePort)
     {
         memset((char *)&s_addr_in, 0, sizeof(s_addr_in));
         s_addr_in.sin_family = AF_INET;
         s_addr_in.sin_addr.s_addr = INADDR_ANY;
-        s_addr_in.sin_port = htons(FirewallConfig::the()->sourcePort);
+        s_addr_in.sin_port = htons(theFirewallConfig.sourcePort);
 
         /* Assign an address to this socket and finds an unused port */
 
@@ -261,8 +246,8 @@ Socket::Socket(const Host *h, int p, int retries, double timeout)
             if (getErrno() == WSAEADDRINUSE)
 #endif
             {
-                FirewallConfig::the()->sourcePort++;
-                s_addr_in.sin_port = htons(FirewallConfig::the()->sourcePort);
+                theFirewallConfig.sourcePort++;
+                s_addr_in.sin_port = htons(theFirewallConfig.sourcePort);
             }
             else
             {
@@ -274,7 +259,7 @@ Socket::Socket(const Host *h, int p, int retries, double timeout)
             }
             errno = 0;
         }
-        FirewallConfig::the()->sourcePort++;
+        theFirewallConfig.sourcePort++;
     }
 
     //        memcpy (&(s_addr_in.sin_addr.s_addr), hp->h_addr, hp->h_length);
@@ -1454,7 +1439,7 @@ SSLSocket::SSLSocket()
     memset((char *)&s_addr_in, 0, sizeof(s_addr_in));
     s_addr_in.sin_family = AF_INET;
     s_addr_in.sin_addr.s_addr = INADDR_ANY;
-    s_addr_in.sin_port = htons(FirewallConfig::the()->sourcePort);
+    s_addr_in.sin_port = htons(theFirewallConfig.sourcePort);
 
     while (::bind(sock_id, (sockaddr *)(void *)&s_addr_in, sizeof(s_addr_in)) < 0)
     {
@@ -1464,8 +1449,8 @@ SSLSocket::SSLSocket()
         if (GetLastError() == WSAEADDRINUSE)
 #endif
         {
-            FirewallConfig::the()->sourcePort++;
-            s_addr_in.sin_port = htons(FirewallConfig::the()->sourcePort);
+            theFirewallConfig.sourcePort++;
+            s_addr_in.sin_port = htons(theFirewallConfig.sourcePort);
         }
         else
         {
@@ -1475,7 +1460,7 @@ SSLSocket::SSLSocket()
             return;
         }
     }
-    FirewallConfig::the()->sourcePort++;
+    theFirewallConfig.sourcePort++;
 }
 
 SSLSocket::SSLSocket(int p, SSL *ssl)

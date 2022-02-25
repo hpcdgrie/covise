@@ -108,17 +108,13 @@ const char df_local_machine = DF_IEEE;
 
 void NETEXPORT shutdownSocket(int socketDescriptor);
 
-class NETEXPORT FirewallConfig
-{
-    static FirewallConfig *theFirewallConfig;
-    FirewallConfig();
-    ~FirewallConfig();
+static void initFirewallConfig(int sourcePort, int destinationPort, bool setSourcePort);
 
-public:
-    int sourcePort;
-    int destinationPort;
-    bool setSourcePort;
-    static FirewallConfig *the();
+struct FirewallConfig
+{
+    int sourcePort = 31000; //sourcePort(coCoviseConfig::getInt("sourcePort", "System.Network", 31000));
+    int destinationPort = 31000; //destinationPort = coCoviseConfig::getInt("covisePort", "System.Network", 31000);
+    bool setSourcePort = 0; //setSourcePort = coCoviseConfig::isOn("setSourcePort", "System.Network", false, 0);
 };
 
 class ServerConnection;
