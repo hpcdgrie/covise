@@ -6,6 +6,7 @@
 #include <cover/coVRPartner.h>
 #include <cover/VRAvatar.h>
 
+
 using namespace opencover;
 
 COVERPLUGIN(AvatarPlugin);
@@ -45,14 +46,20 @@ AvatarPlugin::AvatarPlugin()
     coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::PartnerLeft, [this](){
         
         const auto me = coVRPartnerList::instance()->me();
-        for (auto a = m_avatars.begin(); a != m_avatars.end(); a++)
+        for (auto a = m_avatars.begin(); a != m_avatars.end();)
         {
-            if(coVRPartnerList::instance()->get(a->first)->sessionID() != me->sessionID())
+            auto p = coVRPartnerList::instance()->get(a->first);
+            if(!p || p->sessionID() != me->sessionID())
             {
                 a = m_avatars.erase(a);
-            }
+            } else
+                ++a;
         }
     });
+    coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::Disconnected, [this](){
+        m_avatars.clear();
+    });
+
 
     // m_avatarFile = std::make_unique<FileBrowserConfigValue>(m_menu, "avatarFile", "", *m_config, "");
     // m_avatarFile->ui()->setFilter("*.fbx");
@@ -61,8 +68,7 @@ AvatarPlugin::AvatarPlugin()
     // });
     // loadAvatar();
 
-    // m_interactor .reset(new coVR3DTransInteractor(osg::Vec3{-400,0,0}, 10, vrui::coInteraction::InteractionType::ButtonA, "target", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
-    // m_interactor->enableIntersection();
+
 }
 
 // void AvatarPlugin::loadAvatar()

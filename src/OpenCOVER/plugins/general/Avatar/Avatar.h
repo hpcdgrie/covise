@@ -15,10 +15,11 @@
 #include <cover/ui/FileBrowser.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/VectorEditField.h>
+#include <cover/ui/Button.h>
+#include <cover/ui/Slider.h>
 #include <ik/ik.h>
 
-#include <PluginUtil/coVR3DTransInteractor.h>
-
+#include <PluginUtil/coVR3DTransRotInteractor.h>
 #include <map>
 using namespace covise;
 using namespace opencover;
@@ -43,17 +44,22 @@ private:
     osg::Vec3 worldPosToShoulder(const osg::Vec3 &pos);
     osgAnimation::AnimationList m_animations;
     AnimationManagerFinder m_animationFinder;
-    std::unique_ptr<Bone> wrist, ellbow, shoulder;
+    std::unique_ptr<Bone> wrist, ellbow, shoulder, head;
     bool m_rotateButtonPresed = false;
     osg::ref_ptr<osg::Node> model;
-    osg::ref_ptr<osg::MatrixTransform> modelTrans;
+    osg::ref_ptr<osg::MatrixTransform> modelTrans, modelRot;
     opencover::ui::Button *lockA, *lockTheta, *lockB, *flipDeltaW, *flipTheta, *flipA, *flipB;
     opencover::ui::EditField *AOffset, *ThethaOffset, *BOffset;
     osg::ref_ptr<osg::MatrixTransform> targetDummy, ellbowDummy;
     ik_solver_t* ikSolver;
-    ik_node_t* ikShoulder, *ikEllbow, *ikAnkle;
+    ik_node_t* ikShoulder, *ikEllbow, *ikWrist;
     ik_effector_t* ikTarget;
-    osg::MatrixTransform *m_targetTransform;
+    osg::MatrixTransform *m_targetTransform, *m_headTransform;
+
+    ui::Button *m_useInteractor = nullptr;  
+    std::array<ui::Slider*, 3> m_angles;
+    std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactor; 
+
 
 
 };

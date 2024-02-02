@@ -15,15 +15,15 @@ BoneFinder::BoneFinder(const std::string &name)
 
 void BoneFinder::apply(osg::Node& node) {
 
-    // std::cerr << "nodename " << node.getName();
+    std::cerr << "nodename " << node.getName();
     node.getUpdateCallback();
-    // if(dynamic_cast<osgAnimation::Skeleton*>(&node))
-    //     std::cerr << " is a skeleton";
-    // if(dynamic_cast<osgAnimation::Bone*>(&node))
-    //     std::cerr << " is a Bone";
-    // if(dynamic_cast<osgAnimation::RigGeometry*>(&node))
-    //     std::cerr << " is a RigGeometry";
-    // std::cerr << std::endl;
+    if(dynamic_cast<osgAnimation::Skeleton*>(&node))
+        std::cerr << " is a skeleton";
+    if(dynamic_cast<osgAnimation::Bone*>(&node))
+        std::cerr << " is a Bone";
+    if(dynamic_cast<osgAnimation::RigGeometry*>(&node))
+        std::cerr << " is a RigGeometry";
+    std::cerr << std::endl;
     if(node.getName() == m_nodeName)
     {
         bone = dynamic_cast<osgAnimation::Bone*>(&node);
