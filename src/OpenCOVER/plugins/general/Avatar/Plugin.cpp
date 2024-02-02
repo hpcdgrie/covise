@@ -5,6 +5,8 @@
 #include <cover/coVRCommunication.h>
 #include <cover/coVRPartner.h>
 #include <cover/VRAvatar.h>
+#include <osgAnimation/UpdateBone>
+#include <osgUtil/UpdateVisitor>
 
 using namespace opencover;
 
@@ -18,51 +20,56 @@ AvatarPlugin::AvatarPlugin()
 , m_config(config())
 , m_menu(new ui::Menu("Avatar",this))
 {
-    
-    auto loadPartnerAvatars = [this](){
+    // auto loadPartnerAvatars = [this](){
         
-        const auto me = coVRPartnerList::instance()->me();
-        for(const auto &partner :  *coVRPartnerList::instance())
-        {
-            if(partner->ID() == me->ID() || partner->sessionID() != me->sessionID())
-                continue;
-            auto av = m_avatars.find(partner->ID());
-            if(av == m_avatars.end())
-            {
-                auto avatar = std::make_unique<LoadedAvatar>();
-                auto partnerAvatar = partner->getAvatar();
+    //     const auto me = coVRPartnerList::instance()->me();
+    //     for(const auto &partner :  *coVRPartnerList::instance())
+    //     {
+    //         if(partner->ID() == me->ID() || partner->sessionID() != me->sessionID())
+    //             continue;
+    //         auto av = m_avatars.find(partner->ID());
+    //         if(av == m_avatars.end())
+    //         {
+    //             auto avatar = std::make_unique<LoadedAvatar>();
+    //             auto partnerAvatar = partner->getAvatar();
 
-                if(avatar->loadAvatar(partner->userInfo().avatar, partnerAvatar, m_menu))
-                    m_avatars[partner->ID()] = std::move(avatar);
-            }    
-        }
-    };
-    coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::PartnerJoined, loadPartnerAvatars);
-    coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::SessionChanged, [this, loadPartnerAvatars](){
-        m_avatars.clear();
-        loadPartnerAvatars();
-    });
-    coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::PartnerLeft, [this](){
-        
-        const auto me = coVRPartnerList::instance()->me();
-        for (auto a = m_avatars.begin(); a != m_avatars.end(); a++)
-        {
-            if(coVRPartnerList::instance()->get(a->first)->sessionID() != me->sessionID())
-            {
-                a = m_avatars.erase(a);
-            }
-        }
-    });
-
-    // m_avatarFile = std::make_unique<FileBrowserConfigValue>(m_menu, "avatarFile", "", *m_config, "");
-    // m_avatarFile->ui()->setFilter("*.fbx");
-    // m_avatarFile->setUpdater([this](){
-    //     loadAvatar();
+    //             if(avatar->loadAvatar(partner->userInfo().avatar, partnerAvatar, m_menu))
+    //                 m_avatars[partner->ID()] = std::move(avatar);
+    //         }    
+    //     }
+    // };
+    // coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::PartnerJoined, loadPartnerAvatars);
+    // coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::SessionChanged, [this, loadPartnerAvatars](){
+    //     m_avatars.clear();
+    //     loadPartnerAvatars();
     // });
-    // loadAvatar();
+    // coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::PartnerLeft, [this](){
+        
+    //     const auto me = coVRPartnerList::instance()->me();
+    //     for (auto a = m_avatars.begin(); a != m_avatars.end();)
+    //     {
+    //         auto p = coVRPartnerList::instance()->get(a->first);
+    //         if(!p || p->sessionID() != me->sessionID())
+    //         {
+    //             a = m_avatars.erase(a);
+    //         } else
+    //             ++a;
+    //     }
+    // });
+    // coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::Disconnected, [this](){
+    //     m_avatars.clear();
+    // });
 
-    // m_interactor .reset(new coVR3DTransInteractor(osg::Vec3{-400,0,0}, 10, vrui::coInteraction::InteractionType::ButtonA, "target", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
-    // m_interactor->enableIntersection();
+
+
+    m_avatar = std::make_unique<LoadedAvatar>();
+    VRAvatar *a = new VRAvatar;
+    if(m_avatar->loadAvatar("C:/Users/Dennis/Data/Avatare/Final/SimulierteWeltenAvatar2.fbx", a, m_menu))
+        m_config->save();
+    else
+        m_avatar = nullptr;
+    m_avatars[1] = std::move(m_avatar);
+
 }
 
 // void AvatarPlugin::loadAvatar()

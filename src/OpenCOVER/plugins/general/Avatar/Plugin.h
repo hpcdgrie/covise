@@ -7,9 +7,8 @@
 #include <cover/ui/VectorEditField.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/Menu.h>
-
 #include "Avatar.h"
-
+#include <util/coExport.h>
 class PLUGINEXPORT AvatarPlugin : public opencover::coVRPlugin, public opencover::ui::Owner
 {
 public:
@@ -21,11 +20,9 @@ private:
     osg::ref_ptr<osg::MatrixTransform>m_sphereTransform;
     std::shared_ptr<config::File>m_config;
     ui::Menu* m_menu = nullptr;
-
     std::map<int, std::unique_ptr<LoadedAvatar>> m_avatars;
 
     std::unique_ptr<LoadedAvatar> m_avatar; 
-    std::unique_ptr<opencover::coVR3DTransInteractor> m_interactor; 
 
     // void loadAvatar();
     // void key(int type, int keySym, int mod) override;
