@@ -1,54 +1,56 @@
 #ifndef COVER_PLUGIN_FBXAVATAR_Bone_H
 #define COVER_PLUGIN_FBXAVATAR_Bone_H
 
-#include <osg/MatrixTransform>
-#include <osg/NodeVisitor>
-#include <osgAnimation/Animation>
-#include <osgAnimation/BasicAnimationManager>
-#include <osgAnimation/RigGeometry>
-#include <osgAnimation/RigTransformHardware>
-#include <osgAnimation/Skeleton>
-#include <osgAnimation/StackedQuaternionElement>
-#include <osgAnimation/StackedRotateAxisElement>
 #include <osgAnimation/StackedTranslateElement>
-#include <osgGA/GUIEventHandler>
+#include <osgAnimation/StackedQuaternionElement>
 
-namespace opencover{
-namespace ui{
-class Menu;
-class Button;
-class VectorEditField;
-class EditField;
-}
-}
+#include <osg/NodeVisitor>
 
-namespace osgAnimation{
-class StackedTransform;
-}
-struct BoneFinder : public osg::NodeVisitor
-{
-    osg::ref_ptr<osgAnimation::Bone> bone;
-    BoneFinder(const std::string &name);
-    void apply(osg::Node& node) override;
-private:
-    std::string m_nodeName;
-};
+#include <ik/ik.h>
 
-struct AnimationManagerFinder : public osg::NodeVisitor
-{
-    osg::ref_ptr<osgAnimation::BasicAnimationManager> m_am;
-    AnimationManagerFinder();
-    void apply(osg::Node& node) override;
-};
+#include <array>
+#include <map>
 
+struct BoneParser : public osg::NodeVisitor {
 struct Bone
 {
-    Bone(Bone *parent, const std::string &name, osg::Node* model, opencover::ui::Menu *menu);
-    osg::ref_ptr<osgAnimation::StackedQuaternionElement> rotation;
-    osg::ref_ptr<osgAnimation::Bone> bone;
-    float length;
-    Bone *parent = nullptr;
-    std::string name;
+    osg::ref_ptr<osgAnimation::StackedQuaternionElement> rot; //rotation to manipulate joint
+    const osgAnimation::StackedTranslateElement* basePos; //initial position of the joint
+    Bone *parent = nullptr; 
+    ik_node_t *ikNode = nullptr;
+    osg::Node *osgNode = nullptr;
+    std::unique_ptr<osg::Vec3> controlPoint; //the bone should bend towards this position
+};
+struct Effector{
+   Effector(const char* name, ik_node_t* ikNode, size_t chainLenght, osg::Node* origin, ik_solver_t *ikSolver) 
+   : name(name)
+   , effector(ikSolver->effector->create())
+   , origin(origin)
+   {
+        ikSolver->effector->attach(effector, ikNode);
+        effector->chain_length = chainLenght;
+   }
+
+const char* name = nullptr;
+ik_effector_t *effector = nullptr;
+osg::Node* origin = nullptr; //The effector position has to be set in the local coordinate system of the origin, which ist chainLenght + 1 bones away from the effector
+};
+
+public:
+
+    typedef  std::map<const osg::Node*, Bone> NodeMap;
+    BoneParser();
+    void apply(osg::Node& node);
+    NodeMap::iterator findNode(const std::string &name);
+    osg::Vec3 claculateBoneDistance(const std::string &boneName1, const std::string &boneName2);
+    NodeMap nodeToIk;
+    ik_solver_t *ikSolver; 
+    uint32_t ikId = 0;
+    ik_node_t *root;
+    std::array<std::unique_ptr<Effector>, 5> effectors;
+    const std::array<const char*, 5> effectorName{"mixamorig:Head", "mixamorig:LeftHand", "mixamorig:RightHand", "mixamorig:LeftFoot", "mixamorig:RightFoot"};
+    // const std::array<const char*, 1> effectorName{"mixamorig:RightHand"};
+    const std::array<size_t, 5> effectorChainLenghts{1, 2, 2, 2, 2};
 };
 
 #endif // COVER_PLUGIN_FBXAVATAR_Bone_H
