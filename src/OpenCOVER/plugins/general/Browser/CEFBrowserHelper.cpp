@@ -18,7 +18,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // Enable High-DPI support on Windows 7 or newer.
-    CefEnableHighDPISupport();
+    // CefEnableHighDPISupport();
 
     void* sandbox_info = nullptr;
     //std::cerr << lpCmdLine << "CEFBrowserHelper" << std::endl;
