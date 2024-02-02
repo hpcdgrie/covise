@@ -65,6 +65,7 @@ SET(SOURCES
   CEF.cpp
 )
 cover_add_plugin(Browser)
+set_property(TARGET Browser PROPERTY CXX_STANDARD 17)
 
 # if(${BUILD_CEF})
 #   add_dependencies(Browser cef_build)
@@ -85,5 +86,6 @@ else()
   ADD_COVISE_EXECUTABLE(CEFBrowserHelper ${SOURCES})
 endif()
 COVISE_WNOERROR(CEFBrowserHelper)
+set_property(TARGET CEFBrowserHelper PROPERTY CXX_STANDARD 17)
 TARGET_LINK_LIBRARIES(CEFBrowserHelper ${EXTRA_LIBS} )
 

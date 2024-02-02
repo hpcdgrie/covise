@@ -423,6 +423,12 @@ void CEF::reload()
 
 bool CEF::init()
 {
+    CefMainArgs tmain_args;   
+    CefSettings tsettings;
+    tsettings.command_line_args_disabled = true;
+    tsettings.external_message_pump = true;
+    bool val = CefInitialize(tmain_args, tsettings, nullptr, nullptr);
+    return true;
     AddRef(); // count our own reference as well.
 
     CEFCoim.reset(new coCOIM(this));
@@ -524,7 +530,7 @@ bool CEF::init()
 #endif
     CefString(&settings.browser_subprocess_path).FromASCII(bsp.c_str());
 
-    std::string lfp = "/tmp/cef.log";
+    std::string lfp = "C:/Users/Dennis/AppData/Local/Temp/opencoverCer.log";
     std::string logfile = *configString("log", "file", lfp);
     CefString(&settings.log_file)
         //.FromASCII(covise::coCoviseConfig::getEntry("logFile", "COVER.Plugin.Browser", lfp).c_str());
