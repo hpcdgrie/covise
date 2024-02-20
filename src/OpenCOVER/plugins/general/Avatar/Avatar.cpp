@@ -1,5 +1,8 @@
 #include "Avatar.h"
+#include "Bone.h"
+
 #include <iostream>
+#include <config/CoviseConfig.h>
 #include <cover/ui/Menu.h>
 #include <cover/ui/Action.h>
 #include <cover/ui/Button.h>
@@ -15,25 +18,29 @@
 #include <osg/Material>
 #include <OpenVRUI/osg/mathUtils.h>
 #include <ik/ik.h>
+#include <osgAnimation/StackedScaleElement>
+#include <cover/VRSceneGraph.h>
+#include <algorithm>
 
-
-
-static void applyIkToOsgNode(ik_node_t*node)
-{
-    auto b = (Bone*) node->user_data;
-        osg::Quat appliedRotation;
-        // oik coords are in root(shoulder) coord system so we have to transform the orientation to local system of the bone
-        osg::Quat totalRotation = osg::Quat(node->rotation.x, node->rotation.y, node->rotation.z, node->rotation.w);
-        auto parent = b->parent;
-        while(parent)
-        {
-            appliedRotation *= b->parent->rotation->getQuaternion();
-            parent = parent->parent;
-        }
-        b->rotation->setQuaternion(appliedRotation.inverse() * totalRotation);
-}
-
+#include <osgAnimation/Bone>
+#include <osgUtil/UpdateVisitor>
 //public
+
+AnimationManagerFinder::AnimationManagerFinder() 
+: osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN) {}
+
+void AnimationManagerFinder::apply(osg::Node& node) {
+
+    if (m_am.valid())
+        return;
+
+    if (node.getUpdateCallback()) {       
+        m_am = dynamic_cast<osgAnimation::BasicAnimationManager*>(node.getUpdateCallback());
+        return;
+    }
+    
+    traverse(node);
+}
 
 bool LoadedAvatar::loadAvatar(const std::string &filename, VRAvatar *partnerAvatar, ui::Menu *menu)
 {
@@ -45,136 +52,129 @@ bool LoadedAvatar::loadAvatar(const std::string &filename, VRAvatar *partnerAvat
         return false;
     positionAndScaleModel(model, partnerAvatar->feetTransform);
     std::cerr<< "loaded model " << filename << std::endl;
-    
-    initArmJoints(menu);
-    createAnimationSliders(menu);
-    buidIkModel();
-    m_interactor .reset(new coVR3DTransRotInteractor(osg::Matrix::scale(1/100.0,1/100.0,1/100.0), 1, vrui::coInteraction::InteractionType::ButtonA, "target", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    buidCompleteIkModel();
+
+    osg::Matrix m;
+    // default size for all interactors
+    float interSize = -1.f;
+    // if defined, COVER.IconSize overrides the default
+    interSize = coCoviseConfig::getFloat("COVER.IconSize", interSize);
+    m_interactor.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
     m_interactor->enableIntersection();
+    m_interactor->show();
     m_useInteractor = new ui::Button(menu, "useInteractor");
-    for (size_t i = 0; i < 3; i++)
-    {
-        m_angles[i] = new ui::Slider(menu, "angle_" + std::to_string(i));
-        m_angles[i]->setBounds(0, 360);
-    }
-    
+    m_effectorSelector =  new ui::SelectionList(menu, "effector");
+    m_effectorSelector->setList(std::vector<std::string>{{"mixamorig:Head", "mixamorig:LeftHand", "mixamorig:RightHand", "mixamorig:LeftFoot", "mixamorig:RightFoot"}});
+    m_modelHeight = new ui::Slider(menu, "modelHeight");
+    m_modelHeight->setBounds(1.0, 2.5);
+    m_modelHeight->setCallback([this](double val, bool x){
+        
+        if (val < 1)
+        {
+            return;
+        }
+        
+        auto h = skeleton->claculateBoneDistance("mixamorig:HeadTop_End_end", "mixamorig:RightToe_End_end");
+        std::cerr << "skeleton height: " << h.y() << std::endl;
+        auto m = modelTrans->getMatrix();
+        auto scale = std::abs(val * 1000/ h.y());
+        auto sm = osg::Matrix::scale(osg::Vec3f(scale, scale, scale));
+        m.makeScale(osg::Vec3f(scale, scale, scale));
+        modelScale->setMatrix(m);
+    });
     return true;
 }
 
 void LoadedAvatar::update(const osg::Vec3 &targetInWorldCoords)
 {
-    resetIkTransform(); // not sure why this step is necessary
-    auto targetInShoulderCoords = worldPosToShoulder(targetInWorldCoords);
 
-    ikTarget->target_position = ik.vec3.vec3(targetInShoulderCoords.x(), targetInShoulderCoords.y(), targetInShoulderCoords.z());
-    // eventually also set rotation -> ikTarget->target_rotation = ik.quat.quat(0.894, 0, 0, 0.447);
-
-    ik.solver.solve(ikSolver);
-
-    //update the osg counterparts of the ik model
-    //ik coords are in the shoulder coord system, so they have to be transformed to their local system
-    ik.solver.iterate_affected_nodes(ikSolver, applyIkToOsgNode);
 }
 
-osg::Matrix toBoneCoords(const Bone &bone, const osg::Matrix &m)
+static void applyIkToOsgNode2(ik_node_t*node, osg::Quat &appliedRotation)
 {
-    auto boneToWorld = bone.bone->getBoneParent()->getWorldMatrices(cover->getObjectsRoot())[0];
-    auto worldToBone = osg::Matrix::inverse(boneToWorld);
-    return boneToWorld * m * worldToBone;
+    auto bone = (BoneParser::Bone*) node->user_data;
+    if(!bone->parent)
+        return;
+    osg::Vec3d targetPosLocal{node->position.x, node->position.y, node->position.z};
+    auto targetPositionOrigin = appliedRotation * targetPosLocal;
+    osg::Vec3d sourcePos = bone->basePos->getTranslate();
+    osg::Quat r;
+    if((sourcePos ^ targetPositionOrigin).length2() > 0.00001)
+        r.makeRotate(sourcePos, targetPositionOrigin);
+    appliedRotation *= r.inverse();
+    bone->parent->rot->setQuaternion(r);
 }
 
-osg::Vec3 getEuler(const osg::Matrix &mat)
+osg::Matrix fromWorldToNode(const osg::Matrix &mInWorld, const osg::Node *node)
 {
-    coCoord offsetCoord(mat);
-    osg::Vec3 hpr;
-    for (size_t i = 0; i < 3; i++)
-    {
-        hpr[i] = offsetCoord.hpr[i];
-    }
-    return hpr;
+    auto nodeToWorld = node->getWorldMatrices(cover->getObjectsRoot())[0];
+    auto worldToNode = osg::Matrix::inverse(nodeToWorld);
+    return  mInWorld * worldToNode;
 }
 
+//real update function
 void LoadedAvatar::update()
 {
-    static size_t count = 0;
-    if(count == 5 && !m_animations.empty())
+    static bool first = true;
+    if(first)
     {
-        auto &anim = *m_animations.begin();
-        m_animationFinder.m_am->stopAnimation(anim);
+        auto h = skeleton->claculateBoneDistance("mixamorig:HeadTop_End_end", "mixamorig:RightToe_End_end");
+        std::cerr << "skeleton height: " << h.length() << std::endl;
+        first = false;
     }
-    ++count;
+    //transform the target to the origin of the ik effector chain 
+    auto &effector = skeleton->effectors[m_effectorSelector->selectedIndex()];
+    auto bone = (BoneParser::Bone*)effector->effector->node->user_data;
+    auto origin  = ((osgAnimation::Bone*)effector->origin);
+    auto originBone = &skeleton->nodeToIk[origin];
+    auto targetInOriginCoords = fromWorldToNode(m_interactor->getMatrix(), origin);
+    auto m = targetInOriginCoords;
 
-    //head orientation
-    auto targetInHead = toBoneCoords(*head, m_headTransform->getMatrix());
-    auto x = targetInHead.getRotate();
-    head->rotation->setQuaternion(targetInHead.getRotate());
 
-    auto hpr = getEuler(m_headTransform->getMatrix());
-
-    modelRot->setMatrix(osg::Matrix::rotate(hpr.x() /180 * osg::PI, 0, 0, 1));
-    resetIkTransform(); // not sure why this step is necessary
-    // auto targetInShoulderCoords = worldPosToShoulder(m_targetTransform->getMatrix().getTrans());
-
+    effector->effector->target_position = ik.vec3.vec3(m.getTrans().x(), m.getTrans().y(), m.getTrans().z());
+    effector->effector->target_rotation = ik.quat.quat(m.getRotate().x(), m.getRotate().y(), m.getRotate().z(), m.getRotate().w());
+    auto result = ik.solver.solve(skeleton->ikSolver);
     
-    auto targetInShoulder= toBoneCoords(*shoulder, m_targetTransform->getMatrix());
-
-    auto targetTrans = targetInShoulder.getTrans();
-    auto targetRot = targetInShoulder.getRotate();
-    if(m_useInteractor->state())
-    {
-        
-        coCoord c;
-        for (size_t i = 0; i < 3; i++)
-        {
-            c.hpr[i] = m_angles[i]->value();
-        }
-        osg::Matrix m;
-        c.makeMat(m);
-        targetRot = m.getRotate();
-    }
-    ikTarget->target_position = ik.vec3.vec3(targetTrans.x(), targetTrans.y(), targetTrans.z());
-    ikTarget->target_rotation = ik.quat.quat(targetRot.x(), targetRot.y(), targetRot.z(), targetRot.w());
-    // eventually also set rotation -> ikTarget->target_rotation = ik.quat.quat(0.894, 0, 0, 0.447);
-
-    ik.solver.solve(ikSolver);
-
+    
+    
     //update the osg counterparts of the ik model
-    //ik coords are in the shoulder coord system, so they have to be transformed to their local system
-    ik.solver.iterate_affected_nodes(ikSolver, applyIkToOsgNode);
+    //ik positions are in the local coord system, so they have to be transformed to the origin system before transforming them to rotations
+    std::vector<ik_node_t*> tree;
     
-    auto targetInWrist= toBoneCoords(*wrist, m_targetTransform->getMatrix());
-    
-    wrist->rotation->setQuaternion(targetInWrist.getRotate());
-    wrist->rotation->setQuaternion(osg::Quat(0,1,0,0));
-    wrist->rotation->setQuaternion(targetInWrist.getRotate());
+    auto node = effector->effector->node;
 
-
+    while(node != originBone->ikNode)
+    {
+        tree.push_back(node);
+        node = node->parent;
+    }
+    tree.push_back(node);
+    osg::Quat rotationFromOrigin;
+    for (auto it = tree.rbegin(); it != tree.rend(); ++it)
+    {
+        applyIkToOsgNode2(*it, rotationFromOrigin);
+    }
+    // auto finalBone = (BoneParser::Bone*)effector->effector->node->user_data; 
+    // finalBone->rot->setQuaternion(rotationFromOrigin * targetInOriginCoords.getRotate()); 
 }
-
-
-//private
 
 void LoadedAvatar::positionAndScaleModel(osg::Node* model, osg::MatrixTransform *pos)
 {
     modelTrans = new osg::MatrixTransform;
-    modelRot = new osg::MatrixTransform;
-    pos->addChild(modelRot);
-    modelRot->addChild(modelTrans);
+    modelTrans->setMatrix(osg::Matrix::translate(10, 10, 10));
+    modelTrans->setName("AvatarTrans");
+    modelScale = new osg::MatrixTransform;
+    modelScale->setName("AvatarScale");
+    modelScale->addChild(modelTrans);
     auto scale = osg::Matrix::scale(osg::Vec3f(10, 10, 10));
+    modelScale->setMatrix(scale);
+    cover->getObjectsRoot()->addChild(modelScale);
     auto rot1 = osg::Matrix::rotate(osg::PI / 2, 1,0,0);
-    auto rot2 = osg::Matrix::rotate(2 *osg::PI /4, 0,0,1);
+    auto rot2 = osg::Matrix::rotate(0, 0,0,1);
     auto transM = osg::Matrix::translate(osg::Vec3f{0,0,0});
-    modelTrans->setMatrix(scale * rot1 * rot2 * transM);
+    modelTrans->setMatrix(rot1 * rot2 * transM);
     modelTrans->addChild(model);
-}
 
-void LoadedAvatar::initArmJoints(ui::Menu *menu)
-{
-    shoulder = std::make_unique<Bone>(nullptr, "mixamorig:RightArm", model, menu); //z = 0, y = between 0 and 90, x between 280 and 45
-    ellbow = std::make_unique<Bone>(shoulder.get(), "mixamorig:RightForeArm", model, menu); // x between 210 and 360
-    wrist = std::make_unique<Bone>(ellbow.get(), "mixamorig:RightHand", model, menu);
-    head = std::make_unique<Bone>(ellbow.get(), "mixamorig:Head", model, menu);
-    // Bone(nullptr, "mixamorig:RightShoulder", model, menu); //just to delete from animator 
 }
 
 void LoadedAvatar::createAnimationSliders(ui::Menu *menu)
@@ -200,50 +200,19 @@ void LoadedAvatar::createAnimationSliders(ui::Menu *menu)
     m_animationFinder.m_am->playAnimation(anim, 1, 1);
 }
 
-void LoadedAvatar::buidIkModel()
+void LoadedAvatar::buidCompleteIkModel()
 {
-    ikSolver = ik.solver.create(IK_FABRIK);
+    skeleton = new BoneParser; //never deleted :(
+    model->accept(*skeleton);
 
-    // Create a simple arm-bone structure
-    ikShoulder = ikSolver->node->create(0);
-    ikEllbow = ikSolver->node->create_child(ikShoulder, 1);
-    ikWrist = ikSolver->node->create_child(ikEllbow, 2);
-
-    // Set node positions in local space so they form a straight line in the Y direction
-    ikEllbow->position = ik.vec3.vec3(0, shoulder->length, 0);
-    ikWrist->position = ik.vec3.vec3(0, ellbow->length, 0);
-
-    // set userdata to later update correspondig osg nodes 
-    ikShoulder->user_data = shoulder.get();
-    ikEllbow->user_data = ellbow.get();
-    ikWrist->user_data = wrist.get();
-
-    // Attach an effector at the end -> ankle will have position and orientation set to this effector
-    ikTarget = ikSolver->effector->create();
-    ikSolver->effector->attach(ikTarget, ikWrist);
-
-    /* We want to calculate rotations as well as positions */
-    ikSolver->flags |= IK_ENABLE_TARGET_ROTATIONS;
 
     /* Assign our tree to the solver, rebuild data and calculate solution */
-    ik.solver.set_tree(ikSolver, ikShoulder);
-    ik.solver.rebuild(ikSolver);
+
+    ik.solver.set_tree(skeleton->ikSolver, skeleton->root);
+    ik.solver.rebuild(skeleton->ikSolver);
+
+
+    
 }
 
-void LoadedAvatar::resetIkTransform()
-{
-    ikShoulder->position =  ik.vec3.vec3(0, 0, 0);
-    ikEllbow->position = ik.vec3.vec3(0, shoulder->length, 0);
-    ikWrist->position = ik.vec3.vec3(0, ellbow->length, 0);
-    ikShoulder->rotation = ik.quat.quat(0, 0, 0, 1);
-    ikEllbow->rotation = ik.quat.quat(0, 0, 0, 1);
-    ikWrist->rotation = ik.quat.quat(0, 0, 0, 1);
-}
-
-osg::Vec3 LoadedAvatar::worldPosToShoulder(const osg::Vec3 &pos)
-{
-    auto shoulderToWorld = shoulder->bone->getBoneParent()->getWorldMatrices(cover->getObjectsRoot())[0];
-    auto worldToShoulder = osg::Matrix::inverse(shoulderToWorld);
-    return pos * worldToShoulder;
-}
 
