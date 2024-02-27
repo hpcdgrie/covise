@@ -114,13 +114,36 @@ osg::Vec3 getClosestPointOnPlane(const osg::Plane &p, const osg::Vec3 &point)
     return point - p.getNormal() * d;
 }
 
-static void applyIkToOsgNode2(ik_node_t*node, osg::Quat &rotationFromOrigin, osg::Vec3d &positionFromOrigin, const osg::Vec3d &originToTarget)
+osg::Vec3 rotateBoneToControlPoint(const osg::Vec3 &bone, const osg::Vec3 &controlPoint, const osg::Vec3 &originToTarget)
 {
+    osg::Matrix transformFromOrigin;
+    auto targetPositionOrigin = transformFromOrigin * bone;
+    osg::Plane p(originToTarget, osg::Vec3(0,0,0));
+
+    auto boneDistanceFromOriginPlane = p.distance(targetPositionOrigin);
+    auto boneOnOriginPlane = targetPositionOrigin - originToTarget * boneDistanceFromOriginPlane;
+    auto controlOnOriginPlane = getClosestPointOnPlane(p, controlPoint);
+
+    auto boneInControlDirectionPlane = controlOnOriginPlane /controlOnOriginPlane.length() * (boneOnOriginPlane).length();
+    auto boneInControlDirection =  boneInControlDirectionPlane + originToTarget * boneDistanceFromOriginPlane; 
+    auto boneInControlDirectionLocal = osg::Matrix::inverse(transformFromOrigin) * boneInControlDirection;
+    auto d = std::abs(bone.length2() - boneInControlDirectionLocal.length2());
+    assert(d < 0.01);
+    return boneInControlDirectionLocal;
+}
+
+static void applyIkToOsgNode2(ik_node_t*node, osg::Matrixd &transformFromOrigin, const osg::Vec3d &originToTarget)
+{
+
+    auto test1 = rotateBoneToControlPoint(osg::Vec3(1,1,0), osg::Vec3(-10,10,0), osg::Vec3(0,1,0));
+    auto test2 = rotateBoneToControlPoint(osg::Vec3(1,1,0), osg::Vec3(10,10,0), osg::Vec3(0,1,0));
+    auto test3 = rotateBoneToControlPoint(osg::Vec3(1,1,0), osg::Vec3(1,0,1), osg::Vec3(0,1,0));
+    auto test4 = rotateBoneToControlPoint(osg::Vec3(1,1,0), osg::Vec3(0,10,1), osg::Vec3(0,1,0));
+
     auto bone = (BoneParser::Bone*) node->user_data;
     if(!bone->parent)
         return;
-    osg::Vec3d sourcePos = bone->basePos->getTranslate();
-    osg::Vec3d bonePos{node->position.x, node->position.y, node->position.z};
+    osg::Vec3d targetPosLocal{node->position.x, node->position.y, node->position.z};
     if(bone->controlPoint)
     {
         // //project bone and control point in orign plane with normal to originToTarget
@@ -132,24 +155,17 @@ static void applyIkToOsgNode2(ik_node_t*node, osg::Quat &rotationFromOrigin, osg
         // targetPosLocal = origin - (originToTarget * ((origin - targetPosLocal) * originToTarget));
 
         //  plane function from point + normale: a (x – x1) + b (y– y1) + c (z –z1) = 0
-        osg::Plane p(originToTarget, positionFromOrigin);
-        auto boneToOrigin = origin - bonePos;
-
-        auto boneDistanceFromOriginPlane = p.distance(bonePos);
-        auto boneOnOriginPlane = bonePos - originToTarget * boneDistanceFromOriginPlane;
-        auto controlOnOriginPlane = getClosestPointOnPlane(p, *bone->controlPoint);
-
-        auto controlToOrigin = controlOnOriginPlane - origin;
-        auto boneInControlDirectionPlane = controlToOrigin /controlToOrigin.length() * (boneOnOriginPlane - origin).length();
-        auto boneInControlDirection =  boneInControlDirectionPlane + originToTarget * boneDistanceFromOriginPlane; 
-        assert(bonePos.length2() == boneInControlDirection.length2());
+        targetPosLocal = rotateBoneToControlPoint(targetPosLocal, *bone->controlPoint, originToTarget);
     }
-    // auto targetPositionOrigin = appliedRotation * targetPosLocal;
-    bonePos = rotationFromOrigin * bonePos;
+    auto targetPositionOrigin = transformFromOrigin.getRotate() * targetPosLocal;
+    osg::Vec3d sourcePos = bone->basePos->getTranslate();
     osg::Quat r;
-    if((sourcePos ^ bonePos).length2() > 0.00001)
-        r.makeRotate(sourcePos, bonePos);
-    rotationFromOrigin *= r.inverse();
+    if((sourcePos ^ targetPositionOrigin).length2() > 0.00001)
+        r.makeRotate(sourcePos, targetPositionOrigin);
+    osg::Matrixd m;
+    m.setRotate(r);
+    m.setTrans(targetPosLocal);
+    transformFromOrigin *= osg::Matrixd::inverse(m);
     bone->parent->rot->setQuaternion(r);
 }
 
@@ -194,11 +210,10 @@ public:
             auto tp = effector->effector->target_position;
             auto originToTarget =  osg::Vec3(tp.x, tp.y, tp.z);
             originToTarget.normalize();
-            osg::Quat rotationFromOrigin;
-            osg::Vec3d positionFromOrigin;
+            osg::Matrixd transformFromOrigin;
             for (auto it = tree.rbegin(); it != tree.rend(); ++it)
             {
-                applyIkToOsgNode2(*it, rotationFromOrigin, positionFromOrigin, originToTarget);
+                applyIkToOsgNode2(*it, transformFromOrigin, originToTarget);
             }
             // auto finalBone = (BoneParser::Bone*)effector->effector->node->user_data; 
             // finalBone->rot->setQuaternion(rotationFromOrigin * targetInOriginCoords.getRotate()); 
