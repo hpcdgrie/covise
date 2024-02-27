@@ -15,79 +15,78 @@ BoneParser::BoneParser()
 
 void BoneParser::apply(osg::Node& node) {
 
-        if(auto bone = dynamic_cast<osgAnimation::Bone*>(&node))
+    if(auto bone = dynamic_cast<osgAnimation::Bone*>(&node))
+    {
+        std::cerr << "bone: " << bone->getName() << std::endl;
+        Bone *parent = nullptr;
+        ik_node_t *ikNode;
+        if(!bone->getBoneParent())
         {
-            std::cerr << "bone: " << bone->getName() << std::endl;
-            Bone *parent = nullptr;
-            ik_node_t *ikNode;
-            if(!bone->getBoneParent())
-            {
-                root = ikSolver->node->create(ikId++);
-                ikNode = root;
-            }
-            else
-            {
-                parent = &nodeToIk[bone->getBoneParent()];
-                ikNode = ikSolver->node->create_child(parent->ikNode, ikId++);
-            }
-            // auto constraint = ikSolver->constraint->create(IK_CUSTOM);
-            // ikSolver->constraint->set_custom(constraint, [](ik_node_t* node){
-            //     auto b = (Bone*) node->user_data;
-            //     std::cerr << "constraint: " << b->osgNode->getName() << std::endl;
-            //     return 1;
-            // });
-            // auto attachResult = ikSolver->constraint->attach(constraint, ikNode);
+            root = ikSolver->node->create(ikId++);
+            ikNode = root;
+        }
+        else
+        {
+            parent = &nodeToIk[bone->getBoneParent()];
+            ikNode = ikSolver->node->create_child(parent->ikNode, ikId++);
+        }
+        // auto constraint = ikSolver->constraint->create(IK_CUSTOM);
+        // ikSolver->constraint->set_custom(constraint, [](ik_node_t* node){
+        //     auto b = (Bone*) node->user_data;
+        //     std::cerr << "constraint: " << b->osgNode->getName() << std::endl;
+        //     return 1;
+        // });
+        // auto attachResult = ikSolver->constraint->attach(constraint, ikNode);
 
-            auto &stacked = dynamic_cast<osgAnimation::UpdateBone*>(node.getUpdateCallback())->getStackedTransforms();
-            osgAnimation::StackedTranslateElement *ste = nullptr;
-            for (const auto &i : stacked)
+        auto &stacked = dynamic_cast<osgAnimation::UpdateBone*>(node.getUpdateCallback())->getStackedTransforms();
+        osgAnimation::StackedTranslateElement *ste = nullptr;
+        for (const auto &i : stacked)
+        {
+            if(auto translate = dynamic_cast<osgAnimation::StackedTranslateElement*>(i.get()))
             {
-                if(auto translate = dynamic_cast<osgAnimation::StackedTranslateElement*>(i.get()))
-                {
-                    auto t = translate->getTranslate();
-                    ikNode->position = ik.vec3.vec3(t.x(), t.y(), t.z());
-                    ste = translate;
-                } 
-            }
-           
-            auto sqe = new osgAnimation::StackedQuaternionElement;
-            Bone &ikBone = nodeToIk.emplace(std::make_pair(&node, Bone{sqe, ste, parent, ikNode, &node})).first->second;
-            stacked.push_back(sqe);
-            ikNode->user_data = &ikBone;
-            nodeToIk[&node] = ikBone;
-            for (size_t i = 0; i < effectorName.size(); i++)
+                auto t = translate->getTranslate();
+                ikNode->position = ik.vec3.vec3(t.x(), t.y(), t.z());
+                ste = translate;
+            } 
+        }
+        
+        auto sqe = new osgAnimation::StackedQuaternionElement;
+        Bone &ikBone = nodeToIk.emplace(std::make_pair(&node, Bone{sqe, ste, parent, ikNode, &node})).first->second;
+        stacked.push_back(sqe);
+        ikNode->user_data = &ikBone;
+        for (size_t i = 0; i < effectorName.size(); i++)
+        {
+            if(node.getName() == effectorName[i])
             {
-                if(node.getName() == effectorName[i])
+                size_t chainLength = effectorChainLenghts[i];
+                auto origin = bone;
+                for (size_t i = 0; i < chainLength + 1; i++)
                 {
-                    size_t chainLength = effectorChainLenghts[i];
-                    auto origin = bone;
-                    for (size_t i = 0; i < chainLength + 1; i++)
-                    {
-                        auto &stacked =  dynamic_cast<osgAnimation::UpdateBone*>(origin->getUpdateCallback())->getStackedTransforms();
-                        stacked.erase(std::remove_if(stacked.begin(), stacked.end(), [](const osgAnimation::StackedTransform::value_type& t){
-                            return dynamic_cast<osgAnimation::StackedRotateAxisElement*>(t.get());
-                        }), stacked.end());
-                        origin = origin->getBoneParent();
-                    }
-                    effectors[i] = std::make_unique<Effector>(effectorName[i], ikNode, chainLength, origin, ikSolver);
+                    auto &stacked =  dynamic_cast<osgAnimation::UpdateBone*>(origin->getUpdateCallback())->getStackedTransforms();
+                    stacked.erase(std::remove_if(stacked.begin(), stacked.end(), [](const osgAnimation::StackedTransform::value_type& t){
+                        return dynamic_cast<osgAnimation::StackedRotateAxisElement*>(t.get());
+                    }), stacked.end());
+                    origin = origin->getBoneParent();
                 }
+                effectors[i] = std::make_unique<Effector>(effectorName[i], ikNode, chainLength, origin, ikSolver);
             }
         }
-        traverse(node);
     }
+    traverse(node);
+}
+
+BoneParser::NodeMap::iterator BoneParser::findNode(const std::string &name)
+{
+    return std::find_if(nodeToIk.begin(), nodeToIk.end(), [&name](const NodeMap::value_type &p){
+        return p.first->getName() == name;
+    });
+}
 
 osg::Vec3 BoneParser::claculateBoneDistance(const std::string &boneName1, const std::string &boneName2)
 {
-    auto bone1it = std::find_if(nodeToIk.begin(), nodeToIk.end(), [&boneName1](const std::pair<const osg::Node*, Bone> &p){
-        return p.first->getName() == boneName1;
-    });
-    auto bone2it = std::find_if(nodeToIk.begin(), nodeToIk.end(), [&boneName2](const std::pair<const osg::Node*, Bone> &p){
-        return p.first->getName() == boneName2;
-    });
-    auto rootIt = std::find_if(nodeToIk.begin(), nodeToIk.end(), [](const std::pair<const osg::Node*, Bone> &p){
-        return !p.second.parent;
-    });
-
+    auto bone1it = findNode(boneName1);
+    auto bone2it = findNode(boneName2);
+    auto rootIt = findNode("mixamorig:Hips");
     if(bone1it == nodeToIk.end() || bone2it == nodeToIk.end() || rootIt == nodeToIk.end())
         return osg::Vec3(0,0,0);
     

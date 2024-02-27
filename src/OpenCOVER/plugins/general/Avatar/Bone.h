@@ -19,6 +19,7 @@ struct Bone
     Bone *parent = nullptr; 
     ik_node_t *ikNode = nullptr;
     osg::Node *osgNode = nullptr;
+    std::unique_ptr<osg::Vec3> controlPoint; //the bone should bend towards this position
 };
 struct Effector{
    Effector(const char* name, ik_node_t* ikNode, size_t chainLenght, osg::Node* origin, ik_solver_t *ikSolver) 
@@ -37,11 +38,12 @@ osg::Node* origin = nullptr; //The effector position has to be set in the local 
 
 public:
 
+    typedef  std::map<const osg::Node*, Bone> NodeMap;
     BoneParser();
     void apply(osg::Node& node);
+    NodeMap::iterator findNode(const std::string &name);
     osg::Vec3 claculateBoneDistance(const std::string &boneName1, const std::string &boneName2);
-
-    std::map<const osg::Node*, Bone> nodeToIk;
+    NodeMap nodeToIk;
     ik_solver_t *ikSolver; 
     uint32_t ikId = 0;
     ik_node_t *root;

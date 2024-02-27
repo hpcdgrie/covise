@@ -66,9 +66,13 @@ private:
     ui::Button *m_useInteractor = nullptr; 
     ui::SelectionList* m_effectorSelector = nullptr; 
     ui::Slider* m_modelHeight = nullptr; 
+    ui::Slider* m_leftLegDistance = nullptr; 
+    ui::Slider* m_rightLegDistance = nullptr; 
+    ui::VectorEditField *m_controllPoint = nullptr;
     std::array<ui::Slider*, 3> m_angles;
-    std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactor; 
+    std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactor, m_interactorFloor; 
     BoneParser *skeleton;
+    float m_modelHeightValue = 0.0f;
 
 
 };
