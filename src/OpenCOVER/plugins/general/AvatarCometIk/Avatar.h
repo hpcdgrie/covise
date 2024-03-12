@@ -9,7 +9,7 @@
 #define _Animated_Avatar_Plugin
 
 #include "Bone.h"
-#include "ThreePointArm.h"
+
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/CovconfigLink.h>
 #include <cover/ui/FileBrowser.h>
@@ -73,7 +73,7 @@ private:
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactor, m_interactorFloor; 
     BoneParser *skeleton;
     float m_modelHeightValue = 0.0f;
-    std::unique_ptr<ThreePointArm> m_leftLeg;
+
 
 };
 
