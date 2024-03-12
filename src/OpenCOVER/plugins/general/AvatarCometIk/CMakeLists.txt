@@ -1,16 +1,14 @@
 
 SET(HEADERS
-Avatar.h
 Bone.h
+Avatar.h
 Plugin.h
-ThreePointArm.cpp
 )
 
 SET(SOURCES
-Avatar.cpp
 Bone.cpp
+Avatar.cpp
 Plugin.cpp
-ThreePointArm.cpp
 )
 
 find_package(IK)

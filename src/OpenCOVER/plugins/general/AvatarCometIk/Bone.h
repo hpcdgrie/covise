@@ -40,7 +40,7 @@ public:
 
     typedef  std::map<const osg::Node*, Bone> NodeMap;
     BoneParser();
-    void apply(osg::Node& node) override;
+    void apply(osg::Node& node);
     NodeMap::iterator findNode(const std::string &name);
     osg::Vec3 claculateBoneDistance(const std::string &boneName1, const std::string &boneName2);
     NodeMap nodeToIk;
