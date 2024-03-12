@@ -71,23 +71,22 @@ bool LoadedAvatar::loadAvatar(const std::string &filename, VRAvatar *partnerAvat
     m_effectorSelector =  new ui::SelectionList(menu, "effector");
     m_effectorSelector->setList(std::vector<std::string>{{"mixamorig:Head", "mixamorig:LeftHand", "mixamorig:RightHand", "mixamorig:LeftFoot", "mixamorig:RightFoot"}});
     m_modelHeight = new ui::Slider(menu, "modelHeight");
-    m_modelHeight->setBounds(0, 360);
-    m_modelHeight->setValue(90);
-    // m_modelHeight->setCallback([this](double val, bool x){
+    m_modelHeight->setBounds(1.0, 2.5);
+    m_modelHeight->setCallback([this](double val, bool x){
         
-    //     if (val < 1)
-    //     {
-    //         return;
-    //     }
+        if (val < 1)
+        {
+            return;
+        }
         
-    //     auto h = skeleton->claculateBoneDistance("mixamorig:HeadTop_End_end", "mixamorig:RightToe_End_end");
-    //     std::cerr << "skeleton height: " << h.y() << std::endl;
-    //     auto m = modelTrans->getMatrix();
-    //     auto scale = std::abs(val * 1000/ h.y());
-    //     auto sm = osg::Matrix::scale(osg::Vec3f(scale, scale, scale));
-    //     m.makeScale(osg::Vec3f(scale, scale, scale));
-    //     modelScale->setMatrix(m);
-    // });
+        auto h = skeleton->claculateBoneDistance("mixamorig:HeadTop_End_end", "mixamorig:RightToe_End_end");
+        std::cerr << "skeleton height: " << h.y() << std::endl;
+        auto m = modelTrans->getMatrix();
+        auto scale = std::abs(val * 1000/ h.y());
+        auto sm = osg::Matrix::scale(osg::Vec3f(scale, scale, scale));
+        m.makeScale(osg::Vec3f(scale, scale, scale));
+        modelScale->setMatrix(m);
+    });
     m_leftLegDistance = new ui::Slider(menu, "leftLegDistance");
     m_rightLegDistance = new ui::Slider(menu, "rightLegDistance");
     m_leftLegDistance->setBounds(-50, 50);
@@ -97,7 +96,8 @@ bool LoadedAvatar::loadAvatar(const std::string &filename, VRAvatar *partnerAvat
 
     m_controllPoint = new ui::VectorEditField(menu, "controlPoint");
     m_controllPoint->setCallback([this](const osg::Vec3 &val){
-        m_leftLeg->setControlPoint(val);
+        auto &bone = skeleton->nodeToIk[skeleton->findNode("mixamorig:RightLeg")->first];
+        bone.controlPoint = std::make_unique<osg::Vec3>(val);
     });
 
     return true;
@@ -227,8 +227,14 @@ private:
 //real update function
 void LoadedAvatar::update()
 {
+    static bool first = true;
+    if(first)
+    {
+        m_modelHeightValue = skeleton->claculateBoneDistance("mixamorig:HeadTop_End", "mixamorig:RightToe_End").y();
+        auto heightTorso = skeleton->claculateBoneDistance("mixamorig:HeadTop_End", "mixamorig:Hips").y();
+        first = false;
+    }
 
-    m_modelHeightValue = 20;
     auto floorGlobal = m_interactorFloor->getMatrix();
     auto targetGlobal = m_interactor->getMatrix();
 
@@ -248,8 +254,8 @@ void LoadedAvatar::update()
     auto s = targetGlobal.getScale();
     targetGlobalPos.z() -= heightModel *10;
     modelTransMatrix.setTrans(targetGlobalPos);
-    // modelTrans->setMatrix(modelTransMatrix);
-    modelTrans->setMatrix(floorGlobal);
+    modelTrans->setMatrix(modelTransMatrix);
+
 
     auto targetLeftFootGloabl = targetGlobal;
     auto targetKeftFootPos = targetLeftFootGloabl.getTrans();
@@ -257,8 +263,22 @@ void LoadedAvatar::update()
     // targetKeftFootPos.x() += legDistance;
     targetLeftFootGloabl.setTrans(targetKeftFootPos);
 
-    // m_leftLeg->update(targetLeftFootGloabl);
-    m_leftLeg->update(targetGlobal, m_modelHeight->value());
+    auto targetRightFootGloabl = targetGlobal;  
+    auto targetRightFootPos = targetRightFootGloabl.getTrans();
+    targetRightFootPos.z() = floorGlobal.getTrans().z();
+    // targetRightFootPos.x() -= legDistance;
+    targetRightFootGloabl.setTrans(targetRightFootPos);
+
+    float legDistance = 0;
+    IkUpdater ikUpdater(skeleton);
+    ikUpdater.updateEffectorChain(*leftFoot, targetLeftFootGloabl, osg::Vec3(m_leftLegDistance->value(),0,0));
+    ikUpdater.updateEffectorChain(*rightFoot, targetRightFootGloabl, osg::Vec3(m_rightLegDistance->value(),0,0));
+    auto result = ikUpdater.solveAndApply();
+
+
+    //transform the target to the origin of the ik effector chain 
+    // auto &effector = skeleton->effectors[m_effectorSelector->selectedIndex()];
+    // updateEffectorChain(*effector, targetGlobal);
 
 }
 
@@ -309,8 +329,17 @@ void LoadedAvatar::createAnimationSliders(ui::Menu *menu)
 
 void LoadedAvatar::buidCompleteIkModel()
 {
+    skeleton = new BoneParser; //never deleted :(
+    model->accept(*skeleton);
+    skeleton->findNode("mixamorig:RightLeg")->second.controlPoint = std::make_unique<osg::Vec3>(osg::Vec3(0,1,0));
+    // skeleton->findNode("mixamorig:LeftLeg")->second.controlPoint = std::make_unique<osg::Vec3>(osg::Vec3(0,1,0));
 
-    m_leftLeg = std::make_unique<ThreePointArm>(*model, "mixamorig:LeftUpLeg", "mixamorig:LeftLeg", "mixamorig:LeftFoot");
+    /* Assign our tree to the solver, rebuild data and calculate solution */
+
+    ik.solver.set_tree(skeleton->ikSolver, skeleton->root);
+    ik.solver.rebuild(skeleton->ikSolver);
+
+
     
 }
 
