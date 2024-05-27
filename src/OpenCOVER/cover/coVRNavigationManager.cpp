@@ -86,6 +86,87 @@ using covise::coCoviseConfig;
 
 coVRNavigationManager *coVRNavigationManager::s_instance = NULL;
 
+
+osg::ref_ptr<osg::Geode> createLine(osg::Material *mat)
+{
+    osg::ref_ptr<osg::Geode> geodeCyl = new osg::Geode;
+    geodeCyl->setName("dummy line");
+    osg::ref_ptr<osg::ShapeDrawable> sd = new osg::ShapeDrawable(new osg::Cylinder(osg::Vec3(0, 0, 0), 1, 1000));
+    // sd->setColor(osg::Vec4{1,0,0,1});
+    sd->setName("measureLineShape");
+    osg::ref_ptr<osg::StateSet> ss = sd->getOrCreateStateSet();
+    geodeCyl->addDrawable(sd);
+    ss->setAttributeAndModes(mat, osg::StateAttribute::ON);
+    return geodeCyl;
+}
+
+
+bool nodeVisible(const osg::Node *node)
+{
+    if(!node)
+        return false;
+    if ((node->getNodeMask() & (Isect::Visible)))
+    {
+        // check also parents of this visible node,
+        const osg::Node *parent = NULL;
+        // there could be an invisible dcs above
+        if (node->getNumParents())
+            parent = node->getParent(0);
+        while (parent && (parent != cover->getObjectsRoot()))
+        {
+            if (parent->getNodeMask() & (Isect::Visible))
+                parent = parent->getNumParents() ? parent->getParent(0) : nullptr;
+            else // parent not visible
+                return false;
+        }
+    }
+    return true;
+}
+
+osg::Matrix projectCursorToWorld(const osg::Vec2& cursorPos)
+{
+    constexpr float intersectionDist = 1000000.0f;
+    const auto & pointertMat = cover->getPointerMat();
+    auto pointerPos = pointertMat.getTrans();
+    std::cerr << "pointerPos=" << pointerPos << pointerPos.x() << " " << pointerPos.y() << " " << pointerPos.z() << std::endl;
+    Vec3 q0, q1{0,intersectionDist,0};
+    q0 = pointertMat.preMult(q0);
+    q1 = pointertMat.preMult(q1);
+    if ((q1-q0).length2() < std::numeric_limits<float>::epsilon())
+    {
+        std::cerr << "coIntersection: intersectionDist=" << intersectionDist << " too short" << std::endl;
+        return osg::Matrix();
+    }
+    const auto &viewer = VRViewer::instance()->getViewerMat();
+    osg::Vec3 startScreen = osg::Vec3(cursorPos.x(), cursorPos.y(), 0);
+    osg::Vec3 endScreen = osg::Vec3(cursorPos.x(), cursorPos.y(), 1);
+    osg::Vec3 startWorld = startScreen * viewer;
+    osg::Vec3 endWorld = endScreen * viewer;
+    // Create a line segment intersector
+    ref_ptr<LineSegment> ray = new LineSegment();
+    ray->set(q0, q1);
+    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = new osgUtil::LineSegmentIntersector(ray->start(), ray->end());
+    // Create an intersection visitor with the intersector
+    osgUtil::IntersectionVisitor visitor(intersector);
+    // Traverse the scene graph with the intersection visitor to find intersections
+    visitor.setTraversalMask(Isect::Pick);
+    // visitor.setTraversalMask(0xffffffff);
+    // visitor.setNodeMaskOverride(0xffffffff);
+    cover->getScene()->accept(visitor);
+    auto isects = intersector->getIntersections();
+    for (const auto &isect: isects)
+    {
+        osg::Node *node = nullptr;
+        if (isect.drawable && isect.drawable->getNumParents()>0)
+            node = isect.drawable->getParent(0);
+
+        if (nodeVisible(node))
+            return *isect.matrix;
+    }
+    return osg::Matrix();
+}
+
+
 static float mouseX()
 {
     return Input::instance()->mouse()->x();
@@ -189,6 +270,7 @@ void coVRNavigationManager::init()
 
     initShowName();
 
+    initClippingCursor();
     updatePerson();
 
     oldHandPos = Vec3(0, 0, 0);
@@ -548,6 +630,26 @@ void coVRNavigationManager::initMenu()
 #endif
 }
 
+void coVRNavigationManager::initClippingCursor()
+{
+    m_clippingCursor = new osg::MatrixTransform();
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+    geode->addDrawable(new osg::ShapeDrawable(new osg::Sphere(osg::Vec3(), 5)));
+    osg::ref_ptr<osg::Material> material = new osg::Material;
+    material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1, 0, 0, 1));
+    geode->getOrCreateStateSet()->setAttribute(material);
+    m_clippingCursor->addChild(geode);
+    m_clippingCursor->setName("clippingCursor");
+    // cover->getObjectsRoot()->addChild(m_clippingCursor);
+    
+    // m_testLineTrans = new osg::MatrixTransform();
+    // m_testLineTrans->setName("testLineTrans");
+    // cover->getObjectsRoot()->addChild(m_testLineTrans);
+    // auto l = createLine(material);
+    // m_testLineTrans->addChild(l);
+
+}
+
 void coVRNavigationManager::initShowName()
 {
     Vec4 fgcolor(0.5451, 0.7020, 0.2431, 1.0);
@@ -700,6 +802,23 @@ bool coVRNavigationManager::keyEvent(int type, int keySym, int mod)
             // halt
             currentVelocity = 0;
             handled = true;
+        } else if(keySym == osgGA::GUIEventAdapter::KEY_Shift_L)
+        {
+            if(!m_clippingCursorVisible)
+            {
+                cover->getScene()->addChild(m_clippingCursor);
+                m_clippingCursorVisible = true;
+            }
+        }
+    } else if (type == osgGA::GUIEventAdapter::KEYUP)
+    {
+        if (keySym == osgGA::GUIEventAdapter::KEY_Shift_L)
+        {
+            if(m_clippingCursorVisible)
+            {
+                cover->getScene()->removeChild(m_clippingCursor);
+                m_clippingCursorVisible = false;
+            }
         }
     }
     return handled;
@@ -842,6 +961,28 @@ void coVRNavigationManager::update()
 {
     if (cover->debugLevel(5))
         fprintf(stderr, "coVRNavigationManager::update\n");
+
+    if(m_clippingCursorVisible)
+    {
+        auto pos = projectCursorToWorld({ mouseX(),  mouseY()});
+        m_clippingCursor->setMatrix(pos);
+    }
+    // {            
+    //     auto viewer = cover->getViewerMat();
+    //     osg::Matrix invbase = cover->getInvBaseMat();
+    //     viewer *= invbase;
+    //     cover->getIntersectionHitPointWorld();
+    //     cover->getIntersectionHitPointWorldNormal();
+        
+    //     // viewer.inverse(viewer);
+    //     osg::Vec3 startScreen = osg::Vec3(mouseX(), mouseY(), 0);
+    //     osg::Vec3 endScreen = osg::Vec3(mouseX(),  mouseY(), 1);
+    //     osg::Vec3 startWorld = startScreen * viewer;
+    //     osg::Vec3 endWorld = endScreen * viewer;
+    //     osg::Matrix pos2 = osg::Matrix::translate(startWorld);
+    //     osg::Matrix rot2 = osg::Matrix::rotate(startWorld, endWorld);
+    //     m_testLineTrans->setMatrix(rot2 * pos2);
+    // }
 
     scaleSlider_->setValue(cover->getScale());
 
@@ -2368,7 +2509,6 @@ void coVRNavigationManager::doMouseWalk()
 void coVRNavigationManager::stopMouseNav()
 {
     cover->setCurrentCursor(osgViewer::GraphicsWindow::LeftArrowCursor);
-
     actScaleFactor = cover->getScale();
     x0 = mx;
     y0 = my;
@@ -2381,7 +2521,6 @@ void coVRNavigationManager::stopMouseNav()
 void coVRNavigationManager::startMouseNav()
 {
     shiftMouseNav = shiftEnabled;
-
     osg::Matrix dcs_mat = VRSceneGraph::instance()->getTransform()->getMatrix();
     mat0 = dcs_mat;
     mouseNavCenter = getCenter();
