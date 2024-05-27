@@ -39,6 +39,7 @@ class Slider;
 #include <osg/Matrix>
 #include <osg/MatrixTransform>
 #include <osg/Geometry>
+#include <osg/AutoTransform>
 
 namespace vrui
 {
@@ -74,7 +75,6 @@ class COVEREXPORT coVRNavigationManager: public ui::Owner
 {
     static coVRNavigationManager *s_instance;
     coVRNavigationManager();
-
 public:
     enum NavMode
     {
@@ -273,6 +273,9 @@ private:
     osg::Node *oldFloorNode = nullptr;
 	osg::Matrix oldFloorMatrix;
 	osg::NodePath oldNodePath;
+    osg::ref_ptr<osg::MatrixTransform> m_clippingCursor;
+    bool m_clippingCursorVisible = false;
+    osg::ref_ptr<osg::MatrixTransform> m_testLineTrans;
 
 
     float currentVelocity;
@@ -378,10 +381,11 @@ private:
     void initMenu();
     void initShowName();
     void initMeasure();
-    
+    void initClippingCursor();
     osg::Vec3 getCenter() const;
     void centerView();
     osg::Vec3 mouseNavCenter;
 };
 }
+
 #endif
