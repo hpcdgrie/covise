@@ -116,7 +116,7 @@ osg::Node *FbxProvider::loadModel(const std::string &filename)
         auto slider = new ui::Slider(fbxMenu, anim->getName());
         slider->setBounds(0,1);
         slider->setCallback([this, &anim](double val, bool x){
-            // m_animationFinder.m_am->playAnimation(anim, 1, val);
+            m_animationFinder.m_am->playAnimation(anim, 1, val);
         });
         m_animationFinder.m_am->stopAnimation(anim);
     }
