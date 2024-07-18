@@ -5,6 +5,8 @@
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/FileBrowser.h>
 #include <cover/ui/Owner.h>
+#include <cover/ui/Slider.h>
+#include <cover/ui/Menu.h>
 
 #include <algorithm>
 #include <map>
@@ -66,15 +68,15 @@ void AnimatedAvatarPlugin::addPartner()
     for (const auto& partner : *partnerList)
     {
         int partnerId = partner->ID();
-        if(partnerId == coVRCommunication::instance()->getID())
-            continue;
+        // if(partnerId == coVRCommunication::instance()->getID())
+        //     continue;
         // Avatar bereits vorhanden?
         if (m_avatars.find(partnerId) != m_avatars.end())
         {
             // Avatar bereits vorhanden, überspringen
             continue;
         }
-        std::string modelFilename = partner->userInfo().icon;
+        std::string modelFilename = partner->userInfo().avatar;
         // Avatar erstellen und in m_avatars einfügen
         auto avatar = std::make_shared<AnimatedAvatar>(modelFilename, partnerId);
         m_avatars.emplace(partnerId, std::move(avatar));
