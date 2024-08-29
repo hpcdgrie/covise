@@ -26,7 +26,8 @@ AnimatedAvatarPlugin::AnimatedAvatarPlugin()
 : coVRPlugin(COVER_PLUGIN_NAME)
 , Owner(COVER_PLUGIN_NAME, cover->ui)
 {
-   
+   ui::Menu *menu = new ui::Menu("AnimatedAvatar", this);
+   m_singleModeButton = new ui::Button(menu, "Single_mode");
 }
 
 bool AnimatedAvatarPlugin::update()
@@ -54,7 +55,7 @@ void AnimatedAvatarPlugin::removeAvatar()
         auto partner = std::find_if(partnerList->begin(), partnerList->end(), [partnerId](const std::unique_ptr<coVRPartner> &partner){
             return partner->ID() == partnerId;
         });
-        if (partner == partnerList->end())
+        if (partner == partnerList->end() || (partnerId == coVRCommunication::instance()->getID() && !m_singleModeButton->state()))
         {
             avatarIt = m_avatars.erase(avatarIt);
             return;
@@ -68,8 +69,9 @@ void AnimatedAvatarPlugin::addPartner()
     for (const auto& partner : *partnerList)
     {
         int partnerId = partner->ID();
-        // if(partnerId == coVRCommunication::instance()->getID())
-        //     continue;
+
+        if(partnerId == coVRCommunication::instance()->getID() && !m_singleModeButton->state())
+            continue;
         // Avatar bereits vorhanden?
         if (m_avatars.find(partnerId) != m_avatars.end())
         {
@@ -78,8 +80,7 @@ void AnimatedAvatarPlugin::addPartner()
         }
         std::string modelFilename = partner->userInfo().avatar;
         // Avatar erstellen und in m_avatars einfügen
-        auto avatar = std::make_shared<AnimatedAvatar>(modelFilename, partnerId);
-        m_avatars.emplace(partnerId, std::move(avatar));
+        m_avatars[partnerId] = std::make_unique<AnimatedAvatar>(modelFilename, partnerId);
     }
 }
 
