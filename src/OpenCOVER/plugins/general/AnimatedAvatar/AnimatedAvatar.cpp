@@ -29,7 +29,8 @@ AnimatedAvatar::AnimatedAvatar(const std::string &filename, int partnerId)
     if(!m_model)
         return;
     m_partner = coVRPartnerList::instance()->get(partnerId);
-    m_partner->getAvatar()->headTransform->addChild(m_model->loadModel(filename));
+    m_modelNode = m_model->loadModel(filename);
+    m_partner->getAvatar()->headTransform->addChild(m_modelNode);
     cover->getObjectsRoot()->addChild(m_partner->getAvatar()->headTransform);
 }
 
@@ -52,6 +53,14 @@ bool movedForward(const osg::Matrix &t1, const osg::Matrix &t2)
     auto angle = acos(div * carDirection);
     // std::cerr << "angle " << angle << std::endl;
     return angle > -osg::PI_2 && angle > osg::PI_2;
+}
+
+AnimatedAvatar::~AnimatedAvatar() //entfernt das model aus dem scenengraph
+{
+    if(m_modelNode)
+    {
+        m_partner->getAvatar()->headTransform->removeChild(m_modelNode);
+    }
 }
 
 void AnimatedAvatar::update()
