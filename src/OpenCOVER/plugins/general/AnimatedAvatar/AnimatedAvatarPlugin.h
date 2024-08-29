@@ -15,6 +15,8 @@
 #include <osgCal/Model>//konkretes Modell in der Szene
 #include <cover/ui/FileBrowser.h>
 #include <cover/ui/Owner.h>
+#include <cover/ui/Button.h>
+
 #include <osg/MatrixTransform>
 #include <map>
 
@@ -28,11 +30,19 @@ class PLUGINEXPORT AnimatedAvatarPlugin : public coVRPlugin, public ui::Owner
 public:
 
     AnimatedAvatarPlugin();
+    //somehow this has to be specified with msvc to use a map with noncopyable objects -->m_avatars
+    AnimatedAvatarPlugin(const AnimatedAvatarPlugin&) = delete;
+    AnimatedAvatarPlugin(AnimatedAvatarPlugin&&) = delete;
+    AnimatedAvatarPlugin &operator=(const AnimatedAvatarPlugin&) = delete;
+    AnimatedAvatarPlugin &operator=(AnimatedAvatarPlugin&&) = delete;
+    ~AnimatedAvatarPlugin() = default;
+
     bool update() override; //wird in jedem Frame aufgerufen: check neue/gegangene partner/ (bei coVRCommunication) und update avatare
 private:
     std::map<std::string, osg::ref_ptr<osgCal::CoreModel>>m_coreModels; //Übersetzung von File-Name auf CoreModel damit man kein core model 2x lädt
-    std::map<int , std::shared_ptr<AnimatedAvatar>> m_avatars;
+    std::map<int , std::unique_ptr<AnimatedAvatar>> m_avatars;
 
+    ui::Button *m_singleModeButton;
     void removeAvatar();
     void addPartner();
 };
