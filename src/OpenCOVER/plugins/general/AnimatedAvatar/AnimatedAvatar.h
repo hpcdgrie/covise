@@ -18,7 +18,7 @@ public:
   AnimatedAvatar(AnimatedAvatar &&other) = default;
   AnimatedAvatar& operator=(const AnimatedAvatar &other) = delete;
   AnimatedAvatar& operator=(AnimatedAvatar &&other) = default;
-
+  ~AnimatedAvatar(); //entfernt das model aus dem scenengraph
   void update(); //checkt die bewegung des partners (bei coVRPartnerList) und macht die entspechenden animationen
 private:
   std::unique_ptr<ModelProvider> m_model;
@@ -26,6 +26,7 @@ private:
   std::queue<osg::Matrix> m_lastHeadPositions; //letzte position um die bewegung fest zu stellen
   std::queue<osg::Matrix> m_lastHandPositions; //letzte position um die bewegung fest zu stellen
   opencover::coVRPartner *m_partner = nullptr;
+  osg::ref_ptr<osg::Node> m_modelNode;
 };
 
 #endif // COVERPLUGINANIMATED_AVATAR_H

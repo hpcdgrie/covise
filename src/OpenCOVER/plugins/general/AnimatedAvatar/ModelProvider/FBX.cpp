@@ -74,13 +74,13 @@ void BoneFinder::apply(osg::Node& node) {
 
 osg::Node *FbxProvider::loadModel(const std::string &filename)
 {
-    osg::MatrixTransform *trans = new osg::MatrixTransform;
+    osg::ref_ptr trans = new osg::MatrixTransform;
     auto scale = osg::Matrix::scale(osg::Vec3f(10, 10, 10));
     auto rot1 = osg::Matrix::rotate(osg::PI / 2, 1,0,0);
     auto rot2 = osg::Matrix::rotate(osg::PI, 0,0,1);
     auto transM = osg::Matrix::translate(osg::Vec3f{0,0,-1300});
     trans->setMatrix(scale * rot1 * rot2 * transM);
-    auto model = osgDB::readNodeFile(filename);  
+    osg::ref_ptr model = osgDB::readNodeFile(filename);  
     if(!model)
         return nullptr;
     model->accept(m_animationFinder);
@@ -103,7 +103,7 @@ osg::Node *FbxProvider::loadModel(const std::string &filename)
         st.push_back(m_rotation);
     }
 
-    osgAnimation::Animation *anim = new osgAnimation::Animation;
+    osg::ref_ptr anim = new osgAnimation::Animation;
     anim->setPlayMode( osgAnimation::Animation::PPONG );
     anim->addChannel( createChannel("mixamorig:RightHand", osg::Y_AXIS, osg::PI_4) );
     anim->setName("hand");
