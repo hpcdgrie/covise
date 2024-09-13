@@ -12,6 +12,7 @@ SET(HEADERS
 Currents.h
 Oct.h
 Tool.h
+ToolChanger.h
 ToolMachine.h
 Plugin.h
 ../CsvPointCloud/OctUtils.h
@@ -21,6 +22,7 @@ SET(SOURCES
 Currents.cpp
 Oct.cpp
 Tool.cpp
+ToolChanger.cpp
 ToolMachine.cpp
 Plugin.cpp
 ../CsvPointCloud/OctUtils.cpp

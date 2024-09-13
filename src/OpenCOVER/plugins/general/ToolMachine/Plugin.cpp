@@ -25,6 +25,7 @@ ToolMaschinePlugin::ToolMaschinePlugin()
 , m_menu(new ui::Menu("ToolMachine", this))
 , m_pauseBtn(new ui::Button(m_menu, "pause"))
 , m_updateMode(std::make_unique<opencover::ui::SelectionListConfigValue>(m_menu, "updateMode", 0, *config(), "ToolMachinePlugin"))
+, m_toolChanger(m_menu)
 {
     m_menu->allowRelayout(true);
     return;
@@ -71,6 +72,8 @@ osg::Quat toOsg(VrmlSFRotation &r)
 
 bool ToolMaschinePlugin::update()
 {
+    m_toolChanger.update();
+    return true;
     if(m_pauseMove || m_pauseBtn->state())
         return true;
     for (const auto m : machineNodes)

@@ -32,6 +32,7 @@ private:
 
     
     bool m_pauseMove = false;
+    ToolChanger m_toolChanger;
 };
 
 
