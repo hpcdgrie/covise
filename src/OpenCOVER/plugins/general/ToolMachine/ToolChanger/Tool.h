@@ -1,0 +1,30 @@
+#ifndef COVER_PLUGIN_TOOLCHANGER_TOOL_H
+#define COVER_PLUGIN_TOOLCHANGER_TOOL_H
+
+#include <osg/MatrixTransform>
+#include <osg/ref_ptr>
+#include <osgAnimation/StackedScaleElement>
+#include <osgAnimation/StackedTransform>
+
+
+class ToolModel
+{
+public:
+    typedef std::unique_ptr<ToolModel> ptr;
+    ToolModel(osg::Node *model);
+    void resize(float length, float radius);
+    float getLength() const;
+    float getRadius() const;
+    void setParent(osg::Group *parent);
+    osg::Group* parent();
+    osg::MatrixTransform *model() { return m_tool; }
+private:
+    osg::ref_ptr<osg::MatrixTransform> m_shaft, m_tip, m_tool;
+    osg::ref_ptr<osgAnimation::StackedScaleElement> m_shaftScale, m_tipScale;
+    osgAnimation::StackedTransform m_socketTransfromStack;
+    const float totalHeight = 10;
+
+};
+
+
+#endif // COVER_PLUGIN_TOOLCHANGER_TOOL_H

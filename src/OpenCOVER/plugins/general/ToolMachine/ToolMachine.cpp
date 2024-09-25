@@ -52,7 +52,7 @@ MachineNode::~MachineNode()
 VrmlNodeType *MachineNode::defineType(VrmlNodeType *t)
 {
     static VrmlNodeType *st = 0;
-
+    std::cerr << "defining ToolMachine type " << std::endl;
     if (!t)
     {
         if (st)

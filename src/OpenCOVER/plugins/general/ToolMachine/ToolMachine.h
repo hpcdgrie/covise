@@ -29,7 +29,6 @@ public:
     static VrmlNode *creator(VrmlScene *scene);
     MachineNode(VrmlScene *scene);
     ~MachineNode();
-
     static VrmlNodeType *defineType(VrmlNodeType *t = 0);
 
     template<typename T>
@@ -80,5 +79,7 @@ private:
     bool addTool();
     bool updateMachine(bool haveTool, UpdateMode updateMode);
 };
+
+VrmlNode *creator(VrmlScene *scene);
 
 extern std::vector<MachineNode *> machineNodes;

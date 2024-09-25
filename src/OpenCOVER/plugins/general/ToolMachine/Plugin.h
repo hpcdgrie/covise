@@ -11,7 +11,7 @@
 #include "Currents.h"
 #include "Oct.h"
 #include "ToolMachine.h"
-#include "ToolChanger.h"
+#include "ToolChanger/ToolChanger.h"
 
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/Button.h>

@@ -9,23 +9,31 @@ endif()
 
 
 SET(HEADERS
+../CsvPointCloud/OctUtils.h
 Currents.h
 Oct.h
-Tool.h
-ToolChanger.h
-ToolMachine.h
 Plugin.h
-../CsvPointCloud/OctUtils.h
+Tool.h
+ToolChanger/Arm.h
+ToolChanger/Changer.h
+ToolChanger/Tool.h
+ToolChanger/ToolChanger.h
+ToolChanger/Utility.h
+ToolMachine.h
 )
 
 SET(SOURCES
+../CsvPointCloud/OctUtils.cpp
 Currents.cpp
 Oct.cpp
-Tool.cpp
-ToolChanger.cpp
-ToolMachine.cpp
 Plugin.cpp
-../CsvPointCloud/OctUtils.cpp
+Tool.cpp
+ToolChanger/Arm.cpp
+ToolChanger/Changer.cpp
+ToolChanger/Tool.cpp
+ToolChanger/ToolChanger.cpp
+ToolChanger/Utility.cpp
+ToolMachine.cpp
 )
 
 cover_add_plugin(ToolMachine)
