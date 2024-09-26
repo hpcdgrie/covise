@@ -1,3 +1,4 @@
+return()
 set(SOURCES)
 set(HEADERS export.h threadworker.h)
 

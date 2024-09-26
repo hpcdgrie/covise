@@ -307,8 +307,26 @@ double coVRPluginSupport::currentTime()
     START("coVRPluginSupport::currentTime");
     struct timeval currentTime;
     gettimeofday(&currentTime, nullptr);
-
-    return currentTime.tv_sec + currentTime.tv_usec / 1000000.0;
+    time_t time = currentTime.tv_sec + currentTime.tv_usec / 1000000.0;
+    struct tm tm;
+#ifdef _WIN32
+    auto ret = _localtime64_s(&tm, &time);
+    if (ret)
+    {
+        std::cerr << "localtime_r failed" << std::endl;
+        return time;
+    }
+    auto offset_epoch = std::localtime(new time_t(0));
+    return currentTime.tv_sec + currentTime.tv_usec / 1000000.0 + offset_epoch->tm_sec;
+#else
+    auto ret = localtime_r(&time, &tm);
+    if (!ret)
+    {
+        std::cerr << "localtime_r failed" << std::endl;
+        return time;
+    }
+    return currentTime.tv_sec + currentTime.tv_usec / 1000000.0 + tm.tm_gmtoff;
+#endif
 }
 
 double coVRPluginSupport::frameTime() const
