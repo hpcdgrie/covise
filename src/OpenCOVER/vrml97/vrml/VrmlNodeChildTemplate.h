@@ -12,22 +12,7 @@
 #include <tuple>
 #include <variant>
 
-#include "VrmlSFBool.h"
-#include "VrmlSFColor.h"
-#include "VrmlSFColorRGBA.h"
-#include "VrmlSFDouble.h"
-#include "VrmlSFFloat.h"
-#include "VrmlSFImage.h"
-#include "VrmlSFInt.h"
-#include "VrmlSFNode.h"
-#include "VrmlSFRotation.h"
-#include "VrmlSFString.h"
-#include "VrmlSFTime.h"
-#include "VrmlSFVec2d.h"
-#include "VrmlSFVec3d.h"
-#include "VrmlSFVec2f.h"
-#include "VrmlSFVec3f.h"
-#include "VrmlSFMatrix.h"
+#include "vrmlexport.h"
 #include "VrmlMFBool.h"
 #include "VrmlMFColor.h"
 #include "VrmlMFColorRGBA.h"
@@ -39,11 +24,26 @@
 #include "VrmlMFString.h"
 #include "VrmlMFTime.h"
 #include "VrmlMFVec2d.h"
-#include "VrmlMFVec3d.h"
 #include "VrmlMFVec2f.h"
+#include "VrmlMFVec3d.h"
 #include "VrmlMFVec3f.h"
-#include "vrmlexport.h"
-
+#include "VrmlNodeType.h"
+#include "VrmlSFBool.h"
+#include "VrmlSFColor.h"
+#include "VrmlSFColorRGBA.h"
+#include "VrmlSFDouble.h"
+#include "VrmlSFFloat.h"
+#include "VrmlSFImage.h"
+#include "VrmlSFInt.h"
+#include "VrmlSFMatrix.h"
+#include "VrmlSFNode.h"
+#include "VrmlSFRotation.h"
+#include "VrmlSFString.h"
+#include "VrmlSFTime.h"
+#include "VrmlSFVec2d.h"
+#include "VrmlSFVec2f.h"
+#include "VrmlSFVec3d.h"
+#include "VrmlSFVec3f.h"
 namespace vrml{
 
 class VrmlNodeChildTemplateImpl;
@@ -58,49 +58,83 @@ public:
 
     template<typename T>
     T* registerField(const std::string& name, const std::function<void()> &updateCb =  std::function<void()>{});
-    bool initialized(const std::string& name) const;
-    bool allInitialized() const;
+    bool fieldInitialized(const std::string& name) const;
+    bool allFieldsInitialized() const;
 
 private:
     std::unique_ptr<VrmlNodeChildTemplateImpl> m_impl;
     void setField(const char *fieldName, const VrmlField &fieldValue) override;
-
 };
+
+template<typename T>
+VrmlField::VrmlFieldType toEnumType(const T *t = nullptr);
+
+template <typename T>
+struct NameValueStruct {
+    std::string name;
+    T value;
+};
+
+template<typename T>
+NameValueStruct<T> namedValue(const std::string &name, T value) {
+    return NameValueStruct<T>{name, value};
+}
+
+template <typename T>
+void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T> &field);
+
+template <typename...Args>
+void initFieldsHelper(VrmlNodeChildTemplate *node, VrmlNodeType *t, const Args&... fields) {
+        (initFieldsHelperImpl(node, t, fields), ...);
+}
+
+#define FOR_ALL_VRML_TYPES(code)\
+    code(VrmlSFBool)\
+    code(VrmlSFColor)\
+    code(VrmlSFColorRGBA)\
+    code(VrmlSFDouble)\
+    code(VrmlSFFloat)\
+    code(VrmlSFInt)\
+    code(VrmlSFRotation)\
+    code(VrmlSFTime)\
+    code(VrmlSFVec2d)\
+    code(VrmlSFVec3d)\
+    code(VrmlSFVec2f)\
+    code(VrmlSFVec3f)\
+    code(VrmlSFImage)\
+    code(VrmlSFString)\
+    code(VrmlMFBool)\
+    code(VrmlMFColor)\
+    code(VrmlMFColorRGBA)\
+    code(VrmlMFDouble)\
+    code(VrmlMFFloat)\
+    code(VrmlMFInt)\
+    code(VrmlMFRotation)\
+    code(VrmlMFString)\
+    code(VrmlMFTime)\
+    code(VrmlMFVec2d)\
+    code(VrmlMFVec3d)\
+    code(VrmlMFVec2f)\
+    code(VrmlMFVec3f)\
+    code(VrmlSFNode)\
+    code(VrmlMFNode)\
+    code(VrmlSFMatrix)
+
 
 #define VRMLNODECHILD2_TEMPLATE_DECL(type) \
 extern template type VRMLEXPORT *VrmlNodeChildTemplate::registerField<type>(const std::string&, const std::function<void()>&);
 
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFBool)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFColor)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFColorRGBA)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFDouble)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFFloat)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFInt)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFRotation)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFTime)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFVec2d)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFVec3d)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFVec2f)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFVec3f)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFImage)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFString)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFBool)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFColor)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFColorRGBA)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFDouble)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFFloat)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFInt)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFRotation)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFString)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFTime)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFVec2d)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFVec3d)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFVec2f)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFVec3f)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFNode)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlMFNode)
-VRMLNODECHILD2_TEMPLATE_DECL(VrmlSFMatrix)
+FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_DECL)
 
+#define TO_VRML_FIELD_TYPES_DECL(type) \
+extern template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
+
+FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_DECL)
+
+#define INIT_FIELDS_HELPER_DECL(type) \
+extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type**> &field); 
+
+FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_DECL)
 
 } // vrml
 

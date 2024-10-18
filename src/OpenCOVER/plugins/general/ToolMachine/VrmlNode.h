@@ -20,22 +20,19 @@ public:
     MachineNodeBase(vrml::VrmlScene *scene);
     ~MachineNodeBase();
     static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t);
-    // Set the value of one of the node fields.
 
-    // void setField(const char* fieldName, const VrmlField& fieldValue) override;
-
-    vrml::VrmlSFString *MachineName = nullptr;
-    vrml::VrmlSFString *VisualizationType = nullptr;;
-    vrml::VrmlSFNode *ToolHeadNode = nullptr;
-    vrml::VrmlSFNode *TableNode = nullptr;
-    vrml::VrmlMFVec3f *AxisOrientations = nullptr;
-    vrml::VrmlMFFloat *Offsets = nullptr;
-    vrml::VrmlMFString *AxisNames = nullptr;
-    vrml::VrmlSFString *ToolNumberName = nullptr;
-    vrml::VrmlSFString *ToolLengthName = nullptr;
-    vrml::VrmlSFString *ToolRadiusName = nullptr;
-    vrml::VrmlMFNode *AxisNodes = nullptr;
-    vrml::VrmlSFFloat *OpcUaToVrml = nullptr;
+    vrml::VrmlSFString *machineName = nullptr;
+    vrml::VrmlSFString *visualizationType = nullptr;;
+    vrml::VrmlSFNode *toolHeadNode = nullptr;
+    vrml::VrmlSFNode *tableNode = nullptr;
+    vrml::VrmlMFVec3f *axisOrientations = nullptr;
+    vrml::VrmlMFFloat *offsets = nullptr;
+    vrml::VrmlMFString *axisNames = nullptr;
+    vrml::VrmlSFString *toolNumberName = nullptr;
+    vrml::VrmlSFString *toolLengthName = nullptr;
+    vrml::VrmlSFString *toolRadiusName = nullptr;
+    vrml::VrmlMFNode *axisNodes = nullptr;
+    vrml::VrmlSFFloat *opcUaToVrml = nullptr;
     std::shared_ptr<LogicInterface> machine;
 private:
     size_t m_index = 0; // used to remove the node from the machineNodes list
@@ -52,8 +49,8 @@ public:
     MachineNodeArrayMode(vrml::VrmlScene *scene);
     vrml::VrmlNodeType *nodeType() const override;
     vrml::VrmlNode *cloneMe() const override;
-    vrml::VrmlSFString *OPCUAArrayName = nullptr;
-    vrml::VrmlMFInt *OPCUAAxisIndicees = nullptr; //array mode expected
+    vrml::VrmlSFString *opcuaArrayName = nullptr;
+    vrml::VrmlMFInt *opcuaAxisIndicees = nullptr; //array mode expected
 };
 
 class MachineNodeSingleMode : public MachineNodeBase
@@ -65,7 +62,7 @@ public:
     MachineNodeSingleMode(vrml::VrmlScene *scene);
     vrml::VrmlNodeType *nodeType() const override;
     vrml::VrmlNode *cloneMe() const override;
-    vrml::VrmlMFString *OPCUANames = nullptr; //axis names on the opcua server
+    vrml::VrmlMFString *opcuaNames = nullptr; //axis names on the opcua server
 };
 
 class ToolChangerNode : public vrml::VrmlNodeChildTemplate

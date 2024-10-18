@@ -3,62 +3,32 @@
 
 #include <plugins/general/Vrml97/ViewerObject.h>
 
-
 using namespace vrml;
 
 std::set<MachineNodeBase *> machineNodes;
 std::set<ToolChangerNode *> toolChangers;
 
-// template <typename... Ts>
-// auto make_variant_vector(Ts&&... args) {
-//     using VariantType = std::variant<std::decay_t<Ts>...>;
-//     return std::vector<VariantType>{std::forward<Ts>(args)...};
-// }
-
-// void initFieldsHelper(MachineNodeBase *node, VrmlNodeType *t)
-// {
-//     auto test = make_variant_vector(&node->MachineName, &node->VisualizationType, &node->ToolHeadNode, &node->TableNode, &node->AxisOrientations, &node->Offsets, &node->AxisNames, &node->ToolNumberName, &node->ToolLengthName, &node->ToolRadiusName, &node->AxisNodes, &node->OpcUaToVrml);
-//     std::vector<std::string> nodeNames = {"MachineName", "VisualizationType", "ToolHeadNode", "TableNode", "AxisOrientations", "Offsets", "AxisNames", "ToolNumberName", "ToolLengthName", "ToolRadiusName", "AxisNodes", "OpcUaToVrml"};
-    
-//     if(node)
-//     {
-//         for (size_t i = 0; i < test.size(); i++)
-//         {
-//             auto &var = test[i];
-//             auto &name = nodeNames[i];
-//             std::visit([node, name](auto&& arg) {
-//                 arg = node->registerField<std::decay_t<decltype(*arg)>>(name);
-//             }, var);
-//         }
-//     }
-//     if(t)
-//     {
-//         for (size_t i = 0; i < test.size(); i++)
-//         {
-//             auto &var = test[i];
-//             auto &name = nodeNames[i];
-//             std::visit([t, name](auto&& arg) {
-//                 t->addExposedField(name, VrmlField::typeOf(arg));
-//             }, var);
-//         }
-//     }
-// }
+void initFields(MachineNodeBase *node, VrmlNodeType *t) {
+    initFieldsHelper(node, t,
+        namedValue("machineName", &node->machineName),
+        namedValue("visualizationType", &node->visualizationType),
+        namedValue("toolHeadNode", &node->toolHeadNode),
+        namedValue("tableNode", &node->tableNode),
+        namedValue("axisOrientations", &node->axisOrientations),
+        namedValue("offsets", &node->offsets),
+        namedValue("axisNames", &node->axisNames),
+        namedValue("toolNumberName", &node->toolNumberName),
+        namedValue("toolLengthName", &node->toolLengthName),
+        namedValue("toolRadiusName", &node->toolRadiusName),
+        namedValue("axisNodes", &node->axisNodes),
+        namedValue("opcUaToVrml", &node->opcUaToVrml)
+    );
+}
 
 MachineNodeBase::MachineNodeBase(VrmlScene *scene)
 : VrmlNodeChildTemplate(scene), m_index(machineNodes.size())
-, MachineName(registerField<VrmlSFString>("MachineName"))
-, VisualizationType(registerField<VrmlSFString>("VisualizationType"))
-, ToolHeadNode(registerField<VrmlSFNode>("ToolHeadNode"))
-, TableNode(registerField<VrmlSFNode>("TableNode"))
-, AxisOrientations(registerField<VrmlMFVec3f>("AxisOrientations"))
-, Offsets(registerField<VrmlMFFloat>("Offsets"))
-, AxisNames(registerField<VrmlMFString>("AxisNames"))
-, ToolNumberName(registerField<VrmlSFString>("ToolNumberName"))
-, ToolLengthName(registerField<VrmlSFString>("ToolLengthName"))
-, ToolRadiusName(registerField<VrmlSFString>("ToolRadiusName"))
-, AxisNodes(registerField<VrmlMFNode>("AxisNodes"))
-, OpcUaToVrml(registerField<VrmlSFFloat>("OpcUaToVrml"))
 {
+    initFields(this, nullptr);
     machineNodes.emplace(this);
 }
 
@@ -70,32 +40,26 @@ MachineNodeBase::~MachineNodeBase()
 VrmlNodeType *MachineNodeBase::defineType(VrmlNodeType *t)
 {
     assert(t);
-
+    std::cerr << "toolmachine node define type" << std::endl;
     VrmlNodeChildTemplate::defineType(t); // Parent class
-    
-    t->addExposedField("MachineName", VrmlField::SFSTRING);
-    t->addExposedField("VisualizationType", VrmlField::SFSTRING); //None, Currents, Oct
-    t->addExposedField("ToolHeadNode", VrmlField::SFNODE);
-    t->addExposedField("TableNode", VrmlField::SFNODE);
-    t->addExposedField("Offsets", VrmlField::MFFLOAT);
-    t->addExposedField("AxisNames", VrmlField::MFSTRING);
-    t->addExposedField("ToolNumberName", VrmlField::SFSTRING);
-    t->addExposedField("ToolLengthName", VrmlField::SFSTRING);
-    t->addExposedField("ToolRadiusName", VrmlField::SFSTRING);
-    t->addExposedField("AxisOrientations", VrmlField::MFVEC3F);
-    t->addExposedField("AxisNodes", VrmlField::MFNODE);
-    t->addExposedField("OpcUaToVrml", VrmlField::SFFLOAT); 
-
+    initFields(nullptr, t);
     return t;
 }
 
 // array mode
+namespace arrayMode{
+void initFields(MachineNodeArrayMode *node, VrmlNodeType *t) {
+    initFieldsHelper(node, t,
+        namedValue("opcuaAxisIndicees", &node->opcuaAxisIndicees),
+        namedValue("opcuaArrayName", &node->opcuaArrayName)
+    );
+}
+}
 
 MachineNodeArrayMode::MachineNodeArrayMode(VrmlScene *scene)
 : MachineNodeBase(scene)
-, OPCUAAxisIndicees(registerField<VrmlMFInt>("OPCUAAxisIndicees"))
-, OPCUAArrayName(registerField<VrmlSFString>("OPCUAArrayName"))
 {
+    arrayMode::initFields(this, nullptr);
 }
 
 VrmlNodeType *MachineNodeArrayMode::defineType(VrmlNodeType *t)
@@ -110,8 +74,7 @@ VrmlNodeType *MachineNodeArrayMode::defineType(VrmlNodeType *t)
 
     MachineNodeBase::defineType(t); // Parent class
     
-    t->addExposedField("OPCUAAxisIndicees", VrmlField::MFINT32);
-    t->addExposedField("OPCUAArrayName", VrmlField::SFSTRING);
+    arrayMode::initFields(nullptr, t);
 
     return t;
 }
@@ -130,10 +93,18 @@ VrmlNode *MachineNodeArrayMode::cloneMe() const
 
 // single mode
 
+namespace singleMode{
+void initFields(MachineNodeSingleMode *node, VrmlNodeType *t) {
+    initFieldsHelper(node, t,
+        namedValue("opcuaNames", &node->opcuaNames)
+    );
+}
+}
+
 MachineNodeSingleMode::MachineNodeSingleMode(VrmlScene *scene)
 : MachineNodeBase(scene)
-, OPCUANames(registerField<VrmlMFString>("OPCUANames"))
 {
+    singleMode::initFields(this, nullptr);
 }
 
 VrmlNodeType *MachineNodeSingleMode::defineType(VrmlNodeType *t)
@@ -148,7 +119,7 @@ VrmlNodeType *MachineNodeSingleMode::defineType(VrmlNodeType *t)
 
     MachineNodeBase::defineType(t); // Parent class
     
-    t->addExposedField("OPCUANames", VrmlField::MFSTRING);
+    singleMode::initFields(nullptr, t);
 
     return t;
 }
@@ -167,13 +138,21 @@ VrmlNode *MachineNodeSingleMode::cloneMe() const
 
 // ToolChangerNode
 
+namespace toolChanger{
+void initFields(ToolChangerNode *node, VrmlNodeType *t) {
+    initFieldsHelper(node, t,
+        namedValue("arm", &node->arm),
+        namedValue("changer", &node->changer),
+        namedValue("cover", &node->cover),
+        namedValue("toolHeadNode", &node->toolHead)
+    );
+}
+}
+
 ToolChangerNode::ToolChangerNode(VrmlScene *scene)
 : VrmlNodeChildTemplate(scene), m_index(toolChangers.size())
-, arm(registerField<VrmlSFString>("arm"))
-, changer(registerField<VrmlSFString>("changer"))
-, cover(registerField<VrmlSFString>("cover"))
-, toolHead(registerField<VrmlSFNode>("ToolHeadNode"))
 {
+    toolChanger::initFields(this, nullptr);
     toolChangers.emplace(this);
 }
 
@@ -206,10 +185,7 @@ VrmlNodeType *ToolChangerNode::defineType(VrmlNodeType *t)
 
     MachineNodeBase::defineType(t); // Parent class
     
-    t->addExposedField("arm", VrmlField::SFSTRING);
-    t->addExposedField("changer", VrmlField::SFSTRING);
-    t->addExposedField("cover", VrmlField::SFSTRING);
-    t->addExposedField("ToolHeadNode", VrmlField::SFNODE);
+    toolChanger::initFields(nullptr, t);
 
     return t;
 }

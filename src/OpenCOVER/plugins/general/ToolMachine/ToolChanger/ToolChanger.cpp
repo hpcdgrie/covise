@@ -55,7 +55,7 @@ ToolChanger::~ToolChanger() = default;
 
 void ToolChanger::init()
 {
-    if(!m_toolChangerNode->allInitialized())
+    if(!m_toolChangerNode->allFieldsInitialized())
         return;
     osg::ref_ptr model = osgDB::readNodeFile(m_toolChangerNode->arm->get()); 
 
