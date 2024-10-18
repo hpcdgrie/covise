@@ -10,18 +10,18 @@ std::set<ToolChangerNode *> toolChangers;
 
 void initFields(MachineNodeBase *node, VrmlNodeType *t) {
     initFieldsHelper(node, t,
-        namedValue("machineName", &node->machineName),
-        namedValue("visualizationType", &node->visualizationType),
-        namedValue("toolHeadNode", &node->toolHeadNode),
-        namedValue("tableNode", &node->tableNode),
-        namedValue("axisOrientations", &node->axisOrientations),
-        namedValue("offsets", &node->offsets),
-        namedValue("axisNames", &node->axisNames),
-        namedValue("toolNumberName", &node->toolNumberName),
-        namedValue("toolLengthName", &node->toolLengthName),
-        namedValue("toolRadiusName", &node->toolRadiusName),
-        namedValue("axisNodes", &node->axisNodes),
-        namedValue("opcUaToVrml", &node->opcUaToVrml)
+        namedValue("machineName", node->machineName),
+        namedValue("visualizationType", node->visualizationType),
+        namedValue("toolHeadNode", node->toolHeadNode),
+        namedValue("tableNode", node->tableNode),
+        namedValue("axisOrientations", node->axisOrientations),
+        namedValue("offsets", node->offsets),
+        namedValue("axisNames", node->axisNames),
+        namedValue("toolNumberName", node->toolNumberName),
+        namedValue("toolLengthName", node->toolLengthName),
+        namedValue("toolRadiusName", node->toolRadiusName),
+        namedValue("axisNodes", node->axisNodes),
+        namedValue("opcUaToVrml", node->opcUaToVrml)
     );
 }
 
@@ -50,8 +50,8 @@ VrmlNodeType *MachineNodeBase::defineType(VrmlNodeType *t)
 namespace arrayMode{
 void initFields(MachineNodeArrayMode *node, VrmlNodeType *t) {
     initFieldsHelper(node, t,
-        namedValue("opcuaAxisIndicees", &node->opcuaAxisIndicees),
-        namedValue("opcuaArrayName", &node->opcuaArrayName)
+        namedValue("opcuaAxisIndicees", node->opcuaAxisIndicees),
+        namedValue("opcuaArrayName", node->opcuaArrayName)
     );
 }
 }
@@ -96,7 +96,7 @@ VrmlNode *MachineNodeArrayMode::cloneMe() const
 namespace singleMode{
 void initFields(MachineNodeSingleMode *node, VrmlNodeType *t) {
     initFieldsHelper(node, t,
-        namedValue("opcuaNames", &node->opcuaNames)
+        namedValue("opcuaNames", node->opcuaNames)
     );
 }
 }
@@ -141,10 +141,10 @@ VrmlNode *MachineNodeSingleMode::cloneMe() const
 namespace toolChanger{
 void initFields(ToolChangerNode *node, VrmlNodeType *t) {
     initFieldsHelper(node, t,
-        namedValue("arm", &node->arm),
-        namedValue("changer", &node->changer),
-        namedValue("cover", &node->cover),
-        namedValue("toolHeadNode", &node->toolHead)
+        namedValue("arm", node->arm),
+        namedValue("changer", node->changer),
+        namedValue("cover", node->cover),
+        namedValue("toolHeadNode", node->toolHead)
     );
 }
 }
