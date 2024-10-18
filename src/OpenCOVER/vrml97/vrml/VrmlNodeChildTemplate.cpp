@@ -66,7 +66,7 @@ struct TypeToEnumHelper {
 
 // Function to map type to enumeration value
 template<typename T>
-VrmlField::VrmlFieldType toEnumType() {
+VrmlField::VrmlFieldType toEnumType(const T *t) {
     return TypeToEnumHelper<T, VrmlTypesTuple>::value();
 }
 
@@ -195,12 +195,12 @@ VrmlNodeChildTemplate::VrmlNodeChildTemplate(const VrmlNodeChildTemplate& other)
 
 VrmlNodeChildTemplate::~VrmlNodeChildTemplate() = default;
 
-bool VrmlNodeChildTemplate::initialized(const std::string& name) const
+bool VrmlNodeChildTemplate::fieldInitialized(const std::string& name) const
 {
     return m_impl->initialized(name);
 }
 
-bool VrmlNodeChildTemplate::allInitialized() const
+bool VrmlNodeChildTemplate::allFieldsInitialized() const
 {
     return m_impl->allInitialized();
 }
@@ -216,40 +216,38 @@ T* VrmlNodeChildTemplate::registerField(const std::string& name, const std::func
     return m_impl->registerField<T>(name, updateCb);
 }
 
+template <typename T>
+void registerField(VrmlNodeChildTemplate *node, const std::string &name, T &field) {
+    *field = node->registerField<std::decay_t<decltype(**field)>>(name);
+}
+
+template <typename T>
+void addExposedField(VrmlNodeType *t, const std::string &name, T field) {
+    t->addExposedField(name.c_str(), toEnumType<std::remove_pointer_t<std::remove_pointer_t<T>>>());
+    // std::cerr << "adding exposed field " << name <<  " whith type " << (int)toEnumType(field) <<  std::endl;
+}
+
+template <typename T>
+void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value);
+    if (t) 
+        addExposedField(t, field.name, field.value);
+}
+
 
 #define VRMLNODECHILD2_TEMPLATE_IMPL(type) \
 template type VRMLEXPORT *VrmlNodeChildTemplate::registerField<type>(const std::string&, const std::function<void()>&);
+FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_IMPL)
 
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFBool)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFColor)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFColorRGBA)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFDouble)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFFloat)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFInt)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFRotation)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFTime)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFVec2d)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFVec3d)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFVec2f)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFVec3f)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFImage)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFString)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFBool)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFColor)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFColorRGBA)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFDouble)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFFloat)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFInt)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFRotation)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFString)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFTime)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFVec2d)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFVec3d)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFVec2f)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFVec3f)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFNode)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlMFNode)
-VRMLNODECHILD2_TEMPLATE_IMPL(VrmlSFMatrix)
+#define TO_VRML_FIELD_TYPES_IMPL(type) \
+template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
+FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_IMPL)
+
+#define INIT_FIELDS_HELPER_IMPL(type) \
+template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type**> &field); 
+FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
 
 } // vrml
 
