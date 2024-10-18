@@ -127,13 +127,11 @@ public:
             field.updateCb();
         }
     }
+    
     template<typename T>
-    T* registerField(const std::string& name, const std::function<void()> &updateCb =  std::function<void()>{}){
-        auto val = new T;
-        m_fields[name] = VrmlTypeStruct{ val, false, updateCb};
-        return val;
+    void registerField(const std::string& name, T &field, const std::function<void()> &updateCb =  std::function<void()>{}){
+        m_fields[name] = VrmlTypeStruct{ &field, false, updateCb};
     }
-
 
     bool initialized(const std::string& name){
         auto it = m_fields.find(name);
@@ -173,16 +171,7 @@ public:
         delete t;
     }
 
-    // class must be copyable -> don't use unique_ptr and delete manually
-    ~VrmlNodeChildTemplateImpl() {
-        for(auto& [name, field] : m_fields){
-            std::visit([this](auto&& arg){
-                deleter(arg);
-            }, field.type);
-        }
 };
-};
-
 
 VrmlNodeChildTemplate::VrmlNodeChildTemplate(VrmlScene *scene)
 : VrmlNode(scene)
@@ -211,19 +200,19 @@ void VrmlNodeChildTemplate::setField(const char *fieldName, const VrmlField &fie
 }
 
 template<typename T>
-T* VrmlNodeChildTemplate::registerField(const std::string& name, const std::function<void()> &updateCb)
+void VrmlNodeChildTemplate::registerField(const std::string& name, T &field, const std::function<void()> &updateCb)
 {
-    return m_impl->registerField<T>(name, updateCb);
+    return m_impl->registerField<T>(name, field, updateCb);
 }
 
 template <typename T>
 void registerField(VrmlNodeChildTemplate *node, const std::string &name, T &field) {
-    *field = node->registerField<std::decay_t<decltype(**field)>>(name);
+    node->registerField(name, field);
 }
 
 template <typename T>
-void addExposedField(VrmlNodeType *t, const std::string &name, T field) {
-    t->addExposedField(name.c_str(), toEnumType<std::remove_pointer_t<std::remove_pointer_t<T>>>());
+void addExposedField(VrmlNodeType *t, const std::string &name, T &field) {
+    t->addExposedField(name.c_str(), toEnumType<std::remove_reference_t<T>>());
     // std::cerr << "adding exposed field " << name <<  " whith type " << (int)toEnumType(field) <<  std::endl;
 }
 
@@ -236,9 +225,8 @@ void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const Na
         addExposedField(t, field.name, field.value);
 }
 
-
 #define VRMLNODECHILD2_TEMPLATE_IMPL(type) \
-template type VRMLEXPORT *VrmlNodeChildTemplate::registerField<type>(const std::string&, const std::function<void()>&);
+template void VRMLEXPORT VrmlNodeChildTemplate::registerField<type>(const std::string& name, type &field, const std::function<void()> &updateCb);
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_IMPL)
 
 #define TO_VRML_FIELD_TYPES_IMPL(type) \
@@ -246,7 +234,7 @@ template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
 FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_IMPL)
 
 #define INIT_FIELDS_HELPER_IMPL(type) \
-template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type**> &field); 
+template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type> &field); 
 FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
 
 } // vrml

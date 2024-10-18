@@ -57,7 +57,7 @@ public:
     ~VrmlNodeChildTemplate();
 
     template<typename T>
-    T* registerField(const std::string& name, const std::function<void()> &updateCb =  std::function<void()>{});
+    void registerField(const std::string& name, T &field, const std::function<void()> &updateCb = std::function<void()>{});
     bool fieldInitialized(const std::string& name) const;
     bool allFieldsInitialized() const;
 
@@ -72,11 +72,11 @@ VrmlField::VrmlFieldType toEnumType(const T *t = nullptr);
 template <typename T>
 struct NameValueStruct {
     std::string name;
-    T value;
+    T &value;
 };
 
 template<typename T>
-NameValueStruct<T> namedValue(const std::string &name, T value) {
+NameValueStruct<T> namedValue(const std::string &name, T &value) {
     return NameValueStruct<T>{name, value};
 }
 
@@ -122,7 +122,7 @@ void initFieldsHelper(VrmlNodeChildTemplate *node, VrmlNodeType *t, const Args&.
 
 
 #define VRMLNODECHILD2_TEMPLATE_DECL(type) \
-extern template type VRMLEXPORT *VrmlNodeChildTemplate::registerField<type>(const std::string&, const std::function<void()>&);
+extern template void VRMLEXPORT VrmlNodeChildTemplate::registerField<type>(const std::string& name, type &field, const std::function<void()> &updateCb);
 
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_DECL)
 
@@ -132,7 +132,7 @@ extern template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
 FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_DECL)
 
 #define INIT_FIELDS_HELPER_DECL(type) \
-extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type**> &field); 
+extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type> &field); 
 
 FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_DECL)
 
