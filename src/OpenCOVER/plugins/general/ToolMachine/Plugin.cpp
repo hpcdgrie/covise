@@ -1,5 +1,4 @@
 #include "Plugin.h"
-#include "VrmlNode.h"
 #include "ToolMachine.h"
 #include "ToolChanger/ToolChanger.h"
 
@@ -51,15 +50,16 @@ osg::Quat toOsg(VrmlSFRotation &r)
 
 bool ToolMaschinePlugin::update()
 {
+    //FIXME: multiple machines and toolchangers need their own ui::Menu with unique name
     for(auto machine : machineNodes)
     {
         if(!machine->machine)
-            machine->machine = std::make_unique<Machine>(m_menu, config().get(), machine);
+            machine->machine = utils::pointer::makeResetOnCopy<Machine>(m_menu, config().get(), machine);
     }
     for(auto toolChanger : toolChangers)
     {
         if(!toolChanger->toolChanger)
-            toolChanger->toolChanger = std::make_unique<ToolChanger>(m_menu, config().get(), toolChanger);
+            toolChanger->toolChanger = utils::pointer::makeResetOnCopy<ToolChanger>(m_menu, config().get(), toolChanger);
     }
     
     
