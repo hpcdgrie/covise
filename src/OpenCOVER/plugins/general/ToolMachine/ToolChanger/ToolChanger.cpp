@@ -223,9 +223,7 @@ void ToolChanger::changeTools(){
                 m_changer->giveTool(std::move(m_toolHeadTool), Changer::End::back);
             }
 
-            
             m_animationState = AnimationState::Swapping;
-
         }
     }
     break;

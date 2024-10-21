@@ -46,6 +46,8 @@
 #include "VrmlSFVec3f.h"
 namespace vrml{
 
+
+
 class VrmlNodeChildTemplateImpl;
 
 class VRMLEXPORT VrmlNodeChildTemplate : public VrmlNode
@@ -55,7 +57,6 @@ public:
     VrmlNodeChildTemplate(VrmlScene *scene);
     VrmlNodeChildTemplate(const VrmlNodeChildTemplate& other);
     ~VrmlNodeChildTemplate();
-
     template<typename T>
     void registerField(const std::string& name, T &field, const std::function<void()> &updateCb = std::function<void()>{});
     bool fieldInitialized(const std::string& name) const;
@@ -64,6 +65,45 @@ public:
 private:
     std::unique_ptr<VrmlNodeChildTemplateImpl> m_impl;
     void setField(const char *fieldName, const VrmlField &fieldValue) override;
+};
+
+template<typename Derived>
+class VrmlNodeChildTemplateTemplate : public VrmlNodeChildTemplate
+{
+public:
+    VrmlNodeChildTemplateTemplate(VrmlScene *scene)
+    : VrmlNodeChildTemplate(scene)
+    {}
+    
+    static VrmlNode *creator(vrml::VrmlScene *scene){return new Derived(scene);}
+    static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t = nullptr)
+    {
+        static VrmlNodeType *st = 0;
+        if (!t)
+        {
+            if (st)
+                return st; // Only define the type once.
+            t = st = new VrmlNodeType(Derived::name(), creator);
+        }
+
+        VrmlNodeChildTemplate::defineType(t); // Parent class
+        
+        Derived::initFields(nullptr, t);
+
+        return t;
+    }
+
+    vrml::VrmlNode *cloneMe() const override
+    {
+        auto node = new Derived(dynamic_cast<const Derived&>(*this));
+        Derived::initFields(node, nullptr);
+        return node;
+    }
+
+    vrml::VrmlNodeType *nodeType() const override
+    {
+        return defineType();
+    }
 };
 
 template<typename T>
