@@ -54,12 +54,12 @@ bool ToolMaschinePlugin::update()
     for(auto machine : machineNodes)
     {
         if(!machine->machine)
-            machine->machine = utils::pointer::makeResetOnCopy<Machine>(m_menu, config().get(), machine);
+            machine->machine = utils::pointer::makeNullCopyPtr<Machine>(m_menu, config().get(), machine);
     }
     for(auto toolChanger : toolChangers)
     {
         if(!toolChanger->toolChanger)
-            toolChanger->toolChanger = utils::pointer::makeResetOnCopy<ToolChanger>(m_menu, config().get(), toolChanger);
+            toolChanger->toolChanger = utils::pointer::makeNullCopyPtr<ToolChanger>(m_menu, config().get(), toolChanger);
     }
     
     

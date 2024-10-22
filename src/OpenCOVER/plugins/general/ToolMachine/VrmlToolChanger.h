@@ -7,7 +7,7 @@
 #include <vrml97/vrml/VrmlNodeType.h>
 
 #include <osg/MatrixTransform>
-#include <utils/pointer/ResetOnCopy.h>
+#include <utils/pointer/NullCopyPtr.h>
 
 
 
@@ -22,8 +22,9 @@ public:
     vrml::VrmlSFString changer;
     vrml::VrmlSFString cover;
     vrml::VrmlSFNode toolHead;
+    vrml::VrmlSFString toolMagazineName;
 
-    opencover::utils::pointer::ResetOnCopyPtr<LogicInterface> toolChanger;
+    opencover::utils::pointer::NullCopyPtr<LogicInterface> toolChanger;
 
 };
 

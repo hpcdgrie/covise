@@ -7,7 +7,7 @@
 #include <vrml97/vrml/VrmlNodeType.h>
 
 #include <osg/MatrixTransform>
-#include <utils/pointer/ResetOnCopy.h>
+#include <utils/pointer/NullCopyPtr.h>
 
 
 class MachineNodeBase {
@@ -29,7 +29,7 @@ public:
     vrml::VrmlSFString toolRadiusName;
     vrml::VrmlMFNode axisNodes;
     vrml::VrmlSFFloat opcUaToVrml;
-    opencover::utils::pointer::ResetOnCopyPtr<LogicInterface> machine;
+    opencover::utils::pointer::NullCopyPtr<LogicInterface> machine;
 };
 
 extern std::set<MachineNodeBase *> machineNodes;
