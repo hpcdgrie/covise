@@ -211,13 +211,28 @@ void registerField(VrmlNodeChildTemplate *node, const std::string &name, T &fiel
 }
 
 template <typename T>
-void addExposedField(VrmlNodeType *t, const std::string &name, T &field) {
-    t->addExposedField(name.c_str(), toEnumType<std::remove_reference_t<T>>());
-    // std::cerr << "adding exposed field " << name <<  " whith type " << (int)toEnumType(field) <<  std::endl;
+void addField(VrmlNodeType *t, const std::string &name, T &field) {
+    t->addField(name.c_str(), toEnumType<std::remove_reference_t<T>>());
+    std::cerr << "adding field " << name <<  " whith type " << toEnumType<std::remove_reference_t<T>>() <<  std::endl;
 }
 
 template <typename T>
-void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T> &field)
+void addExposedField(VrmlNodeType *t, const std::string &name, T &field) {
+    t->addExposedField(name.c_str(), toEnumType<std::remove_reference_t<T>>());
+    std::cerr << "adding exposed field " << name <<  " whith type " << toEnumType<std::remove_reference_t<T>>() <<  std::endl;
+}
+
+template <typename T>
+void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Private> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value);
+    if (t) 
+        addField(t, field.name, field.value);
+}
+
+template <typename T>
+void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Exposed> &field)
 {
     if (node) 
         registerField(node, field.name, field.value);
@@ -234,8 +249,12 @@ template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
 FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_IMPL)
 
 #define INIT_FIELDS_HELPER_IMPL(type) \
-template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type> &field); 
+template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Private> &field); 
 FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
+
+#define INIT_EXPOSED_FIELDS_HELPER_IMPL(type) \
+template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
+FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_IMPL)
 
 } // vrml
 
