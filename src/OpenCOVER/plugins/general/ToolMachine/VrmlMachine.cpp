@@ -9,18 +9,18 @@ std::set<MachineNodeBase *> machineNodes;
 
 void MachineNodeBase::initFields(vrml::VrmlNodeChildTemplate *base, MachineNodeBase *node, VrmlNodeType *t) {
     initFieldsHelper(base, t,
-        namedValue("machineName", node->machineName),
-        namedValue("visualizationType", node->visualizationType),
-        namedValue("toolHeadNode", node->toolHeadNode),
-        namedValue("tableNode", node->tableNode),
-        namedValue("axisOrientations", node->axisOrientations),
-        namedValue("offsets", node->offsets),
-        namedValue("axisNames", node->axisNames),
-        namedValue("toolNumberName", node->toolNumberName),
-        namedValue("toolLengthName", node->toolLengthName),
-        namedValue("toolRadiusName", node->toolRadiusName),
-        namedValue("axisNodes", node->axisNodes),
-        namedValue("opcUaToVrml", node->opcUaToVrml)
+        field("machineName", node->machineName),
+        field("visualizationType", node->visualizationType),
+        field("toolHeadNode", node->toolHeadNode),
+        field("tableNode", node->tableNode),
+        field("axisOrientations", node->axisOrientations),
+        field("offsets", node->offsets),
+        field("axisNames", node->axisNames),
+        field("toolNumberName", node->toolNumberName),
+        field("toolLengthName", node->toolLengthName),
+        field("toolRadiusName", node->toolRadiusName),
+        field("axisNodes", node->axisNodes),
+        field("opcUaToVrml", node->opcUaToVrml)
     );
 }
 
@@ -39,8 +39,8 @@ void MachineNodeArrayMode::initFields(MachineNodeArrayMode *node, VrmlNodeType *
     
     MachineNodeBase::initFields(node, node, t);
     initFieldsHelper(node, t,
-        namedValue("opcuaAxisIndicees", node->opcuaAxisIndicees),
-        namedValue("opcuaArrayName", node->opcuaArrayName)
+        field("opcuaAxisIndicees", node->opcuaAxisIndicees),
+        field("opcuaArrayName", node->opcuaArrayName)
     );
 
 }
@@ -63,7 +63,7 @@ MachineNodeSingleMode::MachineNodeSingleMode(VrmlScene *scene)
 void MachineNodeSingleMode::initFields(MachineNodeSingleMode *node, VrmlNodeType *t) {
     MachineNodeBase::initFields(node, node, t);
     initFieldsHelper(node, t,
-        namedValue("opcuaNames", node->opcuaNames)
+        field("opcuaNames", node->opcuaNames)
     );
 }
 

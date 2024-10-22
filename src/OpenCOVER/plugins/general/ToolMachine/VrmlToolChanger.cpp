@@ -12,17 +12,18 @@ std::set<ToolChangerNode *> toolChangers;
 
 void ToolChangerNode::initFields(ToolChangerNode *node, VrmlNodeType *t) {
     initFieldsHelper(node, t,
-        namedValue("arm", node->arm),
-        namedValue("changer", node->changer),
-        namedValue("cover", node->cover),
-        namedValue("toolHeadNode", node->toolHead)
+        field("arm", node->arm),
+        field("changer", node->changer),
+        field("cover", node->cover),
+        field("toolHeadNode", node->toolHead),
+        field("toolMagazineName", node->toolMagazineName)
     );
 }
 
 ToolChangerNode::ToolChangerNode(VrmlScene *scene)
 : VrmlNodeChildTemplateTemplate<ToolChangerNode>(scene)
 {
-    initFields(this, nullptr);
+    // initFields(this, nullptr);
     toolChangers.emplace(this);
 }
 
