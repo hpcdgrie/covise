@@ -3,7 +3,7 @@
 
 #include "LogicInterface.h"
 
-#include <vrml97/vrml/VrmlNodeChildTemplate.h>
+#include <vrml97/vrml/VrmlNodeTemplate.h>
 #include <vrml97/vrml/VrmlNodeType.h>
 
 #include <osg/MatrixTransform>
@@ -11,7 +11,7 @@
 
 
 
-class ToolChangerNode : public vrml::VrmlNodeChildTemplateTemplate<ToolChangerNode> {
+class ToolChangerNode : public vrml::VrmlNodeTemplate {
 public:
     ToolChangerNode(vrml::VrmlScene *scene);
     ~ToolChangerNode();

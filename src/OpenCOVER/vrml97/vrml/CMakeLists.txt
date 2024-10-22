@@ -103,7 +103,7 @@ SET(VRML_SOURCES
   Viewer.cpp
   VrmlField.cpp
   VrmlNamespace.cpp
-  VrmlNodeChildTemplate.cpp
+  VrmlNodeTemplate.cpp
   VrmlNodeAnchor.cpp
   VrmlNodeAppearance.cpp
   VrmlNodeAudioClip.cpp
@@ -257,7 +257,7 @@ SET(VRML_HEADERS
   VrmlNamespace.h
   VrmlNodeBindable.h
   VrmlNodeChild.h
-  VrmlNodeChildTemplate.h
+  VrmlNodeTemplate.h
   VrmlNodeTexture.h
   VrmlNode.h
   VrmlNodeAnchor.h

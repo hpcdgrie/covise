@@ -30,12 +30,11 @@ ToolMaschinePlugin::ToolMaschinePlugin()
 {
     m_menu->allowRelayout(true);
     VrmlNamespace::addBuiltIn(MachineNode::defineType());
-    VrmlNamespace::addBuiltIn(MachineNodeArrayMode::defineType());
-    VrmlNamespace::addBuiltIn(MachineNodeSingleMode::defineType());
-    VrmlNamespace::addBuiltIn(ToolChangerNode::defineType());
+    VrmlNamespace::addBuiltIn(VrmlNodeTemplate::defineType<MachineNodeArrayMode>());
+    VrmlNamespace::addBuiltIn(VrmlNodeTemplate::defineType<MachineNodeSingleMode>());
+    VrmlNamespace::addBuiltIn(VrmlNodeTemplate::defineType<ToolChangerNode>());
     std::cerr << "added vrml nodes" << "MachineNode, MachineNodeArrayMode, MachineNodeSingleMode, ToolChangerNode" << std::endl;
     config()->setSaveOnExit(true);
-
 }
 
 osg::Vec3 toOsg(VrmlSFVec3f &v)
@@ -54,7 +53,9 @@ bool ToolMaschinePlugin::update()
     for(auto machine : machineNodes)
     {
         if(!machine->machine)
+        {
             machine->machine = utils::pointer::makeNullCopyPtr<Machine>(m_menu, config().get(), machine);
+        }
     }
     for(auto toolChanger : toolChangers)
     {
