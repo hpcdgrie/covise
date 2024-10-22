@@ -50,13 +50,13 @@ namespace vrml{
 
 class VrmlNodeChildTemplateImpl;
 
-class VRMLEXPORT VrmlNodeChildTemplate : public VrmlNode
+class VRMLEXPORT VrmlNodeTemplate : public VrmlNode
 {
 
 public:
-    VrmlNodeChildTemplate(VrmlScene *scene);
-    VrmlNodeChildTemplate(const VrmlNodeChildTemplate& other);
-    ~VrmlNodeChildTemplate();
+    VrmlNodeTemplate(VrmlScene *scene);
+    VrmlNodeTemplate(const VrmlNodeTemplate& other);
+    ~VrmlNodeTemplate();
     template<typename T>
     void registerField(const std::string& name, T &field, const std::function<void()> &updateCb = std::function<void()>{});
     bool fieldInitialized(const std::string& name) const;
@@ -68,7 +68,7 @@ private:
 };
 
 template<typename Derived>
-class VrmlNodeChildTemplateTemplate : public VrmlNodeChildTemplate
+class VrmlNodTemplateTemplate : public VrmlNodeTemplate
 {
 public:
     
@@ -88,7 +88,7 @@ public:
             t = st = new VrmlNodeType(Derived::name(), creator);
         }
 
-        VrmlNodeChildTemplate::defineType(t); // Parent class
+        VrmlNodeTemplate::defineType(t); // Parent class
         
         Derived::initFields(nullptr, t);
 
@@ -108,8 +108,8 @@ public:
     }
 
 protected:
-    VrmlNodeChildTemplateTemplate(VrmlScene *scene)
-    : VrmlNodeChildTemplate(scene)
+    VrmlNodTemplateTemplate(VrmlScene *scene)
+    : VrmlNodeTemplate(scene)
     {}
 };
 
@@ -137,13 +137,13 @@ NameValueStruct<T, FieldAccessibility::Exposed> exposedField(const std::string &
 }
 
 template <typename T>
-void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Private> &field);
+void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Private> &field);
 
 template <typename T>
-void initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Exposed> &field);
+void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Exposed> &field);
 
 template <typename...Args>
-void initFieldsHelper(VrmlNodeChildTemplate *node, VrmlNodeType *t, const Args&... fields) {
+void initFieldsHelper(VrmlNodeTemplate *node, VrmlNodeType *t, const Args&... fields) {
         (initFieldsHelperImpl(node, t, fields), ...);
 }
 
@@ -181,7 +181,7 @@ void initFieldsHelper(VrmlNodeChildTemplate *node, VrmlNodeType *t, const Args&.
 
 
 #define VRMLNODECHILD2_TEMPLATE_DECL(type) \
-extern template void VRMLEXPORT VrmlNodeChildTemplate::registerField<type>(const std::string& name, type &field, const std::function<void()> &updateCb);
+extern template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(const std::string& name, type &field, const std::function<void()> &updateCb);
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_DECL)
 
 #define TO_VRML_FIELD_TYPES_DECL(type) \
@@ -189,11 +189,11 @@ extern template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
 FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_DECL)
 
 #define INIT_FIELDS_HELPER_DECL(type) \
-extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Private> &field); 
+extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Private> &field); 
 FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_DECL)
 
 #define INIT_EXPOSED_FIELDS_HELPER_DECL(type) \
-extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeChildTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
+extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_DECL)
 
 } // vrml

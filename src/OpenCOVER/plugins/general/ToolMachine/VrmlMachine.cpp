@@ -7,7 +7,7 @@ using namespace vrml;
 
 std::set<MachineNodeBase *> machineNodes;
 
-void MachineNodeBase::initFields(vrml::VrmlNodeChildTemplate *base, MachineNodeBase *node, VrmlNodeType *t) {
+void MachineNodeBase::initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *node, VrmlNodeType *t) {
     initFieldsHelper(base, t,
         field("machineName", node->machineName),
         field("visualizationType", node->visualizationType),
@@ -46,7 +46,7 @@ void MachineNodeArrayMode::initFields(MachineNodeArrayMode *node, VrmlNodeType *
 }
 
 MachineNodeArrayMode::MachineNodeArrayMode(VrmlScene *scene)
-: VrmlNodeChildTemplateTemplate(scene)
+: VrmlNodTemplateTemplate(scene)
 {
     initFields(this, nullptr);
 }
@@ -55,7 +55,7 @@ MachineNodeArrayMode::MachineNodeArrayMode(VrmlScene *scene)
 
 
 MachineNodeSingleMode::MachineNodeSingleMode(VrmlScene *scene)
-: VrmlNodeChildTemplateTemplate(scene)
+: VrmlNodTemplateTemplate(scene)
 {
     initFields(this, nullptr);
 }

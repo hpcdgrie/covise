@@ -3,7 +3,7 @@
 
 #include "LogicInterface.h"
 
-#include <vrml97/vrml/VrmlNodeChildTemplate.h>
+#include <vrml97/vrml/VrmlNodeTemplate.h>
 #include <vrml97/vrml/VrmlNodeType.h>
 
 #include <osg/MatrixTransform>
@@ -12,7 +12,7 @@
 
 class MachineNodeBase {
 public:
-    static void initFields(vrml::VrmlNodeChildTemplate *base, MachineNodeBase *node, vrml::VrmlNodeType *t);
+    static void initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *node, vrml::VrmlNodeType *t);
     MachineNodeBase();
     virtual ~MachineNodeBase();
 
@@ -34,7 +34,7 @@ public:
 
 extern std::set<MachineNodeBase *> machineNodes;
 
-class MachineNodeArrayMode : public vrml::VrmlNodeChildTemplateTemplate<MachineNodeArrayMode>, public MachineNodeBase {
+class MachineNodeArrayMode : public vrml::VrmlNodTemplateTemplate<MachineNodeArrayMode>, public MachineNodeBase {
 public:
     static void initFields(MachineNodeArrayMode *node, vrml::VrmlNodeType *t);
     static const char *name() { return "MachineNodeArrayMode"; }
@@ -45,7 +45,7 @@ public:
     vrml::VrmlMFInt opcuaAxisIndicees; // array mode expected
 };
 
-class MachineNodeSingleMode : public vrml::VrmlNodeChildTemplateTemplate<MachineNodeSingleMode>, public MachineNodeBase {
+class MachineNodeSingleMode : public vrml::VrmlNodTemplateTemplate<MachineNodeSingleMode>, public MachineNodeBase {
 public:
     static void initFields(MachineNodeSingleMode *node, vrml::VrmlNodeType *t);
     static const char *name() { return "MachineNodeSingleMode"; }
