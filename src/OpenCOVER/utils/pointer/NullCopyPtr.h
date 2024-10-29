@@ -11,7 +11,7 @@ template <typename T>
 class NullCopyPtr {
 public:
     template <typename U>
-    friend class ResetOnCopyPtr;
+    friend class NullCopyPtr;
     // Constructor
     explicit NullCopyPtr(T* ptr = nullptr) : m_ptr(ptr) {}
 
@@ -28,6 +28,14 @@ public:
         if ((void*)this != (void*)&other) {
             m_ptr = nullptr;
         }
+        return *this;
+    }
+
+    // Move assignment operator
+    template<typename U>
+    NullCopyPtr& operator=(NullCopyPtr<U>&& other) 
+    {
+        m_ptr = std::move(other.m_ptr);
         return *this;
     }
     
@@ -55,7 +63,8 @@ public:
         m_ptr = ptr;
     }
 
-    bool operator==(const NullCopyPtr& other) const 
+    template<typename U>
+    bool operator==(const NullCopyPtr<U>& other) const 
     {
         return m_ptr == other.m_ptr;
     }
