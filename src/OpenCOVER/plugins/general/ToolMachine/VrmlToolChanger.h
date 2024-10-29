@@ -11,7 +11,7 @@
 
 
 
-class ToolChangerNode : public vrml::VrmlNodTemplateTemplate<ToolChangerNode> {
+class ToolChangerNode : public vrml::VrmlNode3 {
 public:
     ToolChangerNode(vrml::VrmlScene *scene);
     ~ToolChangerNode();

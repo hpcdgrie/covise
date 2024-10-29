@@ -48,6 +48,7 @@ namespace vrml{
 
 
 
+
 class VrmlNodeChildTemplateImpl;
 
 class VRMLEXPORT VrmlNodeTemplate : public VrmlNode
@@ -65,6 +66,9 @@ public:
 private:
     std::unique_ptr<VrmlNodeChildTemplateImpl> m_impl;
     void setField(const char *fieldName, const VrmlField &fieldValue) override;
+protected:
+    static std::map<std::string, vrml::VrmlNodeType*> m_creators;
+    static std::map<std::string, std::function<VrmlNode *(const VrmlNode *)>> m_clones;
 };
 
 template<typename Derived>
@@ -195,6 +199,87 @@ FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_DECL)
 #define INIT_EXPOSED_FIELDS_HELPER_DECL(type) \
 extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_DECL)
+
+
+
+
+
+
+
+
+
+//experiments
+//____________________________________________________________________________________
+
+
+class VrmlNode3 : public VrmlNodeTemplate
+{
+public:
+    // VrmlNode3(vrml::VrmlScene *s, const std::string &name);
+
+    // vrml::VrmlNode *cloneMe() const override;
+
+    // vrml::VrmlNodeType *nodeType() const override;
+    
+    template<typename Derived>
+    static VrmlNode *creator(vrml::VrmlScene *scene){
+        auto node = new Derived(scene);
+        Derived::initFields(node, nullptr);
+        return node;
+    }
+    
+    template<typename Derived>
+    static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t = nullptr)
+    {
+        static VrmlNodeType *st = 0;
+        if (!t)
+        {
+            if (st)
+                return st; // Only define the type once.
+            t = st = new VrmlNodeType(Derived::name(), creator<Derived>);
+            m_creators[Derived::name()] = t;
+            m_clones[Derived::name()] = [](const VrmlNode *node){ 
+                auto newNode = new Derived(*dynamic_cast<const Derived*>(node)); 
+                Derived::initFields(newNode, nullptr);
+                return newNode;
+            };
+        }
+
+        VrmlNode::defineType(t); // Parent class
+        
+        Derived::initFields(nullptr, t);
+
+        return t;
+    }
+
+    VrmlNode3(VrmlScene *s, const std::string &name)
+    : VrmlNodeTemplate(s)
+    , m_name(name)
+    {}
+
+    vrml::VrmlNode *cloneMe() const
+    {
+        return m_clones[m_name](this); 
+    }
+
+    vrml::VrmlNodeType *nodeType() const
+    {
+        return m_creators[m_name];
+    }
+
+private:
+    // static std::map<std::string, vrml::VrmlNodeType*> m_creators;
+    const std::string m_name;
+};
+
+
+
+
+
+
+
+
+
 
 } // vrml
 

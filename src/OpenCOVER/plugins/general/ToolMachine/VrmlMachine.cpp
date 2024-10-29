@@ -24,7 +24,8 @@ void MachineNodeBase::initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *
     );
 }
 
-MachineNodeBase::MachineNodeBase()
+MachineNodeBase::MachineNodeBase(vrml::VrmlScene *scene, const std::string &name)
+: VrmlNode3(scene, name)
 {
     machineNodes.emplace(this);
 }
@@ -46,7 +47,7 @@ void MachineNodeArrayMode::initFields(MachineNodeArrayMode *node, VrmlNodeType *
 }
 
 MachineNodeArrayMode::MachineNodeArrayMode(VrmlScene *scene)
-: VrmlNodTemplateTemplate(scene)
+: MachineNodeBase(scene, name())
 {
     initFields(this, nullptr);
 }
@@ -55,7 +56,7 @@ MachineNodeArrayMode::MachineNodeArrayMode(VrmlScene *scene)
 
 
 MachineNodeSingleMode::MachineNodeSingleMode(VrmlScene *scene)
-: VrmlNodTemplateTemplate(scene)
+: MachineNodeBase(scene, name())
 {
     initFields(this, nullptr);
 }

@@ -256,5 +256,43 @@ FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
 template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_IMPL)
 
+
+
+
+
+
+//experiments
+//____________________________________________________________________________________
+
+// std::map<std::string, VrmlNodeType*> vrml::VrmlNode3::m_creators;
+std::map<std::string, VrmlNodeType*> vrml::VrmlNodeTemplate::m_creators;
+std::map<std::string, std::function<VrmlNode *(const VrmlNode *)>> vrml::VrmlNodeTemplate::m_clones;
+
+// VrmlNode3::VrmlNode3(VrmlScene *s, const std::string &name)
+// : VrmlNodeTemplate(s)
+// , m_name(name)
+// {}
+
+// vrml::VrmlNode *VrmlNode3::cloneMe() const
+// {
+//     return nullptr;
+//     // return m_creators[m_name]->newNode(d_scene); //wrong
+// }
+
+// vrml::VrmlNodeType *VrmlNode3::nodeType() const
+// {
+//     return nullptr;
+//     // return m_creators[m_name];
+// }
+
+
+
+
+
+
+
+
+
+
 } // vrml
 

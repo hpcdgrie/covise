@@ -10,10 +10,10 @@
 #include <utils/pointer/NullCopyPtr.h>
 
 
-class MachineNodeBase {
+class MachineNodeBase : public vrml::VrmlNode3 {
 public:
     static void initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *node, vrml::VrmlNodeType *t);
-    MachineNodeBase();
+    MachineNodeBase(vrml::VrmlScene *scene, const std::string &name);
     virtual ~MachineNodeBase();
 
 
@@ -34,7 +34,7 @@ public:
 
 extern std::set<MachineNodeBase *> machineNodes;
 
-class MachineNodeArrayMode : public vrml::VrmlNodTemplateTemplate<MachineNodeArrayMode>, public MachineNodeBase {
+class MachineNodeArrayMode : public MachineNodeBase {
 public:
     static void initFields(MachineNodeArrayMode *node, vrml::VrmlNodeType *t);
     static const char *name() { return "MachineNodeArrayMode"; }
@@ -45,7 +45,7 @@ public:
     vrml::VrmlMFInt opcuaAxisIndicees; // array mode expected
 };
 
-class MachineNodeSingleMode : public vrml::VrmlNodTemplateTemplate<MachineNodeSingleMode>, public MachineNodeBase {
+class MachineNodeSingleMode : public MachineNodeBase {
 public:
     static void initFields(MachineNodeSingleMode *node, vrml::VrmlNodeType *t);
     static const char *name() { return "MachineNodeSingleMode"; }

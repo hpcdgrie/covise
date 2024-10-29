@@ -21,7 +21,7 @@ void ToolChangerNode::initFields(ToolChangerNode *node, VrmlNodeType *t) {
 }
 
 ToolChangerNode::ToolChangerNode(VrmlScene *scene)
-: VrmlNodTemplateTemplate<ToolChangerNode>(scene)
+: VrmlNode3(scene, name())
 {
     // initFields(this, nullptr);
     toolChangers.emplace(this);
