@@ -7,8 +7,8 @@ using namespace vrml;
 
 std::set<MachineNodeBase *> machineNodes;
 
-void MachineNodeBase::initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *node, VrmlNodeType *t) {
-    initFieldsHelper(base, t,
+void MachineNodeBase::initFields(MachineNodeBase *node, VrmlNodeType *t) {
+    initFieldsHelper(node, t,
         field("machineName", node->machineName),
         field("visualizationType", node->visualizationType),
         field("toolHeadNode", node->toolHeadNode),
@@ -25,7 +25,7 @@ void MachineNodeBase::initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *
 }
 
 MachineNodeBase::MachineNodeBase(vrml::VrmlScene *scene, const std::string &name)
-: VrmlNode3(scene, name)
+: VrmlNodeTemplate(scene, name)
 {
     machineNodes.emplace(this);
 }
@@ -38,7 +38,7 @@ MachineNodeBase::~MachineNodeBase()
 // array mode
 void MachineNodeArrayMode::initFields(MachineNodeArrayMode *node, VrmlNodeType *t) {
     
-    MachineNodeBase::initFields(node, node, t);
+    MachineNodeBase::initFields(node, t);
     initFieldsHelper(node, t,
         field("opcuaAxisIndicees", node->opcuaAxisIndicees),
         field("opcuaArrayName", node->opcuaArrayName)
@@ -62,7 +62,7 @@ MachineNodeSingleMode::MachineNodeSingleMode(VrmlScene *scene)
 }
 
 void MachineNodeSingleMode::initFields(MachineNodeSingleMode *node, VrmlNodeType *t) {
-    MachineNodeBase::initFields(node, node, t);
+    MachineNodeBase::initFields(node, t);
     initFieldsHelper(node, t,
         field("opcuaNames", node->opcuaNames)
     );

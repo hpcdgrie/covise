@@ -10,9 +10,9 @@
 #include <utils/pointer/NullCopyPtr.h>
 
 
-class MachineNodeBase : public vrml::VrmlNode3 {
+class MachineNodeBase : public vrml::VrmlNodeTemplate {
 public:
-    static void initFields(vrml::VrmlNodeTemplate *base, MachineNodeBase *node, vrml::VrmlNodeType *t);
+    static void initFields(MachineNodeBase *node, vrml::VrmlNodeType *t);
     MachineNodeBase(vrml::VrmlScene *scene, const std::string &name);
     virtual ~MachineNodeBase();
 

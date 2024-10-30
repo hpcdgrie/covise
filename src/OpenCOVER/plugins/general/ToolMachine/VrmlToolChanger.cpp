@@ -2,6 +2,7 @@
 #include <cassert>
 
 #include <plugins/general/Vrml97/ViewerObject.h>
+#include <vrml97/vrml/VrmlNodeGroup.h>
 
 using namespace vrml;
 
@@ -21,7 +22,7 @@ void ToolChangerNode::initFields(ToolChangerNode *node, VrmlNodeType *t) {
 }
 
 ToolChangerNode::ToolChangerNode(VrmlScene *scene)
-: VrmlNode3(scene, name())
+: VrmlNodeTemplate(scene, name())
 {
     // initFields(this, nullptr);
     toolChangers.emplace(this);

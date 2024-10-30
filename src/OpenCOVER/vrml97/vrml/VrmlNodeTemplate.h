@@ -3,7 +3,6 @@
 
 #include "VrmlField.h"
 #include "VrmlNode.h"
-#include "VrmlScene.h"
 
 #include <functional>
 #include <map>
@@ -46,42 +45,82 @@
 #include "VrmlSFVec3f.h"
 namespace vrml{
 
+class VrmlScene;
 
 
-
-class VrmlNodeChildTemplateImpl;
+class VrmlNodeUpdateRegistry;
 
 class VRMLEXPORT VrmlNodeTemplate : public VrmlNode
 {
+private:
+    std::unique_ptr<VrmlNodeUpdateRegistry> m_impl;
+    struct Constructors{
+        vrml::VrmlNodeType* creator;
+        // std::function<vrml::VrmlNode*(const VrmlNode*)> clone;
+        vrml::VrmlNode*(*clone)(const VrmlNode*);
+    };
+    static std::map<std::string, Constructors> m_constructors;
+    const std::map<std::string, Constructors>::const_iterator m_constructor;
+
+    void setField(const char *fieldName, const VrmlField &fieldValue) override;
+protected:
+
+    enum FieldAccessibility{
+        Private, Exposed
+    };
+
+    using FieldUpdateCallback = std::function<void()>;
+    template<typename VrmlType>
+    static void registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType &field, const FieldUpdateCallback &updateCb = std::function<void()>{});
+
+    VrmlNodeTemplate(VrmlScene *scene, const std::string &name);
+    VrmlNodeTemplate(const VrmlNodeTemplate& other);
+
+    template <typename VrmlType, FieldAccessibility FT>
+    struct NameValueStruct {
+        std::string name;
+        VrmlType &value;
+        FieldUpdateCallback updateCb;
+    };
+
+    template<typename VrmlType>
+    static NameValueStruct<VrmlType, FieldAccessibility::Private> field(const std::string &name, VrmlType &value, const FieldUpdateCallback &updateCb = FieldUpdateCallback()) {
+        return NameValueStruct<VrmlType, FieldAccessibility::Private>{name, value, updateCb};
+    }
+
+    template<typename VrmlType>
+    static NameValueStruct<VrmlType, FieldAccessibility::Exposed> exposedField(const std::string &name, VrmlType &value, const FieldUpdateCallback &updateCb = FieldUpdateCallback()) {
+        return NameValueStruct<VrmlType, FieldAccessibility::Exposed>{name, value, updateCb};
+    }
+
+    template <typename VrmlType>
+    static void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Private> &field);
+
+    template <typename VrmlType>
+    static void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Exposed> &field);
+
+    template <typename...Args>
+    static void initFieldsHelper(VrmlNodeTemplate *node, VrmlNodeType *t, const Args&... fields) {
+            (initFieldsHelperImpl(node, t, fields), ...);
+    }
 
 public:
-    VrmlNodeTemplate(VrmlScene *scene);
-    VrmlNodeTemplate(const VrmlNodeTemplate& other);
     ~VrmlNodeTemplate();
-    template<typename T>
-    void registerField(const std::string& name, T &field, const std::function<void()> &updateCb = std::function<void()>{});
+    std::ostream &printFields(std::ostream &os, int indent) override;
     bool fieldInitialized(const std::string& name) const;
     bool allFieldsInitialized() const;
 
-private:
-    std::unique_ptr<VrmlNodeChildTemplateImpl> m_impl;
-    void setField(const char *fieldName, const VrmlField &fieldValue) override;
-protected:
-    static std::map<std::string, vrml::VrmlNodeType*> m_creators;
-    static std::map<std::string, std::function<VrmlNode *(const VrmlNode *)>> m_clones;
-};
+    vrml::VrmlNode *cloneMe() const;
+    vrml::VrmlNodeType *nodeType() const;
 
-template<typename Derived>
-class VrmlNodTemplateTemplate : public VrmlNodeTemplate
-{
-public:
-    
+    template<typename Derived>
     static VrmlNode *creator(vrml::VrmlScene *scene){
         auto node = new Derived(scene);
         Derived::initFields(node, nullptr);
         return node;
     }
-    
+
+    template<typename Derived>
     static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t = nullptr)
     {
         static VrmlNodeType *st = 0;
@@ -89,67 +128,29 @@ public:
         {
             if (st)
                 return st; // Only define the type once.
-            t = st = new VrmlNodeType(Derived::name(), creator);
+            t = st = new VrmlNodeType(Derived::name(), creator<Derived>);
+            Constructors cs;
+            cs.creator = t;
+            cs.clone = [](const VrmlNode *node){ 
+                auto newNode = new Derived(*dynamic_cast<const Derived*>(node)); 
+                Derived::initFields(newNode, nullptr);
+                return static_cast<vrml::VrmlNode*>(newNode);
+            };
+            m_constructors[Derived::name()] = cs;
         }
 
-        VrmlNodeTemplate::defineType(t); // Parent class
+        VrmlNode::defineType(t); // Parent class
         
         Derived::initFields(nullptr, t);
 
         return t;
     }
 
-    vrml::VrmlNode *cloneMe() const override
-    {
-        auto node = new Derived(dynamic_cast<const Derived&>(*this));
-        Derived::initFields(node, nullptr);
-        return node;
-    }
 
-    vrml::VrmlNodeType *nodeType() const override
-    {
-        return defineType();
-    }
-
-protected:
-    VrmlNodTemplateTemplate(VrmlScene *scene)
-    : VrmlNodeTemplate(scene)
-    {}
 };
 
-template<typename T>
-VrmlField::VrmlFieldType toEnumType(const T *t = nullptr);
-
-enum FieldAccessibility{
-    Private, Exposed
-};
-
-template <typename T, FieldAccessibility FT>
-struct NameValueStruct {
-    std::string name;
-    T &value;
-};
-
-template<typename T>
-NameValueStruct<T, FieldAccessibility::Private> field(const std::string &name, T &value) {
-    return NameValueStruct<T, FieldAccessibility::Private>{name, value};
-}
-
-template<typename T>
-NameValueStruct<T, FieldAccessibility::Exposed> exposedField(const std::string &name, T &value) {
-    return NameValueStruct<T, FieldAccessibility::Exposed>{name, value};
-}
-
-template <typename T>
-void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Private> &field);
-
-template <typename T>
-void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<T, FieldAccessibility::Exposed> &field);
-
-template <typename...Args>
-void initFieldsHelper(VrmlNodeTemplate *node, VrmlNodeType *t, const Args&... fields) {
-        (initFieldsHelperImpl(node, t, fields), ...);
-}
+template<typename VrmlType>
+VrmlField::VrmlFieldType toEnumType(const VrmlType *t = nullptr);
 
 #define FOR_ALL_VRML_TYPES(code)\
     code(VrmlSFBool)\
@@ -185,7 +186,7 @@ void initFieldsHelper(VrmlNodeTemplate *node, VrmlNodeType *t, const Args&... fi
 
 
 #define VRMLNODECHILD2_TEMPLATE_DECL(type) \
-extern template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(const std::string& name, type &field, const std::function<void()> &updateCb);
+extern template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(VrmlNodeTemplate *node, const std::string& name, type &field, const std::function<void()> &updateCb);
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_DECL)
 
 #define TO_VRML_FIELD_TYPES_DECL(type) \
@@ -193,93 +194,12 @@ extern template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
 FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_DECL)
 
 #define INIT_FIELDS_HELPER_DECL(type) \
-extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Private> &field); 
+extern template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Private> &field); 
 FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_DECL)
 
 #define INIT_EXPOSED_FIELDS_HELPER_DECL(type) \
-extern template void VRMLEXPORT initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
+extern template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_DECL)
-
-
-
-
-
-
-
-
-
-//experiments
-//____________________________________________________________________________________
-
-
-class VrmlNode3 : public VrmlNodeTemplate
-{
-public:
-    // VrmlNode3(vrml::VrmlScene *s, const std::string &name);
-
-    // vrml::VrmlNode *cloneMe() const override;
-
-    // vrml::VrmlNodeType *nodeType() const override;
-    
-    template<typename Derived>
-    static VrmlNode *creator(vrml::VrmlScene *scene){
-        auto node = new Derived(scene);
-        Derived::initFields(node, nullptr);
-        return node;
-    }
-    
-    template<typename Derived>
-    static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t = nullptr)
-    {
-        static VrmlNodeType *st = 0;
-        if (!t)
-        {
-            if (st)
-                return st; // Only define the type once.
-            t = st = new VrmlNodeType(Derived::name(), creator<Derived>);
-            m_creators[Derived::name()] = t;
-            m_clones[Derived::name()] = [](const VrmlNode *node){ 
-                auto newNode = new Derived(*dynamic_cast<const Derived*>(node)); 
-                Derived::initFields(newNode, nullptr);
-                return newNode;
-            };
-        }
-
-        VrmlNode::defineType(t); // Parent class
-        
-        Derived::initFields(nullptr, t);
-
-        return t;
-    }
-
-    VrmlNode3(VrmlScene *s, const std::string &name)
-    : VrmlNodeTemplate(s)
-    , m_name(name)
-    {}
-
-    vrml::VrmlNode *cloneMe() const
-    {
-        return m_clones[m_name](this); 
-    }
-
-    vrml::VrmlNodeType *nodeType() const
-    {
-        return m_creators[m_name];
-    }
-
-private:
-    // static std::map<std::string, vrml::VrmlNodeType*> m_creators;
-    const std::string m_name;
-};
-
-
-
-
-
-
-
-
-
 
 } // vrml
 

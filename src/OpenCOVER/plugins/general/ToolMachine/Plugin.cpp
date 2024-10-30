@@ -30,9 +30,9 @@ ToolMaschinePlugin::ToolMaschinePlugin()
 {
     m_menu->allowRelayout(true);
     VrmlNamespace::addBuiltIn(MachineNode::defineType());
-    VrmlNamespace::addBuiltIn(VrmlNode3::defineType<MachineNodeArrayMode>());
-    VrmlNamespace::addBuiltIn(VrmlNode3::defineType<MachineNodeSingleMode>());
-    VrmlNamespace::addBuiltIn(VrmlNode3::defineType<ToolChangerNode>());
+    VrmlNamespace::addBuiltIn(VrmlNodeTemplate::defineType<MachineNodeArrayMode>());
+    VrmlNamespace::addBuiltIn(VrmlNodeTemplate::defineType<MachineNodeSingleMode>());
+    VrmlNamespace::addBuiltIn(VrmlNodeTemplate::defineType<ToolChangerNode>());
     std::cerr << "added vrml nodes" << "MachineNode, MachineNodeArrayMode, MachineNodeSingleMode, ToolChangerNode" << std::endl;
     config()->setSaveOnExit(true);
 }
@@ -55,7 +55,6 @@ bool ToolMaschinePlugin::update()
         if(!machine->machine)
         {
             machine->machine = utils::pointer::makeNullCopyPtr<Machine>(m_menu, config().get(), machine);
-            assert(machine->machine);
         }
     }
     for(auto toolChanger : toolChangers)
