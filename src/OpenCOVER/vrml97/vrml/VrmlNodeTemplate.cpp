@@ -10,7 +10,7 @@
 #include <tuple>
 #include <variant>
 
-
+#include <cassert>
 
 namespace vrml{
 
@@ -45,7 +45,8 @@ namespace vrml{
         VrmlMFVec3f,
         VrmlSFNode,
         VrmlMFNode,
-        VrmlSFMatrix
+        VrmlSFMatrix,
+        VrmlField
     > VrmlTypesTuple;
 
 
@@ -106,12 +107,33 @@ private:
     const VrmlType* getField(const VrmlField &fieldValue, const VrmlType *t){
         const VrmlType* val = dynamic_cast<const VrmlType*>(&fieldValue);
         if(!val)
-            std::cerr << "Field type mismatch" << std::endl;
+            return nullptr;
         return val;
     }
-    
+    template<>
+    const VrmlField* getField(const VrmlField &fieldValue, const VrmlField *t){
+        if(fieldValue.fieldType() != t->fieldType()){
+            return nullptr;
+        }
+        return &fieldValue;
+    }
 
 public:
+    const VrmlField *getField(const char *fieldName) const
+    {
+        auto it = m_fields.find(fieldName);
+        if(it == m_fields.end()){
+            return m_nodeChild->getField(fieldName);
+        }
+        auto& field = it->second;
+        
+        return std::visit([](auto&& arg){
+            return static_cast<const VrmlField*>(arg);
+        }, field.type);
+        return nullptr;
+    }
+    
+    
     void setField(const char *fieldName, const VrmlField &fieldValue) {
         auto it = m_fields.find(fieldName);
         if(it == m_fields.end()){
@@ -119,8 +141,14 @@ public:
             return;
         }
         auto& field = it->second;
-        std::visit([&fieldValue, this](auto&& arg){
-            *arg = *getField(fieldValue, arg);
+        std::visit([fieldName, &fieldValue, this](auto&& arg){
+            auto val = getField(fieldValue, arg);
+            if(!val){
+                System::the->error("Invalid type (%s) for %s field.\n",
+                    fieldValue.fieldTypeName(), fieldName);
+                return;
+            }
+            *arg = *val;
         }, field.type);
         field.initialized = true;
         if(field.updateCb){
@@ -153,6 +181,12 @@ public:
     template<typename VrmlType>
     VrmlType* copy(const VrmlType* other){
         return new VrmlType(*other);
+    }
+
+    template<>
+    VrmlField* copy(const VrmlField* other){
+        assert(!("can not copy abstract VrmlField"));
+        return nullptr;
     }
 
     // use new pointers with this inital values of other
@@ -226,6 +260,16 @@ void VrmlNodeTemplate::setField(const char *fieldName, const VrmlField &fieldVal
 std::ostream &VrmlNodeTemplate::printFields(std::ostream &os, int indent)
 {
     return m_impl->printFields(os, indent);
+}
+
+const VrmlField *VrmlNodeTemplate::getField(const char *fieldName) const
+{
+    return m_impl->getField(fieldName);
+}
+
+void VrmlNodeTemplate::setFieldByName(const char *fieldName, const VrmlField &fieldValue)
+{
+    m_impl->setField(fieldName, fieldValue);
 }
 
 

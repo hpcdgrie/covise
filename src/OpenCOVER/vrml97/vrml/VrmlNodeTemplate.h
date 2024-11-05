@@ -107,6 +107,10 @@ protected:
 public:
     ~VrmlNodeTemplate();
     std::ostream &printFields(std::ostream &os, int indent) override;
+    const VrmlField *getField(const char *fieldName) const override;
+    //hide setField
+    void setFieldByName(const char *fieldName, const VrmlField &fieldValue);
+
     bool fieldInitialized(const std::string& name) const;
     bool allFieldsInitialized() const;
 
@@ -152,6 +156,8 @@ public:
 template<typename VrmlType>
 VrmlField::VrmlFieldType toEnumType(const VrmlType *t = nullptr);
 
+struct DummyType{};
+
 #define FOR_ALL_VRML_TYPES(code)\
     code(VrmlSFBool)\
     code(VrmlSFColor)\
@@ -182,7 +188,8 @@ VrmlField::VrmlFieldType toEnumType(const VrmlType *t = nullptr);
     code(VrmlMFVec3f)\
     code(VrmlSFNode)\
     code(VrmlMFNode)\
-    code(VrmlSFMatrix)
+    code(VrmlSFMatrix)\
+    code(VrmlField)
 
 
 #define VRMLNODECHILD2_TEMPLATE_DECL(type) \
