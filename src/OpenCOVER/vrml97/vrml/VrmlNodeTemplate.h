@@ -66,12 +66,12 @@ private:
 protected:
 
     enum FieldAccessibility{
-        Private, Exposed
+        Private, Exposed, EventIn, EventOut
     };
 
     using FieldUpdateCallback = std::function<void()>;
     template<typename VrmlType>
-    static void registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType &field, const FieldUpdateCallback &updateCb = std::function<void()>{});
+    static void registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType *field, const FieldUpdateCallback &updateCb = std::function<void()>{});
 
     VrmlNodeTemplate(VrmlScene *scene, const std::string &name);
     VrmlNodeTemplate(const VrmlNodeTemplate& other);
@@ -79,18 +79,28 @@ protected:
     template <typename VrmlType, FieldAccessibility FT>
     struct NameValueStruct {
         std::string name;
-        VrmlType &value;
+        VrmlType *value;
         FieldUpdateCallback updateCb;
     };
 
     template<typename VrmlType>
     static NameValueStruct<VrmlType, FieldAccessibility::Private> field(const std::string &name, VrmlType &value, const FieldUpdateCallback &updateCb = FieldUpdateCallback()) {
-        return NameValueStruct<VrmlType, FieldAccessibility::Private>{name, value, updateCb};
+        return NameValueStruct<VrmlType, FieldAccessibility::Private>{name, &value, updateCb};
     }
 
     template<typename VrmlType>
     static NameValueStruct<VrmlType, FieldAccessibility::Exposed> exposedField(const std::string &name, VrmlType &value, const FieldUpdateCallback &updateCb = FieldUpdateCallback()) {
-        return NameValueStruct<VrmlType, FieldAccessibility::Exposed>{name, value, updateCb};
+        return NameValueStruct<VrmlType, FieldAccessibility::Exposed>{name, &value, updateCb};
+    }
+
+    template<typename VrmlType>
+    static NameValueStruct<VrmlType, FieldAccessibility::EventIn> eventInCallBack(const std::string &name, const FieldUpdateCallback &updateCb) {
+        return NameValueStruct<VrmlType, FieldAccessibility::EventIn>{name, nullptr, updateCb};
+    }
+
+    template<typename VrmlType>
+    static NameValueStruct<VrmlType, FieldAccessibility::EventOut> eventOutCallBack(const std::string &name, const FieldUpdateCallback &updateCb) {
+        return NameValueStruct<VrmlType, FieldAccessibility::EventOut>{name, nullptr, updateCb};
     }
 
     template <typename VrmlType>
@@ -98,6 +108,12 @@ protected:
 
     template <typename VrmlType>
     static void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Exposed> &field);
+    
+    template <typename VrmlType>
+    static void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventIn> &field);
+
+    template <typename VrmlType>
+    static void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventOut> &field);
 
     template <typename...Args>
     static void initFieldsHelper(VrmlNodeTemplate *node, VrmlNodeType *t, const Args&... fields) {
@@ -193,7 +209,7 @@ struct DummyType{};
 
 
 #define VRMLNODECHILD2_TEMPLATE_DECL(type) \
-extern template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(VrmlNodeTemplate *node, const std::string& name, type &field, const std::function<void()> &updateCb);
+extern template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(VrmlNodeTemplate *node, const std::string& name, type *field, const std::function<void()> &updateCb);
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_DECL)
 
 #define TO_VRML_FIELD_TYPES_DECL(type) \
@@ -207,6 +223,14 @@ FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_DECL)
 #define INIT_EXPOSED_FIELDS_HELPER_DECL(type) \
 extern template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_DECL)
+
+#define INIT_EVENT_IN_HELPER_DECL(type) \
+extern template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::EventIn> &field); 
+FOR_ALL_VRML_TYPES(INIT_EVENT_IN_HELPER_DECL)
+
+#define INIT_EVENT_OUT_HELPER_DECL(type) \
+extern template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::EventOut> &field); 
+FOR_ALL_VRML_TYPES(INIT_EVENT_OUT_HELPER_DECL)
 
 } // vrml
 

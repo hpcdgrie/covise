@@ -142,13 +142,16 @@ public:
         }
         auto& field = it->second;
         std::visit([fieldName, &fieldValue, this](auto&& arg){
-            auto val = getField(fieldValue, arg);
-            if(!val){
-                System::the->error("Invalid type (%s) for %s field.\n",
-                    fieldValue.fieldTypeName(), fieldName);
-                return;
+            if(arg) //events do not have a field
+            {
+                auto val = getField(fieldValue, arg);
+                if(!val){
+                    System::the->error("Invalid type (%s) for %s field.\n",
+                        fieldValue.fieldTypeName(), fieldName);
+                    return;
+                }
+                *arg = *val;
             }
-            *arg = *val;
         }, field.type);
         field.initialized = true;
         if(field.updateCb){
@@ -157,8 +160,8 @@ public:
     }
     
     template<typename VrmlType>
-    void registerField(const std::string& name, VrmlType &field, const std::function<void()> &updateCb =  std::function<void()>{}){
-        m_fields[name] = VrmlTypeStruct{ &field, false, updateCb};
+    void registerField(const std::string& name, VrmlType *field, const std::function<void()> &updateCb =  std::function<void()>{}){
+        m_fields[name] = VrmlTypeStruct{ field, false, updateCb};
     }
 
     bool initialized(const std::string& name){
@@ -274,7 +277,7 @@ void VrmlNodeTemplate::setFieldByName(const char *fieldName, const VrmlField &fi
 
 
 template<typename VrmlType>
-void VrmlNodeTemplate::registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType &field, const std::function<void()> &updateCb)
+void VrmlNodeTemplate::registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType *field, const std::function<void()> &updateCb)
 {
     return node->m_impl->registerField<VrmlType>(name, field, updateCb);
 }
@@ -295,20 +298,38 @@ void VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType
     if (node) 
         registerField(node, field.name, field.value, field.updateCb);
     if (t) 
-        addField(t, field.name, field.value);
+        addField(t, field.name, *field.value);
 }
 
 template <typename VrmlType>
 void VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Exposed> &field)
 {
     if (node) 
-        registerField(node, field.name, field.value);
+        registerField(node, field.name, field.value, field.updateCb);
     if (t) 
-        addExposedField(t, field.name, field.value);
+        addExposedField(t, field.name, *field.value);
+}
+
+template <typename VrmlType>
+void VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventIn> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value, field.updateCb);
+    if (t) 
+        t->addEventIn(field.name.c_str(), toEnumType<VrmlType>());
+}
+
+template <typename VrmlType>
+void VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventOut> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value, field.updateCb);
+    if (t) 
+        t->addEventOut(field.name.c_str(), toEnumType<VrmlType>());
 }
 
 #define VRMLNODECHILD2_TEMPLATE_IMPL(type) \
-template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(VrmlNodeTemplate *node, const std::string& name, type &field, const std::function<void()> &updateCb);
+template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(VrmlNodeTemplate *node, const std::string& name, type *field, const std::function<void()> &updateCb);
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_IMPL)
 
 #define TO_VRML_FIELD_TYPES_IMPL(type) \
@@ -322,6 +343,14 @@ FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
 #define INIT_EXPOSED_FIELDS_HELPER_IMPL(type) \
 template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_IMPL)
+
+#define INIT_EVENT_IN_HELPER_IMPL(type) \
+template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::EventIn> &field); 
+FOR_ALL_VRML_TYPES(INIT_EVENT_IN_HELPER_IMPL)
+
+#define INIT_EVENT_OUT_HELPER_IMPL(type) \
+template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::EventOut> &field); 
+FOR_ALL_VRML_TYPES(INIT_EVENT_OUT_HELPER_IMPL)
 
 
 } // vrml
