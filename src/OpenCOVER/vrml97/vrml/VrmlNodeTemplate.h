@@ -92,7 +92,8 @@ protected:
     static NameValueStruct<VrmlType, FieldAccessibility::Exposed> exposedField(const std::string &name, VrmlType &value, const FieldUpdateCallback &updateCb = FieldUpdateCallback()) {
         return NameValueStruct<VrmlType, FieldAccessibility::Exposed>{name, &value, updateCb};
     }
-
+    //eventInCallBack and eventOutCallBack are only used to set callbacks that can be used to replace
+    //setField calls with the event name
     template<typename VrmlType>
     static NameValueStruct<VrmlType, FieldAccessibility::EventIn> eventInCallBack(const std::string &name, const FieldUpdateCallback &updateCb) {
         return NameValueStruct<VrmlType, FieldAccessibility::EventIn>{name, nullptr, updateCb};

@@ -82,6 +82,7 @@ template<typename Tuple>
 using tuple_to_variant_ptr = decltype(tuple_to_variant_ptr_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}));
 
 
+
 class VrmlNodeUpdateRegistry
 {
 
@@ -96,27 +97,42 @@ private:
     
     using VrmlTypesVariant = tuple_to_variant_ptr<VrmlTypesTuple>;
 
-    struct VrmlTypeStruct{
-        VrmlTypesVariant type;
-        bool initialized = false;
-        std::function<void()> updateCb;
-    };
-    std::map<std::string, VrmlTypeStruct> m_fields;
-    VrmlNode *m_nodeChild;
     template<typename VrmlType>
-    const VrmlType* getField(const VrmlField &fieldValue, const VrmlType *t){
-        const VrmlType* val = dynamic_cast<const VrmlType*>(&fieldValue);
-        if(!val)
-            return nullptr;
-        return val;
+    struct VrmlTypeStruct{
+        VrmlType *type;
+        bool initialized = false;
+        std::function<void(const VrmlType*)> updateCb;
+        // const VrmlType defaultValue;
+    };
+
+
+    template<typename Tuple, std::size_t... Indices>
+    static auto tuple_to_VrmlTypeStruct_impl(std::index_sequence<Indices...>) {
+        return std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...>{};
     }
-    template<>
-    const VrmlField* getField(const VrmlField &fieldValue, const VrmlField *t){
-        if(fieldValue.fieldType() != t->fieldType()){
-            return nullptr;
-        }
-        return &fieldValue;
-    }
+
+    template<typename Tuple>
+    using tuple_to_VrmlTypeStruct = decltype(tuple_to_VrmlTypeStruct_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}));
+
+    using VrmlTypeStructs = tuple_to_VrmlTypeStruct<VrmlTypesTuple>;
+    
+    std::map<std::string, VrmlTypeStructs> m_fields;
+    VrmlNode *m_nodeChild;
+
+    // template<typename VrmlType>
+    // const VrmlType* getField(const VrmlField &fieldValue, const VrmlType *t){
+    //     const VrmlType* val = dynamic_cast<const VrmlType*>(&fieldValue);
+    //     if(!val)
+    //         return nullptr;
+    //     return val;
+    // }
+    // template<>
+    // const VrmlField* getField(const VrmlField &fieldValue, const VrmlField *t){
+    //     if(fieldValue.fieldType() != t->fieldType()){
+    //         return nullptr;
+    //     }
+    //     return &fieldValue;
+    // }
 
 public:
     const VrmlField *getField(const char *fieldName) const
@@ -125,11 +141,11 @@ public:
         if(it == m_fields.end()){
             return m_nodeChild->getField(fieldName);
         }
-        auto& field = it->second;
+        const VrmlTypeStructs& field = it->second;
         
         return std::visit([](auto&& arg){
-            return static_cast<const VrmlField*>(arg);
-        }, field.type);
+            return static_cast<const VrmlField*>(arg.type);
+        }, field);
         return nullptr;
     }
     
@@ -142,21 +158,22 @@ public:
         }
         auto& field = it->second;
         std::visit([fieldName, &fieldValue, this](auto&& arg){
-            if(arg) //events do not have a field
+            auto val = dynamic_cast<const std::remove_pointer_t<decltype(arg.type)>*>(&fieldValue);
+            if(arg.type) //events do not have a field
             {
-                auto val = getField(fieldValue, arg);
                 if(!val){
                     System::the->error("Invalid type (%s) for %s field.\n",
                         fieldValue.fieldTypeName(), fieldName);
                     return;
                 }
-                *arg = *val;
+                *arg.type = *val;
             }
-        }, field.type);
-        field.initialized = true;
-        if(field.updateCb){
-            field.updateCb();
-        }
+            arg.initialized = true;
+            if(arg.updateCb){
+                arg.updateCb(val);
+            }
+
+        }, field);
     }
     
     template<typename VrmlType>
@@ -169,14 +186,18 @@ public:
         if(it == m_fields.end()){
             return false;
         }
-        return it->second.initialized;
+        std::visit([](auto&& arg){
+            return arg.initialized;
+        }, it->second);
     }
 
     bool allInitialized(){
         for(auto& [name, field] : m_fields){
-            if(!field.initialized){
-                return false;
-            }
+            std::visit([](auto&& arg){
+                if(!arg.initialized){
+                    return false;
+                }
+            }, field);
         }
         return true;
     }
@@ -198,8 +219,8 @@ public:
     {
         for(auto& [name, field] : m_fields){
             std::visit([this, &field](auto&& arg){
-                arg = copy(arg);
-            }, field.type);
+                arg.type = copy(arg.type);
+            }, field);
         }
     }
 
@@ -212,13 +233,12 @@ public:
         for(auto& [name, field] : m_fields){
             os << std::string(indent, ' ') << name << " : ";
             std::visit([&os](auto&& arg){
-                os << *arg;
-            }, field.type);
+                os << *arg.type;
+            }, field);
             os << std::endl;
         }
         return os;
     }
-
 };
 
 std::map<std::string, VrmlNodeTemplate::Constructors> VrmlNodeTemplate::m_constructors;
