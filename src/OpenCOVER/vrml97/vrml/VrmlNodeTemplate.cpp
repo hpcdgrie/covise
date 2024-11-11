@@ -65,7 +65,7 @@ struct TypeToEnumHelper {
     }
 };
 
-// Function to map type to enumeration value
+// Function to map VrmlType to enumeration value
 template<typename VrmlType>
 VrmlField::VrmlFieldType toEnumType(const VrmlType *t) {
     return TypeToEnumHelper<VrmlType, VrmlTypesTuple>::value();
@@ -99,17 +99,18 @@ private:
 
     template<typename VrmlType>
     struct VrmlTypeStruct{
-        VrmlType *type;
+        VrmlType *value;
         bool initialized = false;
-        std::function<void(const VrmlType*)> updateCb;
+        VrmlNodeTemplate::FieldUpdateCallback<VrmlType> updateCb;
         // const VrmlType defaultValue;
     };
 
 
     template<typename Tuple, std::size_t... Indices>
-    static auto tuple_to_VrmlTypeStruct_impl(std::index_sequence<Indices...>) {
+    static std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...> tuple_to_VrmlTypeStruct_impl(std::index_sequence<Indices...>) {
         return std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...>{};
     }
+
 
     template<typename Tuple>
     using tuple_to_VrmlTypeStruct = decltype(tuple_to_VrmlTypeStruct_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}));
@@ -118,21 +119,6 @@ private:
     
     std::map<std::string, VrmlTypeStructs> m_fields;
     VrmlNode *m_nodeChild;
-
-    // template<typename VrmlType>
-    // const VrmlType* getField(const VrmlField &fieldValue, const VrmlType *t){
-    //     const VrmlType* val = dynamic_cast<const VrmlType*>(&fieldValue);
-    //     if(!val)
-    //         return nullptr;
-    //     return val;
-    // }
-    // template<>
-    // const VrmlField* getField(const VrmlField &fieldValue, const VrmlField *t){
-    //     if(fieldValue.fieldType() != t->fieldType()){
-    //         return nullptr;
-    //     }
-    //     return &fieldValue;
-    // }
 
 public:
     const VrmlField *getField(const char *fieldName) const
@@ -144,11 +130,10 @@ public:
         const VrmlTypeStructs& field = it->second;
         
         return std::visit([](auto&& arg){
-            return static_cast<const VrmlField*>(arg.type);
+            return static_cast<const VrmlField*>(arg.value);
         }, field);
         return nullptr;
     }
-    
     
     void setField(const char *fieldName, const VrmlField &fieldValue) {
         auto it = m_fields.find(fieldName);
@@ -158,15 +143,15 @@ public:
         }
         auto& field = it->second;
         std::visit([fieldName, &fieldValue, this](auto&& arg){
-            auto val = dynamic_cast<const std::remove_pointer_t<decltype(arg.type)>*>(&fieldValue);
-            if(arg.type) //events do not have a field
+            auto val = dynamic_cast<const std::remove_pointer_t<decltype(arg.value)>*>(&fieldValue);
+            if(arg.value) //events do not have a field
             {
                 if(!val){
-                    System::the->error("Invalid type (%s) for %s field.\n",
+                    System::the->error("Invalid VrmlType (%s) for %s field.\n",
                         fieldValue.fieldTypeName(), fieldName);
                     return;
                 }
-                *arg.type = *val;
+                *arg.value = *val;
             }
             arg.initialized = true;
             if(arg.updateCb){
@@ -177,8 +162,8 @@ public:
     }
     
     template<typename VrmlType>
-    void registerField(const std::string& name, VrmlType *field, const std::function<void()> &updateCb =  std::function<void()>{}){
-        m_fields[name] = VrmlTypeStruct{ field, false, updateCb};
+    void registerField(const std::string& name, VrmlType *field, const VrmlNodeTemplate::FieldUpdateCallback<VrmlType> &updateCb = VrmlNodeTemplate::FieldUpdateCallback<VrmlType>{}){
+        m_fields[name] = VrmlTypeStruct<VrmlType>{ field, false, updateCb};
     }
 
     bool initialized(const std::string& name){
@@ -189,28 +174,24 @@ public:
         std::visit([](auto&& arg){
             return arg.initialized;
         }, it->second);
+        return false;
     }
 
     bool allInitialized(){
+        bool retval = true;
         for(auto& [name, field] : m_fields){
-            std::visit([](auto&& arg){
+            std::visit([&retval](auto&& arg){
                 if(!arg.initialized){
-                    return false;
+                    retval = false;
                 }
             }, field);
         }
-        return true;
+        return retval;
     }
 
     template<typename VrmlType>
     VrmlType* copy(const VrmlType* other){
         return new VrmlType(*other);
-    }
-
-    template<>
-    VrmlField* copy(const VrmlField* other){
-        assert(!("can not copy abstract VrmlField"));
-        return nullptr;
     }
 
     // use new pointers with this inital values of other
@@ -219,7 +200,7 @@ public:
     {
         for(auto& [name, field] : m_fields){
             std::visit([this, &field](auto&& arg){
-                arg.type = copy(arg.type);
+                arg.value = copy(arg.value);
             }, field);
         }
     }
@@ -233,7 +214,7 @@ public:
         for(auto& [name, field] : m_fields){
             os << std::string(indent, ' ') << name << " : ";
             std::visit([&os](auto&& arg){
-                os << *arg.type;
+                os << *arg.value;
             }, field);
             os << std::endl;
         }
@@ -241,17 +222,28 @@ public:
     }
 };
 
+template<>
+VrmlField* VrmlNodeUpdateRegistry::copy(const VrmlField* other){
+    assert(!("can not copy abstract VrmlField"));
+    return nullptr;
+}
+
 std::map<std::string, VrmlNodeTemplate::Constructors> VrmlNodeTemplate::m_constructors;
 
 VrmlNodeTemplate::VrmlNodeTemplate(VrmlScene *scene, const std::string &name)
 : VrmlNode(scene)
 , m_constructor(m_constructors.find(name)) 
-, m_impl(std::make_unique<VrmlNodeUpdateRegistry>(this)) {}
+, m_impl(std::make_unique<VrmlNodeUpdateRegistry>(this)) {
+    assert(m_constructor != m_constructors.end());
+}
 
 // use new pointers with this inital values of other
 VrmlNodeTemplate::VrmlNodeTemplate(const VrmlNodeTemplate& other)
 : VrmlNode(other)
-, m_impl(std::make_unique<VrmlNodeUpdateRegistry>(*other.m_impl)) {}
+, m_impl(std::make_unique<VrmlNodeUpdateRegistry>(*other.m_impl))
+, m_constructor(other.m_constructor) {
+    assert(m_constructor != m_constructors.end());
+}
 
 VrmlNodeTemplate::~VrmlNodeTemplate() = default;
 
@@ -297,7 +289,7 @@ void VrmlNodeTemplate::setFieldByName(const char *fieldName, const VrmlField &fi
 
 
 template<typename VrmlType>
-void VrmlNodeTemplate::registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType *field, const std::function<void()> &updateCb)
+void VrmlNodeTemplate::registerField(VrmlNodeTemplate *node, const std::string& name, VrmlType *field, const FieldUpdateCallback<VrmlType> &updateCb)
 {
     return node->m_impl->registerField<VrmlType>(name, field, updateCb);
 }
@@ -348,28 +340,28 @@ void VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType
         t->addEventOut(field.name.c_str(), toEnumType<VrmlType>());
 }
 
-#define VRMLNODECHILD2_TEMPLATE_IMPL(type) \
-template void VRMLEXPORT VrmlNodeTemplate::registerField<type>(VrmlNodeTemplate *node, const std::string& name, type *field, const std::function<void()> &updateCb);
+#define VRMLNODECHILD2_TEMPLATE_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNodeTemplate::registerField<VrmlType>(VrmlNodeTemplate *node, const std::string& name, VrmlType *field, const FieldUpdateCallback<VrmlType> &updateCb);
 FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_IMPL)
 
-#define TO_VRML_FIELD_TYPES_IMPL(type) \
-template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const type *t);
+#define TO_VRML_FIELD_TYPES_IMPL(VrmlType) \
+template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const VrmlType *t);
 FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_IMPL)
 
-#define INIT_FIELDS_HELPER_IMPL(type) \
-template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Private> &field); 
+#define INIT_FIELDS_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Private> &field); 
 FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
 
-#define INIT_EXPOSED_FIELDS_HELPER_IMPL(type) \
-template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::Exposed> &field); 
+#define INIT_EXPOSED_FIELDS_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Exposed> &field); 
 FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_IMPL)
 
-#define INIT_EVENT_IN_HELPER_IMPL(type) \
-template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::EventIn> &field); 
+#define INIT_EVENT_IN_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventIn> &field); 
 FOR_ALL_VRML_TYPES(INIT_EVENT_IN_HELPER_IMPL)
 
-#define INIT_EVENT_OUT_HELPER_IMPL(type) \
-template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<type, FieldAccessibility::EventOut> &field); 
+#define INIT_EVENT_OUT_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNodeTemplate::initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventOut> &field); 
 FOR_ALL_VRML_TYPES(INIT_EVENT_OUT_HELPER_IMPL)
 
 
