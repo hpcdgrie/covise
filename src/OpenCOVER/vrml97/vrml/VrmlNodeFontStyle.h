@@ -34,8 +34,6 @@ public:
 
     VrmlNodeFontStyle(VrmlScene *);
 
-    virtual VrmlNodeFontStyle *toFontStyle() const;
-
     VrmlMFString &justify()
     {
         return d_justify;

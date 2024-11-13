@@ -73,11 +73,6 @@ void VrmlNodeAppearance::cloneChildren(VrmlNamespace *ns)
     }
 }
 
-VrmlNodeAppearance *VrmlNodeAppearance::toAppearance() const
-{
-    return (VrmlNodeAppearance *)this;
-}
-
 bool VrmlNodeAppearance::isModified() const
 {
     bool modified =d_modified || (d_material.get() && d_material.get()->isModified());
@@ -145,7 +140,7 @@ void VrmlNodeAppearance::copyRoutes(VrmlNamespace *ns)
 
 void VrmlNodeAppearance::render(Viewer *viewer)
 {
-    VrmlNodeMaterial *m = d_material.get() ? d_material.get()->toMaterial() : 0;
+    VrmlNodeMaterial *m = d_material.get() ? d_material.get()->as<VrmlNodeMaterial>() : 0;
     if (m)
     {
         float trans = m->transparency();
@@ -192,7 +187,7 @@ void VrmlNodeAppearance::render(Viewer *viewer)
             else
                 viewer->setTextureTransform(0, 0, 0, 0);
         }
-        auto t = d_textures[i].get()->toTexture();
+        auto t = d_textures[i].get()->as<VrmlNodeTexture>();
         if(i == 0)
             t->setAppearance(this);
         // MAYBE something must be done here for multi-texturing to work correctly

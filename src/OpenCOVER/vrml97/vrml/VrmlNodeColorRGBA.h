@@ -33,8 +33,6 @@ public:
 
     VrmlNodeColorRGBA(VrmlScene *);
 
-    virtual VrmlNodeColorRGBA *toColorRGBA() const;
-
     VrmlMFColorRGBA &color()
     {
         return d_color;

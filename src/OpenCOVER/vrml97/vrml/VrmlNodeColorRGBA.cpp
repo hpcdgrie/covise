@@ -33,8 +33,3 @@ VrmlNodeColorRGBA::VrmlNodeColorRGBA(VrmlScene *scene)
     : VrmlNodeTemplate(scene, name())
 {
 }
-
-VrmlNodeColorRGBA *VrmlNodeColorRGBA::toColorRGBA() const
-{
-    return (VrmlNodeColorRGBA *)this;
-}

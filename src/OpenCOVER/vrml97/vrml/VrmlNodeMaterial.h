@@ -32,8 +32,6 @@ public:
 
     VrmlNodeMaterial(VrmlScene *);
 
-    virtual VrmlNodeMaterial *toMaterial() const;
-
     virtual void render(Viewer *);
 
     float ambientIntensity()

@@ -28,8 +28,6 @@ public:
     static void initFields(VrmlNodeChild *node, VrmlNodeType *t);
     VrmlNodeChild(VrmlScene *scene, const std::string& name);
 
-    virtual VrmlNodeChild *toChild() const;
-
 };
 
 }

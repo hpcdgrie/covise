@@ -309,8 +309,3 @@ const VrmlMFInt &VrmlNodeIFaceSet::getTexCoordIndex10() const
 {
     return d_texCoordIndices[9];
 }
-
-VrmlNodeIFaceSet *VrmlNodeIFaceSet::toIFaceSet() const
-{
-    return (VrmlNodeIFaceSet *)this;
-}

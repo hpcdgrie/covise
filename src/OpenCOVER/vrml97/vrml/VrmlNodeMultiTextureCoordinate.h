@@ -35,8 +35,6 @@ public:
 
     virtual void copyRoutes(VrmlNamespace *ns);
 
-    VrmlNodeMultiTextureCoordinate *toMultiTextureCoordinate() const override;
-
     VrmlMFNode &texCoord()
     {
         return d_texCoord;

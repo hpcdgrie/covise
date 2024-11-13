@@ -197,11 +197,6 @@ void VrmlNodeScript::copyRoutes(VrmlNamespace *ns)
     nodeStack.pop_front();
 }
 
-VrmlNodeScript *VrmlNodeScript::toScript() const
-{
-    return (VrmlNodeScript *)this;
-}
-
 void VrmlNodeScript::addToScene(VrmlScene *s, const char *relUrl)
 {
     System::the->debug("VrmlNodeScript::%s 0x%llx addToScene 0x%llx\n",

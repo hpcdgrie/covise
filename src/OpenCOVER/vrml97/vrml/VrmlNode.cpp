@@ -22,6 +22,8 @@
 #include "VrmlScene.h"
 #include "MathUtils.h"
 #include "coEventQueue.h"
+#include "VrmlNodeMetadataNumeric.h"
+#include "VrmlNodeMetadataSet.h"
 #include <stdio.h>
 
 using std::cerr;
@@ -205,125 +207,6 @@ void VrmlNode::addToScene(VrmlScene *scene, const char * /* relativeUrl */)
 {
     d_scene = scene;
 }
-
-// Node type tests
-
-VrmlNodeAnchor *VrmlNode::toAnchor() const { return 0; }
-VrmlNodeAppearance *VrmlNode::toAppearance() const { return 0; }
-VrmlNodeWave *VrmlNode::toWave() const { return 0; }
-VrmlNodeBumpMapping *VrmlNode::toBumpMapping() const { return 0; }
-VrmlNodeAudioClip *VrmlNode::toAudioClip() const { return 0; }
-VrmlNodeBackground *VrmlNode::toBackground() const { return 0; }
-VrmlNodeBooleanSequencer *VrmlNode::toBooleanSequencer() const { return 0; }
-VrmlNodeBox *VrmlNode::toBox() const //LarryD Mar 08/99
-{
-    return 0;
-}
-
-VrmlNodeChild *VrmlNode::toChild() const { return 0; }
-VrmlNodeColor *VrmlNode::toColor() const { return 0; }
-VrmlNodeColorRGBA *VrmlNode::toColorRGBA() const { return 0; }
-VrmlNodeCone *VrmlNode::toCone() const //LarryD Mar 08/99
-{
-    return 0;
-}
-
-VrmlNodeCoordinate *VrmlNode::toCoordinate() const { return 0; }
-VrmlNodeCylinder *VrmlNode::toCylinder() const //LarryD Mar 08/99
-{
-    return 0;
-}
-
-VrmlNodeDirLight *VrmlNode::toDirLight() const //LarryD Mar 04/99
-{
-    return 0;
-}
-
-//LarryD Mar 09/99
-VrmlNodeElevationGrid *VrmlNode::toElevationGrid() const
-{
-    return 0;
-}
-
-//LarryD Mar 09/99
-VrmlNodeExtrusion *VrmlNode::toExtrusion() const
-{
-    return 0;
-}
-
-VrmlNodeFog *VrmlNode::toFog() const { return 0; }
-VrmlNodeFontStyle *VrmlNode::toFontStyle() const { return 0; }
-VrmlNodeGeometry *VrmlNode::toGeometry() const { return 0; }
-VrmlNodeGroup *VrmlNode::toGroup() const { return 0; }
-VrmlNodeIFaceSet *VrmlNode::toIFaceSet() const { return 0; }
-VrmlNodeIQuadSet *VrmlNode::toIQuadSet() const { return 0; }
-VrmlNodeITriangleFanSet *VrmlNode::toITriangleFanSet() const { return 0; }
-VrmlNodeITriangleSet *VrmlNode::toITriangleSet() const { return 0; }
-VrmlNodeITriangleStripSet *VrmlNode::toITriangleStripSet() const { return 0; }
-VrmlNodeInline *VrmlNode::toInline() const { return 0; }
-VrmlNodeLight *VrmlNode::toLight() const { return 0; }
-VrmlNodeMaterial *VrmlNode::toMaterial() const { return 0; }
-VrmlNodeMetadataBoolean *VrmlNode::toMetadataBoolean() const { return 0; }
-VrmlNodeMetadataDouble *VrmlNode::toMetadataDouble() const { return 0; }
-VrmlNodeMetadataFloat *VrmlNode::toMetadataFloat() const { return 0; }
-VrmlNodeMetadataInteger *VrmlNode::toMetadataInteger() const { return 0; }
-VrmlNodeMetadataSet *VrmlNode::toMetadataSet() const { return 0; }
-VrmlNodeMetadataString *VrmlNode::toMetadataString() const { return 0; }
-VrmlNodeMovieTexture *VrmlNode::toMovieTexture() const { return 0; }
-VrmlNodeMultiTexture *VrmlNode::toMultiTexture() const { return 0; }
-VrmlNodeMultiTextureCoordinate *VrmlNode::toMultiTextureCoordinate() const { return 0; }
-VrmlNodeMultiTextureTransform *VrmlNode::toMultiTextureTransform() const { return 0; }
-VrmlNodeNavigationInfo *VrmlNode::toNavigationInfo() const { return 0; }
-VrmlNodeCOVER *VrmlNode::toCOVER() const { return 0; }
-VrmlNodeNormal *VrmlNode::toNormal() const { return 0; }
-VrmlNodePlaneSensor *VrmlNode::toPlaneSensor() const { return 0; }
-VrmlNodeSpaceSensor *VrmlNode::toSpaceSensor() const { return 0; }
-VrmlNodeARSensor *VrmlNode::toARSensor() const { return 0; }
-VrmlNodePointLight *VrmlNode::toPointLight() const { return 0; }
-VrmlNodeProximitySensor *VrmlNode::toProximitySensor() const { return 0; }
-VrmlNodeQuadSet *VrmlNode::toQuadSet() const { return 0; }
-VrmlNodeScript *VrmlNode::toScript() const { return 0; }
-VrmlNodeShape *VrmlNode::toShape() const { return 0; }
-VrmlNodeSound *VrmlNode::toSound() const { return 0; }
-VrmlNodeSphere *VrmlNode::toSphere() const //LarryD Mar 08/99
-{
-    return 0;
-}
-
-VrmlNodeSpotLight *VrmlNode::toSpotLight() const { return 0; }
-VrmlNodeSwitch *VrmlNode::toSwitch() const //LarryD Mar 08/99
-{
-    return 0;
-}
-
-VrmlNodeTexture *VrmlNode::toTexture() const { return 0; }
-VrmlNodeTextureCoordinate *VrmlNode::toTextureCoordinate() const { return 0; }
-VrmlNodeTextureCoordinateGenerator *VrmlNode::toTextureCoordinateGenerator() const { return 0; }
-VrmlNodeTextureTransform *VrmlNode::toTextureTransform() const { return 0; }
-VrmlNodeTimeSensor *VrmlNode::toTimeSensor() const { return 0; }
-VrmlNodeTouchSensor *VrmlNode::toTouchSensor() const { return 0; }
-VrmlNodeTriangleFanSet *VrmlNode::toTriangleFanSet() const { return 0; }
-VrmlNodeTriangleSet *VrmlNode::toTriangleSet() const { return 0; }
-VrmlNodeTriangleStripSet *VrmlNode::toTriangleStripSet() const { return 0; }
-VrmlNodeCylinderSensor *VrmlNode::toCylinderSensor() const { return 0; }
-VrmlNodeSphereSensor *VrmlNode::toSphereSensor() const { return 0; }
-VrmlNodeTransform *VrmlNode::toTransform() const //LarryD Feb 24/99
-{
-    return 0;
-}
-
-VrmlNodeViewpoint *VrmlNode::toViewpoint() const { return 0; }
-
-VrmlNodeImageTexture *VrmlNode::toImageTexture() const { return 0; }
-VrmlNodeCubeTexture *VrmlNode::toCubeTexture() const { return 0; }
-VrmlNodePixelTexture *VrmlNode::toPixelTexture() const { return 0; }
-
-VrmlNodeLOD *VrmlNode::toLOD() const { return 0; }
-VrmlNodeScalarInt *VrmlNode::toScalarInt() const { return 0; }
-VrmlNodeOrientationInt *VrmlNode::toOrientationInt() const { return 0; }
-VrmlNodePositionInt *VrmlNode::toPositionInt() const { return 0; }
-
-VrmlNodeProto *VrmlNode::toProto() const { return 0; }
 
 // Routes
 
@@ -582,6 +465,11 @@ void VrmlNode::setModified()
     forceTraversal();
 }
 
+void VrmlNode::clearModified()
+{
+    d_modified = false;
+}
+
 bool VrmlNode::haveToRender()
 {
     return true;
@@ -767,7 +655,7 @@ void VrmlNode::eventIn(double timeStamp,
         setField(eventName, *fieldValue);
         setModified();
     }
-    else if (auto scriptNode = toScript())
+    else if (auto scriptNode = as<VrmlNodeScript>())
     {
         if (scriptNode->hasExposedField(eventName))
         {
@@ -886,13 +774,23 @@ std::ostream &VrmlNode::printField(std::ostream &os,
 
 void VrmlNode::setField(const char *fieldName, const VrmlField &fieldValue)
 {
-    if
-        TRY_SFNODE_FIELD6(metadata, MetadataBoolean,
-                          MetadataDouble,
-                          MetadataFloat,
-                          MetadataInteger,
-                          MetadataSet,
-                          MetadataString)
+    auto metaTypes = {"MetadataBoolean", "MetadataDouble", "MetadataFloat", "MetadataInteger", "MetadataSet", "MetadataString"};
+    if (strcmp(fieldName, "metaData") == 0)
+    {
+        const VrmlSFNode *x = fieldValue.toSFNode();
+        if(x && x->get() && x->get()->is<VrmlNodeMetadataBoolean,
+                                         VrmlNodeMetadataDouble,
+                                         VrmlNodeMetadataFloat,
+                                         VrmlNodeMetadataInteger,
+                                         VrmlNodeMetadataSet,
+                                         VrmlNodeMetadataString>())
+                                         {
+                                            d_metadata = *x;
+                                         } else {
+                                             System::the->error("Invalid type (%s) for %s field of %s node (expected Metadata*).\n",
+                                             fieldValue.fieldTypeName(), fieldName, nodeType()->getName());
+                                         }
+    } 
     else
         System::the->error("%s::setField: no such field (%s)\n",
                            nodeType()->getName(), fieldName);
@@ -931,8 +829,8 @@ const VrmlField *VrmlNode::getEventOut(const char *fieldName) const
         strncpy(shortName, fieldName, sizeof(shortName));
         shortName[255] = '\0';
     }
-    VrmlNodeScript *scriptNode;
-    if ((scriptNode = toScript()))
+    const VrmlNodeScript *scriptNode;
+    if ((scriptNode = as<VrmlNodeScript>()))
     {
         // Handle exposedFields
         if (scriptNode->hasExposedField(shortName))
@@ -967,11 +865,6 @@ void VrmlNodeChild::initFields(VrmlNodeChild *node, VrmlNodeType *t)
 VrmlNodeChild::VrmlNodeChild(VrmlScene *scene, const std::string& name)
     : VrmlNodeTemplate(scene, name)
 {
-}
-
-VrmlNodeChild *VrmlNodeChild::toChild() const
-{
-    return (VrmlNodeChild *)this; // discards const...
 }
 
 #endif

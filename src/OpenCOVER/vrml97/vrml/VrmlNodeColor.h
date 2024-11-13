@@ -33,8 +33,6 @@ public:
 
     VrmlNodeColor(VrmlScene *);
 
-    virtual VrmlNodeColor *toColor() const;
-
     VrmlMFColor &color()
     {
         return d_color;

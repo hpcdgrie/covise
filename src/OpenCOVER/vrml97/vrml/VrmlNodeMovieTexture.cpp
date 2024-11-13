@@ -84,11 +84,6 @@ VrmlNodeMovieTexture::~VrmlNodeMovieTexture()
     delete d_image;
 }
 
-VrmlNodeMovieTexture *VrmlNodeMovieTexture::toMovieTexture() const
-{
-    return (VrmlNodeMovieTexture *)this;
-}
-
 void VrmlNodeMovieTexture::addToScene(VrmlScene *s, const char *rel)
 {
     if (d_scene != s && (d_scene = s) != 0)

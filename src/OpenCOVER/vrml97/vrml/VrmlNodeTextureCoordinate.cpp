@@ -31,8 +31,3 @@ VrmlNodeTextureCoordinate::VrmlNodeTextureCoordinate(VrmlScene *scene)
     : VrmlNodeTemplate(scene, name())
 {
 }
-
-VrmlNodeTextureCoordinate *VrmlNodeTextureCoordinate::toTextureCoordinate() const
-{
-    return (VrmlNodeTextureCoordinate *)this;
-}

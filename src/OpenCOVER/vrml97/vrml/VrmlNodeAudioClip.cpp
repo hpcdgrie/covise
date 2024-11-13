@@ -130,11 +130,6 @@ void VrmlNodeAudioClip::addToScene(VrmlScene *s, const char *rel)
         d_relativeUrl.set(rel);
 }
 
-VrmlNodeAudioClip *VrmlNodeAudioClip::toAudioClip() const
-{
-    return (VrmlNodeAudioClip *)this;
-}
-
 const Audio *VrmlNodeAudioClip::getAudio() const
 {
     return d_audio;

@@ -116,11 +116,6 @@ void VrmlNodeBooleanSequencer::eventIn(double timeStamp, const char *eventName,
     }
 }
 
-VrmlNodeBooleanSequencer *VrmlNodeBooleanSequencer::toBooleanSequencer() const
-{
-    return (VrmlNodeBooleanSequencer *)this;
-}
-
 const VrmlMFFloat &VrmlNodeBooleanSequencer::getKey() const
 {
     return d_key;

@@ -32,8 +32,6 @@ public:
 
     VrmlNodeGeometry(VrmlScene *, const std::string &name);
 
-    VrmlNodeGeometry *toGeometry() const override;
-
     // Geometry nodes need only define insertGeometry(), not render().
     virtual void render(Viewer *) override;
 

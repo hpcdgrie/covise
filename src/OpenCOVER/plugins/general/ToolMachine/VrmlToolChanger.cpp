@@ -35,7 +35,7 @@ ToolChangerNode::~ToolChangerNode()
 
 osg::MatrixTransform *toOsg(VrmlNode *node)
 {
-    auto g = node->toGroup();
+    auto g = node->as<VrmlNodeGroup>();
     if(!g)
         return nullptr;
     auto vo = g->getViewerObject();

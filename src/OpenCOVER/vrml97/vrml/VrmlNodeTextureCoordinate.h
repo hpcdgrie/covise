@@ -31,8 +31,6 @@ public:
 
     VrmlNodeTextureCoordinate(VrmlScene *);
 
-    VrmlNodeTextureCoordinate *toTextureCoordinate() const override;
-
     VrmlMFVec2f &coordinate()
     {
         return d_point;

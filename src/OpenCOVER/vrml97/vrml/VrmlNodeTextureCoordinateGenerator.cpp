@@ -34,8 +34,3 @@ VrmlNodeTextureCoordinateGenerator::VrmlNodeTextureCoordinateGenerator(VrmlScene
     , d_mode("SPHERE")
 {
 }
-
-VrmlNodeTextureCoordinateGenerator *VrmlNodeTextureCoordinateGenerator::toTextureCoordinateGenerator() const
-{
-    return (VrmlNodeTextureCoordinateGenerator *)this;
-}

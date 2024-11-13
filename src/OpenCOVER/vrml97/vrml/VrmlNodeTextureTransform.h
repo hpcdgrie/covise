@@ -34,8 +34,6 @@ public:
 
     VrmlNodeTextureTransform(VrmlScene *);
 
-    VrmlNodeTextureTransform *toTextureTransform() const override;
-
     virtual void render(Viewer *);
 
 

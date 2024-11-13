@@ -30,12 +30,6 @@ const VrmlMFString &VrmlNodeImageTexture::getUrl() const
     return d_url;
 }
 
-VrmlNodeImageTexture *VrmlNodeImageTexture::toImageTexture() const
-{
-    return (VrmlNodeImageTexture *)this;
-}
-
-
 void VrmlNodeImageTexture::initFields(VrmlNodeImageTexture *node, VrmlNodeType *t)
 {
     VrmlNodeTexture::initFields(node, t);

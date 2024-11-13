@@ -44,8 +44,6 @@ public:
 
     VrmlNodeTexture(VrmlScene *s, const std::string &name);
 
-    virtual VrmlNodeTexture *toTexture() const;
-
     virtual int nComponents() = 0;
     virtual int width() = 0;
     virtual int height() = 0;

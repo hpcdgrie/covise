@@ -168,11 +168,6 @@ void VrmlNodeLOD::render(Viewer *viewer)
     viewer->endObject();
 }
 
-VrmlNodeLOD *VrmlNodeLOD::toLOD() const
-{
-    return (VrmlNodeLOD *)this;
-}
-
 const VrmlMFFloat &VrmlNodeLOD::getRange() const
 {
     return d_range;

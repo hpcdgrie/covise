@@ -38,8 +38,6 @@ public:
 
     virtual void copyRoutes(VrmlNamespace *ns);
 
-    virtual VrmlNodeMultiTextureTransform *toMultiTextureTransform() const;
-
     virtual void render(Viewer *, int numberTexture);
 
 private:

@@ -81,11 +81,6 @@ VrmlNodeViewpoint::~VrmlNodeViewpoint()
         d_scene->removeViewpoint(this);
 }
 
-VrmlNodeViewpoint *VrmlNodeViewpoint::toViewpoint() const
-{
-    return (VrmlNodeViewpoint *)this;
-}
-
 void VrmlNodeViewpoint::addToScene(VrmlScene *s, const char *)
 {
     if (d_scene != s && (d_scene = s) != 0)

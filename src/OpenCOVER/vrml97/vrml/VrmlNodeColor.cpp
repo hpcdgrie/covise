@@ -30,8 +30,3 @@ VrmlNodeColor::VrmlNodeColor(VrmlScene *scene)
     : VrmlNodeTemplate(scene, name())
 {
 }
-
-VrmlNodeColor *VrmlNodeColor::toColor() const
-{
-    return (VrmlNodeColor *)this;
-}

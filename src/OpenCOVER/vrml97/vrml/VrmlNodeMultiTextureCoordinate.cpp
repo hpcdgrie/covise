@@ -65,8 +65,3 @@ void VrmlNodeMultiTextureCoordinate::copyRoutes(VrmlNamespace *ns)
     }
     nodeStack.pop_front();
 }
-
-VrmlNodeMultiTextureCoordinate *VrmlNodeMultiTextureCoordinate::toMultiTextureCoordinate() const
-{
-    return (VrmlNodeMultiTextureCoordinate *)this;
-}

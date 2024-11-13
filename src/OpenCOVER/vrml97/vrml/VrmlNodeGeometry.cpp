@@ -29,11 +29,6 @@ VrmlNodeGeometry::VrmlNodeGeometry(VrmlScene *s, const std::string &name)
 {
 }
 
-VrmlNodeGeometry *VrmlNodeGeometry::toGeometry() const
-{
-    return (VrmlNodeGeometry *)this;
-}
-
 VrmlNodeColor *VrmlNodeGeometry::color() { return 0; }
 
 bool VrmlNodeGeometry::isOnlyGeometry() const

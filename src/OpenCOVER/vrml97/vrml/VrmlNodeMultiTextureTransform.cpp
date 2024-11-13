@@ -48,11 +48,6 @@ VrmlNodeMultiTextureTransform::~VrmlNodeMultiTextureTransform()
     }
 }
 
-VrmlNodeMultiTextureTransform *VrmlNodeMultiTextureTransform::toMultiTextureTransform() const
-{
-    return (VrmlNodeMultiTextureTransform *)this;
-}
-
 void VrmlNodeMultiTextureTransform::render(Viewer *viewer, int numberTexture)
 {
     d_textureTransform[numberTexture]->render(viewer);

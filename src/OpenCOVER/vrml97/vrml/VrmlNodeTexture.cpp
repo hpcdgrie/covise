@@ -44,9 +44,4 @@ VrmlNodeTexture::VrmlNodeTexture(VrmlScene *s, const std::string &name)
     d_blendModeOverwrite = -1;
 }
 
-VrmlNodeTexture *VrmlNodeTexture::toTexture() const
-{
-    return (VrmlNodeTexture *)this;
-}
-
 }

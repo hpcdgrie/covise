@@ -154,8 +154,3 @@ void VrmlNodeSwitch::accumulateTransform(VrmlNode *parent)
         kid->accumulateTransform(parent);
     }
 }
-
-VrmlNodeSwitch *VrmlNodeSwitch::toSwitch() const //LarryD
-{
-    return (VrmlNodeSwitch *)this;
-}

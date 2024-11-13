@@ -79,11 +79,6 @@ VrmlNodeTimeSensor::~VrmlNodeTimeSensor()
         d_scene->removeTimeSensor(this);
 }
 
-VrmlNodeTimeSensor *VrmlNodeTimeSensor::toTimeSensor() const
-{
-    return (VrmlNodeTimeSensor *)this;
-}
-
 void VrmlNodeTimeSensor::addToScene(VrmlScene *s, const char *)
 {
     if (d_scene != s && (d_scene = s) != 0)

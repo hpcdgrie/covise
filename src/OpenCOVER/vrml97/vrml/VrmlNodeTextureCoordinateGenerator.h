@@ -32,8 +32,6 @@ public:
 
     VrmlNodeTextureCoordinateGenerator(VrmlScene *);
 
-    VrmlNodeTextureCoordinateGenerator *toTextureCoordinateGenerator() const override;
-
 private:
     VrmlSFString d_mode;
     VrmlMFFloat d_parameter;

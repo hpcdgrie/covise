@@ -31,8 +31,6 @@ public:
 
     VrmlNodeCoordinate(VrmlScene *);
 
-    virtual VrmlNodeCoordinate *toCoordinate() const;
-
     VrmlMFVec3f &coordinate()
     {
         return d_point;

@@ -107,8 +107,3 @@ void VrmlNodeMetadataSet::copyRoutes(VrmlNamespace *ns)
             d_value[i]->copyRoutes(ns);
     nodeStack.pop_front();
 }
-
-VrmlNodeMetadataSet *VrmlNodeMetadataSet::toMetadataSet() const
-{
-    return (VrmlNodeMetadataSet *)this;
-}

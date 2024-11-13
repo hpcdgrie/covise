@@ -101,11 +101,6 @@ void VrmlNodePositionInt::eventIn(double timeStamp,
     }
 }
 
-VrmlNodePositionInt *VrmlNodePositionInt::toPositionInt() const
-{
-    return (VrmlNodePositionInt *)this;
-}
-
 const VrmlMFFloat &VrmlNodePositionInt::getKey() const
 {
     return d_key;

@@ -315,11 +315,6 @@ void VrmlNodeCOVER::update(double timeNow)
     eventOut(timeNow, "localViewerOrientation", d_localViewerOrientation);
 }
 
-VrmlNodeCOVER *VrmlNodeCOVER::toCOVER() const
-{
-    return (VrmlNodeCOVER *)this;
-}
-
 void VrmlNodeCOVER::addToScene(VrmlScene *s, const char *)
 {
     d_scene = s;

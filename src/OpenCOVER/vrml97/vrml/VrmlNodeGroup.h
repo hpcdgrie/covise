@@ -40,8 +40,6 @@ public:
     virtual VrmlNode *cloneMe() const override;
     virtual void cloneChildren(VrmlNamespace *) override;
 
-    virtual VrmlNodeGroup *toGroup() const override;
-
     virtual bool isModified() const override;
     virtual void clearFlags() override;
 

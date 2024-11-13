@@ -30,11 +30,6 @@ VrmlNodeCoordinate::VrmlNodeCoordinate(VrmlScene *scene)
 {
 }
 
-VrmlNodeCoordinate *VrmlNodeCoordinate::toCoordinate() const
-{
-    return (VrmlNodeCoordinate *)this;
-}
-
 int VrmlNodeCoordinate::getNumberCoordinates()
 {
     if (d_point.get())

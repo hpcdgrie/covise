@@ -31,8 +31,6 @@ public:
 
     VrmlNodeNormal(VrmlScene *);
 
-    VrmlNodeNormal *toNormal() const override;
-
     VrmlMFVec3f &normal()
     {
         return d_vector;

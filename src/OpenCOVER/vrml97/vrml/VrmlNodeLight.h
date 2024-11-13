@@ -33,8 +33,6 @@ public:
     
     VrmlNodeLight(VrmlScene *, const std::string &name);
 
-    virtual VrmlNodeLight *toLight() const;
-
     virtual void render(Viewer *);
 
     virtual float getAmbientIntensity() //LarryD Mar 04/99

@@ -47,8 +47,6 @@ public:
     // an update. Renderable nodes need to redefine this.
     virtual void update(VrmlSFTime &now);
 
-    virtual VrmlNodeAudioClip *toAudioClip() const;
-
     const Audio *getAudio() const;
 
     bool isAudible(VrmlSFTime &now) const;

@@ -28,8 +28,3 @@ VrmlNodeNormal::VrmlNodeNormal(VrmlScene *scene)
     : VrmlNodeTemplate(scene, name())
 {
 }
-
-VrmlNodeNormal *VrmlNodeNormal::toNormal() const
-{
-    return (VrmlNodeNormal *)this;
-}

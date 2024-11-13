@@ -106,11 +106,6 @@ void VrmlNodeScalarInt::eventIn(double timeStamp,
     }
 }
 
-VrmlNodeScalarInt *VrmlNodeScalarInt::toScalarInt() const
-{
-    return (VrmlNodeScalarInt *)this;
-}
-
 const VrmlMFFloat &VrmlNodeScalarInt::getKey() const
 {
     return d_key;

@@ -75,6 +75,7 @@ public:
     vrml::VrmlNode *cloneMe() const override;
     vrml::VrmlNodeType *nodeType() const override;
 
+
 private:
     std::unique_ptr<VrmlNodeUpdateRegistry> m_impl;
     struct Constructors{
@@ -86,7 +87,7 @@ private:
     const std::map<std::string, Constructors>::const_iterator m_constructor;
 
     void setField(const char *fieldName, const VrmlField &fieldValue) override;
-    
+
 protected:
 
     enum FieldAccessibility{

@@ -39,8 +39,6 @@ public:
 
     virtual void clearFlags() override;
 
-    virtual VrmlNodeShape *toShape() const override;
-
     virtual void addToScene(VrmlScene *s, const char *relUrl) override;
 
     virtual void copyRoutes(VrmlNamespace *ns) override;

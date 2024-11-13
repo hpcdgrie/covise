@@ -45,11 +45,6 @@ VrmlNodeMaterial::VrmlNodeMaterial(VrmlScene *scene)
 {
 }
 
-VrmlNodeMaterial *VrmlNodeMaterial::toMaterial() const
-{
-    return (VrmlNodeMaterial *)this;
-}
-
 // This currently isn't used - see VrmlNodeAppearance.cpp.
 
 void VrmlNodeMaterial::render(Viewer *viewer)

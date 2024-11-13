@@ -37,83 +37,6 @@ class VrmlNodeType;
 class VrmlField;
 class VrmlScene;
 
-// For the safe downcasts
-class VrmlNodeAnchor;
-class VrmlNodeAppearance;
-class VrmlNodeWave;
-class VrmlNodeBumpMapping;
-class VrmlNodeAudioClip;
-class VrmlNodeBackground;
-class VrmlNodeBox; //LarryD Mar 08/99
-class VrmlNodeBooleanSequencer;
-class VrmlNodeChild;
-class VrmlNodeColor;
-class VrmlNodeColorRGBA;
-class VrmlNodeCone; //LarryD Mar 08/99
-class VrmlNodeCoordinate;
-class VrmlNodeCylinder; //LarryD Mar 08/99
-class VrmlNodeDirLight; //LarryD Mar 08/99
-class VrmlNodeElevationGrid; //LarryD Mar 09/99
-class VrmlNodeExtrusion; //LarryD Mar 09/99
-class VrmlNodeFog;
-class VrmlNodeFontStyle;
-class VrmlNodeGeometry;
-class VrmlNodeGroup;
-class VrmlNodeIFaceSet;
-class VrmlNodeIQuadSet;
-class VrmlNodeITriangleFanSet;
-class VrmlNodeITriangleSet;
-class VrmlNodeITriangleStripSet;
-class VrmlNodeInline;
-class VrmlNodeLight;
-class VrmlNodeMaterial;
-class VrmlNodeMetadataBoolean;
-class VrmlNodeMetadataDouble;
-class VrmlNodeMetadataFloat;
-class VrmlNodeMetadataInteger;
-class VrmlNodeMetadataSet;
-class VrmlNodeMetadataString;
-class VrmlNodeMovieTexture;
-class VrmlNodeMultiTexture;
-class VrmlNodeMultiTextureCoordinate;
-class VrmlNodeMultiTextureTransform;
-class VrmlNodeNavigationInfo;
-class VrmlNodeCOVER;
-class VrmlNodeNormal;
-class VrmlNodePlaneSensor;
-class VrmlNodeSpaceSensor;
-class VrmlNodeARSensor;
-class VrmlNodePointLight;
-class VrmlNodeProximitySensor;
-class VrmlNodeQuadSet;
-class VrmlNodeScript;
-class VrmlNodeShape;
-class VrmlNodeSphere; //LarryD Mar 08/99
-class VrmlNodeSound;
-class VrmlNodeSpotLight;
-class VrmlNodeSwitch;
-class VrmlNodeTexture;
-class VrmlNodeTextureCoordinate;
-class VrmlNodeTextureCoordinateGenerator;
-class VrmlNodeTextureTransform;
-class VrmlNodeTimeSensor;
-class VrmlNodeTouchSensor;
-class VrmlNodeTriangleFanSet;
-class VrmlNodeTriangleSet;
-class VrmlNodeTriangleStripSet;
-class VrmlNodeSphereSensor;
-class VrmlNodeCylinderSensor;
-class VrmlNodeTransform;
-class VrmlNodeViewpoint;
-class VrmlNodeImageTexture;
-class VrmlNodeCubeTexture;
-class VrmlNodePixelTexture;
-class VrmlNodeLOD;
-class VrmlNodeScalarInt;
-class VrmlNodeOrientationInt;
-class VrmlNodePositionInt;
-
-class VrmlNodeProto;
 
 class VRMLEXPORT VrmlNode
 {
@@ -150,94 +73,18 @@ public:
     VrmlNode *reference();
     void dereference();
 
-    // Safe node downcasts. These avoid the dangerous casts of VrmlNode* (esp in
-    // presence of protos), but are ugly in that this class must know about all
-    // the subclasses. These return 0 if the typecast is invalid.
-    // Remember to also add new ones to VrmlNodeProto. Protos should
-    // return their first implementation node (except toProto()).
-    virtual VrmlNodeAnchor *toAnchor() const;
-    virtual VrmlNodeAppearance *toAppearance() const;
-    virtual VrmlNodeWave *toWave() const;
-    virtual VrmlNodeBumpMapping *toBumpMapping() const;
-    virtual VrmlNodeAudioClip *toAudioClip() const;
-    virtual VrmlNodeBackground *toBackground() const;
-    virtual VrmlNodeBox *toBox() const; //LarryD Mar 08/99
-    virtual VrmlNodeBooleanSequencer *toBooleanSequencer() const;
-    virtual VrmlNodeChild *toChild() const;
-    virtual VrmlNodeColor *toColor() const;
-    virtual VrmlNodeColorRGBA *toColorRGBA() const;
-    virtual VrmlNodeCone *toCone() const; //LarryD Mar 08/99
-    virtual VrmlNodeCoordinate *toCoordinate() const;
-    //LarryD Mar 08/99
-    virtual VrmlNodeCylinder *toCylinder() const;
-    //LarryD Mar 08/99
-    virtual VrmlNodeDirLight *toDirLight() const;
-    //LarryD Mar 09/99
-    virtual VrmlNodeElevationGrid *toElevationGrid() const;
-    //LarryD Mar 09/99
-    virtual VrmlNodeExtrusion *toExtrusion() const;
-    virtual VrmlNodeFog *toFog() const;
-    virtual VrmlNodeFontStyle *toFontStyle() const;
-    virtual VrmlNodeGeometry *toGeometry() const;
-    virtual VrmlNodeGroup *toGroup() const;
-    virtual VrmlNodeIFaceSet *toIFaceSet() const;
-    virtual VrmlNodeIQuadSet *toIQuadSet() const;
-    virtual VrmlNodeITriangleFanSet *toITriangleFanSet() const;
-    virtual VrmlNodeITriangleSet *toITriangleSet() const;
-    virtual VrmlNodeITriangleStripSet *toITriangleStripSet() const;
-    virtual VrmlNodeImageTexture *toImageTexture() const;
-    virtual VrmlNodeCubeTexture *toCubeTexture() const;
-    virtual VrmlNodePixelTexture *toPixelTexture() const;
-    virtual VrmlNodeInline *toInline() const;
-    virtual VrmlNodeLight *toLight() const;
-    virtual VrmlNodeMaterial *toMaterial() const;
-    virtual VrmlNodeMetadataBoolean *toMetadataBoolean() const;
-    virtual VrmlNodeMetadataDouble *toMetadataDouble() const;
-    virtual VrmlNodeMetadataFloat *toMetadataFloat() const;
-    virtual VrmlNodeMetadataInteger *toMetadataInteger() const;
-    virtual VrmlNodeMetadataSet *toMetadataSet() const;
-    virtual VrmlNodeMetadataString *toMetadataString() const;
-    virtual VrmlNodeMovieTexture *toMovieTexture() const;
-    virtual VrmlNodeMultiTexture *toMultiTexture() const;
-    virtual VrmlNodeMultiTextureCoordinate *toMultiTextureCoordinate() const;
-    virtual VrmlNodeMultiTextureTransform *toMultiTextureTransform() const;
-    virtual VrmlNodeNavigationInfo *toNavigationInfo() const;
-    virtual VrmlNodeCOVER *toCOVER() const;
-    virtual VrmlNodeNormal *toNormal() const;
-    virtual VrmlNodePlaneSensor *toPlaneSensor() const;
-    virtual VrmlNodeSpaceSensor *toSpaceSensor() const;
-    virtual VrmlNodeARSensor *toARSensor() const;
-    virtual VrmlNodePointLight *toPointLight() const;
-    virtual VrmlNodeProximitySensor *toProximitySensor() const;
-    virtual VrmlNodeQuadSet *toQuadSet() const;
-    virtual VrmlNodeScript *toScript() const;
-    virtual VrmlNodeShape *toShape() const;
-    virtual VrmlNodeSphere *toSphere() const; //LarryD Mar 08/99
-    virtual VrmlNodeSound *toSound() const;
-    virtual VrmlNodeSpotLight *toSpotLight() const;
-    virtual VrmlNodeSwitch *toSwitch() const; //LarryD Mar 08/99
-    virtual VrmlNodeTexture *toTexture() const;
-    virtual VrmlNodeTextureCoordinate *toTextureCoordinate() const;
-    virtual VrmlNodeTextureCoordinateGenerator *toTextureCoordinateGenerator() const;
-    virtual VrmlNodeTextureTransform *toTextureTransform() const;
-    virtual VrmlNodeTimeSensor *toTimeSensor() const;
-    virtual VrmlNodeTouchSensor *toTouchSensor() const;
-    virtual VrmlNodeTriangleFanSet *toTriangleFanSet() const;
-    virtual VrmlNodeTriangleSet *toTriangleSet() const;
-    virtual VrmlNodeTriangleStripSet *toTriangleStripSet() const;
-    virtual VrmlNodeSphereSensor *toSphereSensor() const;
-    virtual VrmlNodeCylinderSensor *toCylinderSensor() const;
-    //LarryD Feb 24/99
-    virtual VrmlNodeTransform *toTransform() const;
-    virtual VrmlNodeViewpoint *toViewpoint() const;
-
-    virtual VrmlNodeLOD *toLOD() const;
-    virtual VrmlNodeScalarInt *toScalarInt() const;
-    virtual VrmlNodeOrientationInt *toOrientationInt() const;
-    virtual VrmlNodePositionInt *toPositionInt() const;
-
-    virtual VrmlNodeProto *toProto() const;
-
+    template<typename Derived>
+    Derived *as() {
+        return dynamic_cast<Derived*>(this);
+    }
+    template<typename Derived>
+    const Derived *as() const {
+        return dynamic_cast<const Derived*>(this);
+    }
+    template<typename...Deriveds>
+    bool is() const {
+        return (... || dynamic_cast<const Deriveds*>(this));
+    }
     // Node DEF/USE/ROUTE name
     void setName(const char *nodeName, VrmlNamespace *ns = 0);
     inline const char *name() const
@@ -257,10 +104,8 @@ public:
 
     // Indicate that the node state has changed, need to re-render
     void setModified();
-    void clearModified()
-    {
-        d_modified = false;
-    }
+    void clearModified();
+
     virtual bool isModified() const;
     void forceTraversal(bool once = true, int increment = 1);
     void decreaseTraversalForce(int num = -1);

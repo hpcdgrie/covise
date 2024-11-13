@@ -42,11 +42,6 @@ VrmlNodeTextureTransform::VrmlNodeTextureTransform(VrmlScene *scene)
 {
 }
 
-VrmlNodeTextureTransform *VrmlNodeTextureTransform::toTextureTransform() const
-{
-    return (VrmlNodeTextureTransform *)this;
-}
-
 void VrmlNodeTextureTransform::render(Viewer *viewer)
 {
     viewer->setTextureTransform(d_center.get(),

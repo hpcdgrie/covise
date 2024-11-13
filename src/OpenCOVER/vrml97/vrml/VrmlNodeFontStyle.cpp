@@ -47,8 +47,3 @@ VrmlNodeFontStyle::VrmlNodeFontStyle(VrmlScene *scene)
     , d_topToBottom(true)
 {
 }
-
-VrmlNodeFontStyle *VrmlNodeFontStyle::toFontStyle() const
-{
-    return (VrmlNodeFontStyle *)this;
-}

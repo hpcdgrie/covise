@@ -170,11 +170,6 @@ void VrmlNodeOrientationInt::eventIn(double timeStamp,
     }
 }
 
-VrmlNodeOrientationInt *VrmlNodeOrientationInt::toOrientationInt() const
-{
-    return (VrmlNodeOrientationInt *)this;
-}
-
 const VrmlMFFloat &VrmlNodeOrientationInt::getKey() const
 {
     return d_key;
