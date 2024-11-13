@@ -54,6 +54,27 @@ class VrmlNodeUpdateRegistry;
 class VRMLEXPORT VrmlNodeTemplate : public VrmlNode
 {
     friend class VrmlNodeUpdateRegistry;
+
+public:
+
+    template<typename Derived>
+    static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t = nullptr)
+    {
+        return defineType_impl<Derived>(t);
+    }
+
+    ~VrmlNodeTemplate();
+    std::ostream &printFields(std::ostream &os, int indent) override;
+    const VrmlField *getField(const char *fieldName) const override;
+    //hide setField
+    void setFieldByName(const char *fieldName, const VrmlField &fieldValue);
+
+    bool fieldInitialized(const std::string& name) const;
+    bool allFieldsInitialized() const;
+
+    vrml::VrmlNode *cloneMe() const override;
+    vrml::VrmlNodeType *nodeType() const override;
+
 private:
     std::unique_ptr<VrmlNodeUpdateRegistry> m_impl;
     struct Constructors{
@@ -65,6 +86,7 @@ private:
     const std::map<std::string, Constructors>::const_iterator m_constructor;
 
     void setField(const char *fieldName, const VrmlField &fieldValue) override;
+    
 protected:
 
     enum FieldAccessibility{
@@ -86,10 +108,6 @@ protected:
         VrmlType *value;
         FieldUpdateCallback<VrmlType> updateCb;
     };
-
-    //eventInCallBack and eventOutCallBack are only used to set callbacks that can be used to replace
-    //setField calls with the event name
-
 
 #define FOR_ALL_FIELD_TYPES(code)\
     code(field, FieldAccessibility::Private)\
@@ -118,32 +136,19 @@ protected:
         return NameValueStruct<VrmlType, FieldAccessibility::EventOut>{name, nullptr, lambda};
     }
 
+    FOR_ALL_FIELD_TYPES(VRML_NAME_VALUE_FIELD)
+private:
 #define INIT_FIELDS_HELPER(Name, FieldType)\
     template <typename VrmlType>\
     static void initFieldsHelperImpl(VrmlNodeTemplate *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldType> &field);\
 
-
-    FOR_ALL_FIELD_TYPES(VRML_NAME_VALUE_FIELD)
     FOR_ALL_FIELD_TYPES(INIT_FIELDS_HELPER)
 
-
+protected:
     template <typename...Args>
     static void initFieldsHelper(VrmlNodeTemplate *node, VrmlNodeType *t, const Args&... fields) {
             (initFieldsHelperImpl(node, t, fields), ...);
     }
-
-public:
-    ~VrmlNodeTemplate();
-    std::ostream &printFields(std::ostream &os, int indent) override;
-    const VrmlField *getField(const char *fieldName) const override;
-    //hide setField
-    void setFieldByName(const char *fieldName, const VrmlField &fieldValue);
-
-    bool fieldInitialized(const std::string& name) const;
-    bool allFieldsInitialized() const;
-
-    vrml::VrmlNode *cloneMe() const override;
-    vrml::VrmlNodeType *nodeType() const override;
 
     //can be specialized for each node in the derived class header file
     //e.g. VrmlNodeVariant.h
@@ -153,9 +158,9 @@ public:
         Derived::initFields(node, nullptr);
         return node;
     }
-
+private:
     template<typename Derived>
-    static vrml::VrmlNodeType *defineType(vrml::VrmlNodeType *t = nullptr)
+    static vrml::VrmlNodeType *defineType_impl(vrml::VrmlNodeType *t = nullptr)
     {
         assert(Derived::name() != nullptr);
         assert(strcmp(Derived::name(), "") != 0);
