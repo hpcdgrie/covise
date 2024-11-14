@@ -20,7 +20,7 @@
 //
 
 #include "config.h"
-#include "VrmlNode.h"
+#include "VrmlNodeTemplate.h"
 #include "VrmlNodeType.h"
 #include "Viewer.h"
 
@@ -29,34 +29,34 @@ namespace vrml
 
 class VrmlMFNode;
 
-class VRMLEXPORT VrmlNodeProto : public VrmlNode
+class VRMLEXPORT VrmlNodeProto : public VrmlNodeTemplate
 {
 
 public:
-    virtual VrmlNodeType *nodeType() const;
+    static void initFields(VrmlNodeProto *node, VrmlNodeType *t);
+    static const char *name();
+    VrmlNodeType *nodeType() const override;
 
     VrmlNodeProto(VrmlNodeType *nodeDef, VrmlScene *scene);
     VrmlNodeProto(const VrmlNodeProto &);
-    virtual ~VrmlNodeProto();
+    ~VrmlNodeProto();
 
-    virtual VrmlNode *cloneMe() const;
+    void addToScene(VrmlScene *, const char *relUrl) override;
+    std::ostream &printFields(std::ostream &os, int indent) override;
 
-    virtual void addToScene(VrmlScene *, const char *relUrl);
-    virtual std::ostream &printFields(std::ostream &os, int indent);
+    void render(Viewer *) override;
 
-    virtual void render(Viewer *);
-
-    virtual void eventIn(double timeStamp,
+    void eventIn(double timeStamp,
                          const char *eventName,
-                         const VrmlField *fieldValue);
+                         const VrmlField *fieldValue) override;
 
-    virtual bool isModified() const;
+    bool isModified() const override;
 
-    virtual void setField(const char *fieldName, const VrmlField &fieldValue);
+    void setField(const char *fieldName, const VrmlField &fieldValue) override;
 
-    virtual const VrmlField *getField(const char *fieldName) const;
+    const VrmlField *getField(const char *fieldName) const override;
 
-    virtual void accumulateTransform(VrmlNode *);
+    void accumulateTransform(VrmlNode *) override;
 
     // LarryD  Feb 11/99
     int size();
@@ -112,5 +112,13 @@ private:
 
     Viewer::Object d_viewerObject; // move to VrmlNode.h ? ...
 };
+
+template<>
+inline VrmlNode *VrmlNodeTemplate::creator<VrmlNodeProto>(vrml::VrmlScene *scene){
+    (void)scene;
+    assert(true);
+    return nullptr;
+}
+
 }
 #endif //_VRMLNODEPROTO_

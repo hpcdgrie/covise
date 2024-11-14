@@ -49,8 +49,18 @@ using namespace vrml;
 
 VrmlNodeType *VrmlNodeProto::nodeType() const { return d_nodeType; }
 
+void VrmlNodeProto::initFields(VrmlNodeProto *node, VrmlNodeType *t)
+{
+
+}
+
+const char *VrmlNodeProto::name()
+{
+    return "PROTO";
+}
+
 VrmlNodeProto::VrmlNodeProto(VrmlNodeType *nodeDef, VrmlScene *scene)
-    : VrmlNode(scene)
+    : VrmlNodeTemplate(scene, name())
     , d_nodeType(nodeDef->reference())
     , d_instantiated(false)
     , d_scope(0)
@@ -60,7 +70,7 @@ VrmlNodeProto::VrmlNodeProto(VrmlNodeType *nodeDef, VrmlScene *scene)
 }
 
 VrmlNodeProto::VrmlNodeProto(const VrmlNodeProto &n)
-    : VrmlNode(0)
+    : VrmlNodeTemplate(n)
     , d_nodeType(n.nodeType()->reference())
     , d_instantiated(false)
     , d_scope(0)
@@ -107,14 +117,6 @@ VrmlNodeProto::~VrmlNodeProto()
     delete d_nodes;
     delete d_scope;
     d_nodeType->dereference();
-}
-
-// Note that the copy constructor doesn't copy the implementation
-// nodes, so they will need to be instantiated.
-
-VrmlNode *VrmlNodeProto::cloneMe() const
-{
-    return new VrmlNodeProto(*this);
 }
 
 // Instantiate a local copy of the implementation nodes.
@@ -456,5 +458,5 @@ const VrmlField *VrmlNodeProto::getField(const char *fieldName) const
     if (nv)
         return nv->value;
 
-    return VrmlNode::getField(fieldName); // no other fields
+    return VrmlNodeTemplate::getField(fieldName); // no other fields
 }

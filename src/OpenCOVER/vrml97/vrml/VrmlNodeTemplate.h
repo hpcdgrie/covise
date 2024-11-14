@@ -86,14 +86,13 @@ private:
     static std::map<std::string, Constructors> m_constructors;
     const std::map<std::string, Constructors>::const_iterator m_constructor;
 
-    void setField(const char *fieldName, const VrmlField &fieldValue) override;
 
 protected:
+    void setField(const char *fieldName, const VrmlField &fieldValue) override;
 
     enum FieldAccessibility{
         Private, Exposed, EventIn, EventOut
     };
-
     template<typename VrmlType>
     using FieldUpdateCallback = std::function<void(const VrmlType*)>;
 
@@ -159,6 +158,7 @@ protected:
         Derived::initFields(node, nullptr);
         return node;
     }
+
 private:
     template<typename Derived>
     static vrml::VrmlNodeType *defineType_impl(vrml::VrmlNodeType *t = nullptr)
