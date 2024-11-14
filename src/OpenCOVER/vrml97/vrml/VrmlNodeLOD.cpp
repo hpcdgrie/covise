@@ -17,6 +17,7 @@
 #include "VrmlScene.h"
 
 #include "MathUtils.h"
+#include "System.h"
 #include "Viewer.h"
 
 using namespace vrml;

@@ -20,7 +20,7 @@
 //
 
 #include "config.h"
-#include "VrmlNodeTemplate.h"
+#include "VrmlNode.h"
 #include "VrmlNodeType.h"
 #include "Viewer.h"
 
@@ -29,7 +29,7 @@ namespace vrml
 
 class VrmlMFNode;
 
-class VRMLEXPORT VrmlNodeProto : public VrmlNodeTemplate
+class VRMLEXPORT VrmlNodeProto : public VrmlNode
 {
 
 public:
@@ -42,7 +42,7 @@ public:
     ~VrmlNodeProto();
 
     void addToScene(VrmlScene *, const char *relUrl) override;
-    std::ostream &printFields(std::ostream &os, int indent) override;
+    std::ostream &printFields(std::ostream &os, int indent) const override;
 
     void render(Viewer *) override;
 
@@ -115,7 +115,7 @@ private:
 };
 
 template<>
-inline VrmlNode *VrmlNodeTemplate::creator<VrmlNodeProto>(vrml::VrmlScene *scene){
+inline VrmlNode *VrmlNode::creator<VrmlNodeProto>(vrml::VrmlScene *scene){
     (void)scene;
     assert(true);
     return nullptr;

@@ -24,7 +24,7 @@ void VrmlNodeGeometry::initFields(VrmlNodeGeometry *node, VrmlNodeType *t)
 }
 
 VrmlNodeGeometry::VrmlNodeGeometry(VrmlScene *s, const std::string &name)
-    : VrmlNodeTemplate(s, name)
+    : VrmlNode(s, name)
     , d_viewerObject(0)
 {
 }

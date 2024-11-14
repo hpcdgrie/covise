@@ -15,7 +15,7 @@
 #ifndef _VRMLNODEGEOMETRY_
 #define _VRMLNODEGEOMETRY_
 
-#include "VrmlNodeTemplate.h"
+#include "VrmlNode.h"
 #include "Viewer.h"
 #include <string>
 namespace vrml
@@ -23,7 +23,7 @@ namespace vrml
 
 class VRMLEXPORT VrmlNodeColor;
 
-class VRMLEXPORT VrmlNodeGeometry : public VrmlNodeTemplate
+class VRMLEXPORT VrmlNodeGeometry : public VrmlNode
 {
 
 public:

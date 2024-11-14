@@ -15,6 +15,7 @@
 #include "VrmlNodePositionInt.h"
 #include "VrmlNodeType.h"
 
+#include "System.h"
 #include "VrmlScene.h"
 
 using namespace vrml;

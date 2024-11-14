@@ -18,6 +18,7 @@
 #include "VrmlScene.h"
 #include "Viewer.h"
 #include "VrmlSFTime.h"
+#include "System.h"
 
 using std::cerr;
 using std::endl;

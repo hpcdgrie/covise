@@ -20,7 +20,9 @@
 
 #include "MathUtils.h"
 
+#include "System.h"
 #include "Viewer.h"
+
 using namespace vrml;
 
 void VrmlNodeIFaceSet::initFields(VrmlNodeIFaceSet *node, VrmlNodeType *t)

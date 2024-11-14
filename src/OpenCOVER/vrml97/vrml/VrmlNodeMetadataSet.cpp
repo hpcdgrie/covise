@@ -16,7 +16,9 @@
 
 #include "VrmlNodeType.h"
 
+#include "System.h"
 #include "Viewer.h"
+
 using namespace vrml;
 
 void VrmlNodeMetadataSet::initFields(VrmlNodeMetadataSet *node, VrmlNodeType *t)

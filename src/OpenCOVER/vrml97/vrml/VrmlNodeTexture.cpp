@@ -26,20 +26,13 @@ int VrmlNodeTexture::maxTextureSize()
     return s_maxTextureSize;
 }
 
-
-
-VrmlNodeType *VrmlNodeTexture::defineType(VrmlNodeType *t)
-{
-    return VrmlNode::defineType(t);
-}
-
 void VrmlNodeTexture::initFields(VrmlNodeTexture *node, VrmlNodeType *t)
 {
     //open for future implementations
 }
 
 VrmlNodeTexture::VrmlNodeTexture(VrmlScene *s, const std::string &name)
-    : VrmlNodeTemplate(s, name)
+    : VrmlNode(s, name)
 {
     d_blendModeOverwrite = -1;
 }

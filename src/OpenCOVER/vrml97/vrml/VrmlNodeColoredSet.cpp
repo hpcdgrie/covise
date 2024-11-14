@@ -25,7 +25,9 @@
 #include "VrmlNodeMultiTextureCoordinate.h"
 #include "VrmlNodeTextureCoordinateGenerator.h"
 
+#include "System.h"
 #include "Viewer.h"
+
 using namespace vrml;
 
 void VrmlNodeColoredSet::initFields(VrmlNodeColoredSet *node, VrmlNodeType *t)

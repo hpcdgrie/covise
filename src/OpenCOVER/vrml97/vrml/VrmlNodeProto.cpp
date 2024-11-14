@@ -43,6 +43,7 @@
 #include "VrmlNamespace.h"
 #include "VrmlMFNode.h"
 #include "VrmlScene.h"
+#include "System.h"
 #include "Doc.h"
 using std::list;
 using namespace vrml;
@@ -60,7 +61,7 @@ const char *VrmlNodeProto::name()
 }
 
 VrmlNodeProto::VrmlNodeProto(VrmlNodeType *nodeDef, VrmlScene *scene)
-    : VrmlNodeTemplate(scene, name())
+    : VrmlNode(scene, name())
     , d_nodeType(nodeDef->reference())
     , d_instantiated(false)
     , d_scope(0)
@@ -70,7 +71,7 @@ VrmlNodeProto::VrmlNodeProto(VrmlNodeType *nodeDef, VrmlScene *scene)
 }
 
 VrmlNodeProto::VrmlNodeProto(const VrmlNodeProto &n)
-    : VrmlNodeTemplate(n)
+    : VrmlNode(n)
     , d_nodeType(n.nodeType()->reference())
     , d_instantiated(false)
     , d_scope(0)
@@ -300,7 +301,7 @@ VrmlNode *VrmlNodeProto::child(int index)
 
 // Print the node type, instance vars
 
-std::ostream &VrmlNodeProto::printFields(std::ostream &os, int)
+std::ostream &VrmlNodeProto::printFields(std::ostream &os, int) const
 {
     os << "#VrmlNodeProto::printFields not implemented yet...\n";
     return os;
@@ -469,5 +470,5 @@ const VrmlField *VrmlNodeProto::getField(const char *fieldName) const
     if (nv)
         return nv->value;
 
-    return VrmlNodeTemplate::getField(fieldName); // no other fields
+    return VrmlNode::getField(fieldName); // no other fields
 }

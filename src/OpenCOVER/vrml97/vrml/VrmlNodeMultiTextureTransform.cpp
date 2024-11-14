@@ -31,7 +31,7 @@ const char *VrmlNodeMultiTextureTransform::name()
 }
 
 VrmlNodeMultiTextureTransform::VrmlNodeMultiTextureTransform(VrmlScene *scene)
-    : VrmlNodeTemplate(scene, name())
+    : VrmlNode(scene, name())
     , d_textureTransform(0)
 {
 }

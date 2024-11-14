@@ -15,7 +15,7 @@
 #ifndef _VRMLNODESHAPE_
 #define _VRMLNODESHAPE_
 
-#include "VrmlNode.h"
+#include "VrmlNodeChild.h"
 #include "VrmlSFNode.h"
 
 #include "Viewer.h"

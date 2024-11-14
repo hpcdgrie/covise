@@ -15,6 +15,7 @@
 #include "VrmlNodeSwitch.h"
 #include "VrmlNodeType.h"
 #include "Viewer.h"
+#include "System.h"
 
 using namespace vrml;
 

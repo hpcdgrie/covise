@@ -31,6 +31,8 @@
 #include "VrmlNodeProto.h"
 #include "VrmlNodeShape.h"
 
+#include "System.h"
+
 using std::cerr;
 using std::endl;
 using namespace vrml;
@@ -83,13 +85,6 @@ void VrmlNodeGroup::flushRemoveList()
     {
         d_childrenToRemove.removeNode(d_childrenToRemove[0]);
     }
-}
-
-//
-
-VrmlNode *VrmlNodeGroup::cloneMe() const
-{
-    return new VrmlNodeGroup(*this);
 }
 
 void VrmlNodeGroup::cloneChildren(VrmlNamespace *ns)

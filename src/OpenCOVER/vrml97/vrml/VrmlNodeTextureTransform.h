@@ -15,7 +15,7 @@
 #ifndef _VRMLNODETEXTURETRANSFORM_
 #define _VRMLNODETEXTURETRANSFORM_
 
-#include "VrmlNodeTemplate.h"
+#include "VrmlNode.h"
 #include "VrmlSFFloat.h"
 #include "VrmlSFVec2f.h"
 
@@ -24,7 +24,7 @@ namespace vrml
 
 class Viewer;
 
-class VRMLEXPORT VrmlNodeTextureTransform : public VrmlNodeTemplate
+class VRMLEXPORT VrmlNodeTextureTransform : public VrmlNode
 {
 
 public:

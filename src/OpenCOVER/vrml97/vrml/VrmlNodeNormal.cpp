@@ -25,6 +25,6 @@ void VrmlNodeNormal::initFields(VrmlNodeNormal *node, VrmlNodeType *t)
 const char *VrmlNodeNormal::name() { return "Normal"; }
 
 VrmlNodeNormal::VrmlNodeNormal(VrmlScene *scene)
-    : VrmlNodeTemplate(scene, name())
+    : VrmlNode(scene, name())
 {
 }

@@ -22,6 +22,8 @@
 #include "ScriptObject.h"
 
 #include "VrmlScene.h"
+#include "System.h"
+
 #include <stdio.h>
 
 using namespace vrml;

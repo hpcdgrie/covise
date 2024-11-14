@@ -18,6 +18,8 @@
 #include "VrmlScene.h"
 #include "coEventQueue.h"
 
+#include "System.h"
+
 #include <cassert>
 
 #define XK_MISCELLANY

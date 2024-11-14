@@ -18,6 +18,8 @@
 #include "VrmlScene.h"
 #include "VrmlSFBool.h"
 
+#include "System.h"
+
 using namespace vrml;
 
 // BooleanSequencer factory.

@@ -19,6 +19,7 @@
 
 #include "MathUtils.h"
 #include "VrmlScene.h"
+#include "System.h"
 
 #include "Player.h"
 

@@ -20,6 +20,8 @@
 #include "VrmlSFColor.h"
 #include "VrmlSFFloat.h"
 
+#include "Viewer.h"
+
 #include "VrmlNodeChild.h"
 
 namespace vrml

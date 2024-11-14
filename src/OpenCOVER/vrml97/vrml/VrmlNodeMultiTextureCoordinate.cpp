@@ -28,7 +28,7 @@ const char *VrmlNodeMultiTextureCoordinate::name()
 }
 
 VrmlNodeMultiTextureCoordinate::VrmlNodeMultiTextureCoordinate(VrmlScene *scene)
-    : VrmlNodeTemplate(scene, name())
+    : VrmlNode(scene, name())
 {
 }
 

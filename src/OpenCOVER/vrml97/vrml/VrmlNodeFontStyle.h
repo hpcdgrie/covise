@@ -15,7 +15,7 @@
 #ifndef _VRMLNODEFONTSTYLE_
 #define _VRMLNODEFONTSTYLE_
 
-#include "VrmlNodeTemplate.h"
+#include "VrmlNode.h"
 #include "VrmlMFString.h"
 #include "VrmlSFBool.h"
 #include "VrmlSFString.h"
@@ -24,7 +24,7 @@
 namespace vrml
 {
 
-class VRMLEXPORT VrmlNodeFontStyle : public VrmlNodeTemplate
+class VRMLEXPORT VrmlNodeFontStyle : public VrmlNode
 {
 
 public:

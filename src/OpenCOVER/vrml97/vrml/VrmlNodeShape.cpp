@@ -12,7 +12,6 @@
 //  %W% %G%
 //  VrmlNodeShape.cpp
 
-#include "VrmlNode.h"
 
 #include "VrmlNodeAppearance.h"
 #include "VrmlNodeGeometry.h"

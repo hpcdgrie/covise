@@ -1,71 +1,267 @@
-/* This file is part of COVISE.
-
-   You can use it under the terms of the GNU Lesser General Public License
-   version 2.1 or later, see lgpl-2.1.txt.
-
- * License: LGPL 2+ */
-
-//
-//  Vrml 97 library
-//  Copyright (C) 1998 Chris Morley
-//
-//  %W% %G%
-//  The VrmlNode class is the base node class.
-#ifndef VRML_NODE_H
-#define VRML_NODE_H
-
-#include "config.h"
-#include "VrmlNode.h"
+#include "coEventQueue.h"
+#include "System.h"
+#include "VrmlField.h"
 #include "VrmlNamespace.h"
-#include "VrmlNodeType.h"
 #include "VrmlNodeScript.h"
 #include "VrmlScene.h"
-#include "MathUtils.h"
-#include "coEventQueue.h"
-#include "VrmlNodeMetadataNumeric.h"
-#include "VrmlNodeMetadataSet.h"
-#include <stdio.h>
 
-using std::cerr;
-using std::endl;
-using namespace vrml;
+#include <cassert>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <variant>
 
-VrmlNodeType *VrmlNode::defineType(VrmlNodeType *t)
-{
-    if (t)
-        t->addExposedField("metadata", VrmlField::SFNODE);
-    return t;
+namespace vrml{
+
+    //keep in line with VrmlField enum
+    typedef std::tuple<
+        VrmlSFBool,
+        VrmlSFColor,
+        VrmlSFColorRGBA,
+        VrmlSFDouble,
+        VrmlSFFloat,
+        VrmlSFInt,
+        VrmlSFRotation,
+        VrmlSFTime,
+        VrmlSFVec2d,
+        VrmlSFVec3d,
+        VrmlSFVec2f,
+        VrmlSFVec3f,
+        VrmlSFImage,
+        VrmlSFString,
+        VrmlMFBool,
+        VrmlMFColor,
+        VrmlMFColorRGBA,
+        VrmlMFDouble,
+        VrmlMFFloat,
+        VrmlMFInt,
+        VrmlMFRotation,
+        VrmlMFString,
+        VrmlMFTime,
+        VrmlMFVec2d,
+        VrmlMFVec3d,
+        VrmlMFVec2f,
+        VrmlMFVec3f,
+        VrmlSFNode,
+        VrmlMFNode,
+        VrmlSFMatrix,
+        VrmlField
+    > VrmlTypesTuple;
+
+
+template <typename VrmlType, typename Tuple, std::size_t Index = 0>
+struct TypeToEnumHelper {
+    static VrmlField::VrmlFieldType value() {
+        if constexpr (Index < std::tuple_size_v<Tuple>) {
+            if constexpr (std::is_same_v<VrmlType, std::tuple_element_t<Index, Tuple>>) {
+                return static_cast<VrmlField::VrmlFieldType>(Index + 1);
+            } else {
+                return TypeToEnumHelper<VrmlType, Tuple, Index + 1>::value();
+            }
+        } else {
+            return VrmlField::VrmlFieldType::NO_FIELD;
+        }
+    }
+};
+
+// Function to map VrmlType to enumeration value
+template<typename VrmlType>
+VrmlField::VrmlFieldType toEnumType(const VrmlType *t) {
+    return TypeToEnumHelper<VrmlType, VrmlTypesTuple>::value();
 }
 
-VrmlNodeType *VrmlNode::nodeType() const { return 0; }
-
-VrmlNode::VrmlNode(VrmlScene *scene)
-    : d_scene(scene)
-    , d_modified(false)
-    , d_routes(0)
-    , d_incomingRoutes(0)
-    , d_myNamespace(0)
-    , d_traverseAtFrame(0)
-    , d_refCount(0)
-    , d_metadata(0)
-{
-    d_isDeletedInline = false;
+// Helper to extract types from tuple and create a variant with pointers to those types
+template<typename Tuple, std::size_t... Indices>
+auto tuple_to_variant_ptr_impl(std::index_sequence<Indices...>) {
+    return std::variant<std::add_pointer_t<std::tuple_element_t<Indices, Tuple>>...>{};
 }
 
-VrmlNode::VrmlNode(const VrmlNode &)
-    : d_scene(0)
-    , d_modified(true)
-    , d_routes(0)
-    , d_incomingRoutes(0)
-    , d_myNamespace(0)
-    , d_traverseAtFrame(0)
-    , d_refCount(0)
-    , d_metadata(0)
+template<typename Tuple>
+using tuple_to_variant_ptr = decltype(tuple_to_variant_ptr_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}));
+
+
+
+class VrmlNodeUpdateRegistry
 {
-    d_isDeletedInline = false;
+
+public:
+    VrmlNodeUpdateRegistry(VrmlNode *nodeChild)
+    : m_nodeChild(nodeChild)
+    {}
+
+
+private:
+    //use pointers to avoid memory overhead for arrays
+    
+    using VrmlTypesVariant = tuple_to_variant_ptr<VrmlTypesTuple>;
+
+    template<typename VrmlType>
+    struct VrmlTypeStruct{
+        VrmlType *value;
+        bool initialized = false;
+        VrmlNode::FieldUpdateCallback<VrmlType> updateCb;
+        // const VrmlType defaultValue;
+    };
+
+
+    template<typename Tuple, std::size_t... Indices>
+    static std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...> tuple_to_VrmlTypeStruct_impl(std::index_sequence<Indices...>) {
+        return std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...>{};
+    }
+
+
+    template<typename Tuple>
+    using tuple_to_VrmlTypeStruct = decltype(tuple_to_VrmlTypeStruct_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}));
+
+    using VrmlTypeStructs = tuple_to_VrmlTypeStruct<VrmlTypesTuple>;
+    
+    std::map<std::string, VrmlTypeStructs> m_fields;
+    VrmlNode *m_nodeChild;
+
+public:
+    const VrmlField *getField(const char *fieldName) const
+    {
+        auto it = m_fields.find(fieldName);
+        if(it == m_fields.end()){
+            return m_nodeChild->getField(fieldName);
+        }
+        const VrmlTypeStructs& field = it->second;
+        
+        return std::visit([](auto&& arg){
+            return static_cast<const VrmlField*>(arg.value);
+        }, field);
+        return nullptr;
+    }
+    
+    void setField(const char *fieldName, const VrmlField &fieldValue) {
+        auto it = m_fields.find(fieldName);
+        if(it == m_fields.end()){
+            m_nodeChild->setField(fieldName, fieldValue);
+            return;
+        }
+        auto& field = it->second;
+        std::visit([fieldName, &fieldValue, this](auto&& arg){
+            auto val = dynamic_cast<const std::remove_pointer_t<decltype(arg.value)>*>(&fieldValue);
+            if(arg.value) //events do not have a field
+            {
+                if(!val){
+                    System::the->error("Invalid VrmlType (%s) for %s field.\n",
+                        fieldValue.fieldTypeName(), fieldName);
+                    return;
+                }
+                *arg.value = *val;
+            }
+            arg.initialized = true;
+            if(arg.updateCb){
+                arg.updateCb(val);
+            }
+
+        }, field);
+    }
+    
+    template<typename VrmlType>
+    void registerField(const std::string& name, VrmlType *field, const VrmlNode::FieldUpdateCallback<VrmlType> &updateCb = VrmlNode::FieldUpdateCallback<VrmlType>{}){
+        m_fields[name] = VrmlTypeStruct<VrmlType>{ field, false, updateCb};
+    }
+
+    bool initialized(const std::string& name){
+        auto it = m_fields.find(name);
+        if(it == m_fields.end()){
+            return false;
+        }
+        std::visit([](auto&& arg){
+            return arg.initialized;
+        }, it->second);
+        return false;
+    }
+
+    bool allInitialized(const std::vector<std::string>& exceptions){
+        bool retval = true;
+        for(auto& [name, field] : m_fields){
+            if(std::find(exceptions.begin(), exceptions.end(), name) != exceptions.end()){
+                continue;
+            }
+            std::visit([&retval](auto&& arg){
+                if(!arg.initialized){
+                    retval = false;
+                }
+            }, field);
+        }
+        return retval;
+    }
+
+    template<typename VrmlType>
+    VrmlType* copy(const VrmlType* other){
+        return new VrmlType(*other);
+    }
+
+    // use new pointers with this inital values of other
+    VrmlNodeUpdateRegistry(const VrmlNodeUpdateRegistry& other)
+    : m_fields(other.m_fields)
+    {
+        for(auto& [name, field] : m_fields){
+            std::visit([this, &field](auto&& arg){
+                arg.value = copy(arg.value);
+            }, field);
+        }
+    }
+
+    template<typename VrmlType>
+    void deleter(VrmlType* t){
+        delete t;
+    }
+    std::ostream &printFields(std::ostream &os, int indent) const
+    {
+        for(auto& [name, field] : m_fields){
+            os << std::string(indent, ' ') << name << " : ";
+            std::visit([&os](auto&& arg){
+                os << *arg.value;
+            }, field);
+            os << std::endl;
+        }
+        return os;
+    }
+};
+
+template<>
+VrmlField* VrmlNodeUpdateRegistry::copy(const VrmlField* other){
+    assert(!("can not copy abstract VrmlField"));
+    return nullptr;
 }
 
-// Free name (if any) and route info.
+//VrmlNode
+//--------------------------------------------------------------------------------------------------
+
+std::map<std::string, VrmlNode::Constructors> VrmlNode::m_constructors;
+
+std::ostream &operator<<(std::ostream &os, const VrmlNode &f)
+{
+    return f.print(os, 0);
+}
+
+void VrmlNode::initFields(VrmlNode *node, VrmlNodeType *t)
+{
+    initFieldsHelper(node, t,
+                     exposedField("metadata", node->d_metadata));
+}
+
+VrmlNode::VrmlNode(VrmlScene *scene, const std::string &name)
+: d_scene(scene)
+, m_constructor(m_constructors.find(name)) 
+, m_impl(std::make_unique<VrmlNodeUpdateRegistry>(this)) {
+    assert(m_constructor != m_constructors.end());
+}
+
+// use new pointers with this inital values of other
+VrmlNode::VrmlNode(const VrmlNode& other)
+: d_modified(true)
+, d_scene(other.d_scene)
+, m_impl(std::make_unique<VrmlNodeUpdateRegistry>(*other.m_impl))
+, m_constructor(other.m_constructor) {
+    assert(m_constructor != m_constructors.end());
+}
 
 VrmlNode::~VrmlNode()
 {
@@ -101,7 +297,7 @@ VrmlNode::~VrmlNode()
         if (!d_isDeletedInline)
             delete r;
         r = next;
-    }
+    }    
 }
 
 VrmlNodeList VrmlNode::nodeStack;
@@ -124,6 +320,11 @@ VrmlNode *VrmlNode::clone(VrmlNamespace *ns)
         n->cloneChildren(ns);
     }
     return n;
+}
+
+vrml::VrmlNode *VrmlNode::cloneMe() const
+{
+    return m_constructor->second.clone(this); 
 }
 
 void VrmlNode::cloneChildren(VrmlNamespace *ns)
@@ -149,31 +350,56 @@ void VrmlNode::copyRoutes(VrmlNamespace *ns)
         }
 }
 
-// true if this node is on the static node stack
-bool VrmlNode::isOnStack(VrmlNode *node)
-{
-    VrmlNodeList::iterator i;
-
-    for (i = nodeStack.begin(); i != nodeStack.end(); ++i)
-        if (*i == node)
-        {
-            return true;
-            break;
-        }
-    return false;
-}
 VrmlNode *VrmlNode::reference()
 {
     ++d_refCount;
     return this;
 }
 
-// Remove a reference to a node
-
 void VrmlNode::dereference()
 {
     if (--d_refCount == 0)
         delete this;
+}
+
+vrml::VrmlNodeType *VrmlNode::nodeType() const
+{
+    return m_constructor->second.creator; 
+}
+
+bool VrmlNode::fieldInitialized(const std::string& name) const
+{
+    return m_impl->initialized(name);
+}
+
+bool VrmlNode::fieldsInitialized(const std::vector<std::string>& names) const
+{
+    for(const auto &name : names){
+        if(!m_impl->initialized(name)){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool VrmlNode::allFieldsInitialized() const
+{
+    return m_impl->allInitialized({"metadata"});
+}
+
+void VrmlNode::setField(const char *fieldName, const VrmlField &fieldValue) 
+{
+    m_impl->setField(fieldName, fieldValue);
+}
+
+std::ostream &VrmlNode::printFields(std::ostream &os, int indent) const
+{
+    return m_impl->printFields(os, indent);
+}
+
+const VrmlField *VrmlNode::getField(const char *fieldName) const
+{
+    return m_impl->getField(fieldName);
 }
 
 // Set the name of the node. Some one else (the parser) needs
@@ -208,73 +434,119 @@ void VrmlNode::addToScene(VrmlScene *scene, const char * /* relativeUrl */)
     d_scene = scene;
 }
 
-// Routes
-
-Route::Route(const char *fromEventOut, VrmlNode *toNode, const char *toEventIn, VrmlNode *fromNode)
-    : d_prev(0)
-    , d_next(0)
-    , d_prevI(0)
-    , d_nextI(0)
+std::ostream &VrmlNode::print(std::ostream &os, int indent) const
 {
-    d_fromEventOut = new char[strlen(fromEventOut) + 1];
-    strcpy(d_fromEventOut, fromEventOut);
-    //if((strlen(d_fromEventOut) > 8)&&(strcmp(d_fromEventOut+strlen(d_fromEventOut)-8,"_changed")==0))
-    //    d_fromEventOut[strlen(d_fromEventOut)-8]='\0';
-    d_toNode = toNode;
-    toNode->addRouteI(this);
-    d_fromNode = fromNode;
-    d_toEventIn = new char[strlen(toEventIn) + 1];
-    //if(strncmp(toEventIn,"set_",4) == 0)
-    //    strcpy(d_toEventIn, toEventIn+4);
-    //else
-    strcpy(d_toEventIn, toEventIn);
+    const char *nm = name();
+    for (int i = 0; i < indent; ++i)
+        os << ' ';
 
-    d_fromImportName = new char[1];
-    d_fromImportName[0] = '\0';
+    if (nm && *nm)
+        os << "DEF " << nm << " ";
 
-    d_toImportName = new char[1];
-    d_toImportName[0] = '\0';
+    os << nodeType()->getName() << " { ";
+
+    printFields(os, indent + INDENT_INCREMENT);
+
+    os << " }";
+
+    return os;
 }
 
-Route::Route(const Route &r)
+std::ostream &VrmlNode::printField(std::ostream &os,
+                                   int indent,
+                                   const char *name,
+                                   const VrmlField &f)
 {
-    d_fromEventOut = new char[strlen(r.d_fromEventOut) + 1];
-    strcpy(d_fromEventOut, r.d_fromEventOut);
-    d_toNode = r.d_toNode;
-    d_fromNode = r.d_fromNode;
-    d_toEventIn = new char[strlen(r.d_toEventIn) + 1];
-    strcpy(d_toEventIn, r.d_toEventIn);
-
-    d_fromImportName = new char[strlen(r.d_fromImportName) + 1];
-    if (strlen(r.d_fromImportName) > 0)
-        strcpy(d_fromImportName, r.d_fromImportName);
-    else
-        d_fromImportName[0] = '\0';
-
-    d_toImportName = new char[strlen(r.d_toImportName) + 1];
-    if (strlen(r.d_toImportName) > 0)
-        strcpy(d_toImportName, r.d_toImportName);
-    else
-        d_toImportName[0] = '\0';
+    os << std::endl;
+    for (int i = 0; i < indent; ++i)
+        os << ' ';
+    os << name << ' ' << f;
+    return os;
 }
 
-Route::~Route()
-{
-    if (d_toNode)
-    {
-        d_toNode->removeRoute(this);
-    }
-    if (d_fromNode)
-    {
-        d_fromNode->removeRoute(this);
-    }
-    delete[] d_fromEventOut;
-    delete[] d_toEventIn;
+// Dirty bit - indicates node needs to be revisited for rendering.
 
-    delete[] d_fromImportName;
-    d_fromImportName = NULL;
-    delete[] d_toImportName;
-    d_toImportName = NULL;
+void VrmlNode::setModified()
+{
+    d_modified = true;
+    if (d_scene)
+        d_scene->setModified();
+    if (d_metadata.get())
+        d_metadata.get()->setModified();
+    forceTraversal();
+}
+
+void VrmlNode::clearModified()
+{
+    d_modified = false;
+}
+
+bool VrmlNode::isModified() const
+{
+    return d_modified;
+}
+
+void VrmlNode::forceTraversal(bool once, int increment)
+{
+    //fprintf(stderr, "name=%s, once=%d, inc=%d\n", name(), int(once), increment);
+    if (once)
+    {
+        if (d_traverseAtFrame < 0 || d_traverseAtFrame == System::the->frame())
+            return;
+        if (d_traverseAtFrame >= 0)
+            d_traverseAtFrame = System::the->frame();
+    }
+    else
+    {
+        if (d_traverseAtFrame >= 0)
+            d_traverseAtFrame = -increment;
+        else
+            d_traverseAtFrame -= increment;
+    }
+
+    for (ParentList::iterator it = parentList.begin();
+         it != parentList.end();
+         it++)
+    {
+        (*it)->forceTraversal(once, increment);
+    }
+}
+
+void VrmlNode::decreaseTraversalForce(int num)
+{
+    if (d_traverseAtFrame >= 0)
+        return;
+
+    if (num == -1)
+        num = -d_traverseAtFrame;
+
+    d_traverseAtFrame += num;
+
+    for (ParentList::iterator it = parentList.begin();
+         it != parentList.end();
+         it++)
+    {
+        (*it)->decreaseTraversalForce(num);
+    }
+}
+
+int VrmlNode::getTraversalForce()
+{
+    if (d_traverseAtFrame < 0)
+        return -d_traverseAtFrame;
+    else
+        return 0;
+}
+
+bool VrmlNode::haveToRender()
+{
+    return true;
+    return (d_traverseAtFrame < 0 || d_traverseAtFrame == System::the->frame());
+}
+
+void VrmlNode::clearFlags()
+{
+    d_flag = false;
 }
 
 // Add a route from an eventOut of this node to an eventIn of another node.
@@ -308,47 +580,6 @@ Route *VrmlNode::addRoute(const char *fromEventOut,
     }
     d_routes = r;
     return r;
-}
-
-void VrmlNode::addRouteI(Route *newr)
-{
-    Route *r;
-    for (r = d_incomingRoutes; r; r = r->nextI())
-    {
-        if (r == newr)
-            return; // Ignore duplicate routes
-    }
-
-    // Add route
-    if (d_incomingRoutes)
-    {
-        newr->setNextI(d_incomingRoutes);
-        d_incomingRoutes->setPrevI(newr);
-    }
-    d_incomingRoutes = newr;
-}
-
-// Remove a route from an eventOut of this node to an eventIn of another node.
-
-void VrmlNode::deleteRoute(const char *fromEventOut,
-                           VrmlNode *toNode,
-                           const char *toEventIn)
-{
-    Route *r;
-    for (r = d_routes; r; r = r->next())
-    {
-        if (toNode == r->toNode() && strcmp(fromEventOut, r->fromEventOut()) == 0 && strcmp(toEventIn, r->toEventIn()) == 0)
-        {
-            if (r->prev())
-                r->prev()->setNext(r->next());
-            else if (d_routes == r)
-                d_routes = r->next();
-            if (r->next())
-                r->next()->setPrev(r->prev());
-            delete r;
-            break;
-        }
-    }
 }
 
 // Remove a route entry if it is in one of the lists.
@@ -385,6 +616,46 @@ void VrmlNode::removeRoute(Route *ir)
     }
 }
 
+void VrmlNode::addRouteI(Route *newr)
+{
+    Route *r;
+    for (r = d_incomingRoutes; r; r = r->nextI())
+    {
+        if (r == newr)
+            return; // Ignore duplicate routes
+    }
+
+    // Add route
+    if (d_incomingRoutes)
+    {
+        newr->setNextI(d_incomingRoutes);
+        d_incomingRoutes->setPrevI(newr);
+    }
+    d_incomingRoutes = newr;
+}
+
+// Remove a route from an eventOut of this node to an eventIn of another node.
+void VrmlNode::deleteRoute(const char *fromEventOut,
+                           VrmlNode *toNode,
+                           const char *toEventIn)
+{
+    Route *r;
+    for (r = d_routes; r; r = r->next())
+    {
+        if (toNode == r->toNode() && strcmp(fromEventOut, r->fromEventOut()) == 0 && strcmp(toEventIn, r->toEventIn()) == 0)
+        {
+            if (r->prev())
+                r->prev()->setNext(r->next());
+            else if (d_routes == r)
+                d_routes = r->next();
+            if (r->next())
+                r->next()->setPrev(r->prev());
+            delete r;
+            break;
+        }
+    }
+}
+
 void VrmlNode::repairRoutes()
 {
     Route *r;
@@ -413,207 +684,6 @@ void VrmlNode::repairRoutes()
     }
     if (routeToDelete != NULL)
         removeRoute(routeToDelete);
-}
-
-void Route::addFromImportName(const char *name)
-{
-    delete[] d_fromImportName;
-    d_fromImportName = new char[strlen(name) + 1];
-    strcpy(d_fromImportName, name);
-}
-
-void Route::addToImportName(const char *name)
-{
-    delete[] d_toImportName;
-    d_toImportName = new char[strlen(name) + 1];
-    strcpy(d_toImportName, name);
-}
-
-Route *Route::newFromRoute(VrmlNode *newFromNode)
-{
-    return newFromNode->addRoute(d_fromEventOut, d_toNode, d_toEventIn);
-}
-
-Route *Route::newToRoute(VrmlNode *newToNode)
-{
-    return d_fromNode->addRoute(d_fromEventOut, newToNode, d_toEventIn);
-}
-
-VrmlNode *Route::newFromNode(void)
-{
-    if (strlen(d_fromImportName) != 0)
-        return d_fromNode->findInside(d_fromImportName);
-    return NULL;
-}
-
-VrmlNode *Route::newToNode(void)
-{
-    if (strlen(d_toImportName) != 0)
-        return d_toNode->findInside(d_toImportName);
-    return NULL;
-}
-
-// Dirty bit - indicates node needs to be revisited for rendering.
-
-void VrmlNode::setModified()
-{
-    d_modified = true;
-    if (d_scene)
-        d_scene->setModified();
-    if (d_metadata.get())
-        d_metadata.get()->setModified();
-    forceTraversal();
-}
-
-void VrmlNode::clearModified()
-{
-    d_modified = false;
-}
-
-bool VrmlNode::haveToRender()
-{
-    return true;
-    return (d_traverseAtFrame < 0 || d_traverseAtFrame == System::the->frame());
-}
-
-int VrmlNode::getTraversalForce()
-{
-    if (d_traverseAtFrame < 0)
-        return -d_traverseAtFrame;
-    else
-        return 0;
-}
-
-void VrmlNode::forceTraversal(bool once, int increment)
-{
-    //fprintf(stderr, "name=%s, once=%d, inc=%d\n", name(), int(once), increment);
-    if (once)
-    {
-        if (d_traverseAtFrame < 0)
-        {
-            return;
-        }
-
-        if (d_traverseAtFrame == System::the->frame())
-        {
-            return;
-        }
-
-        if (d_traverseAtFrame >= 0)
-        {
-            d_traverseAtFrame = System::the->frame();
-        }
-    }
-    else
-    {
-        if (d_traverseAtFrame >= 0)
-        {
-            d_traverseAtFrame = -increment;
-        }
-        else
-        {
-            d_traverseAtFrame -= increment;
-        }
-    }
-
-    for (ParentList::iterator it = parentList.begin();
-         it != parentList.end();
-         it++)
-    {
-        (*it)->forceTraversal(once, increment);
-    }
-}
-
-void VrmlNode::decreaseTraversalForce(int num)
-{
-    if (d_traverseAtFrame >= 0)
-    {
-        return;
-    }
-
-    if (num == -1)
-    {
-        num = -d_traverseAtFrame;
-    }
-
-    d_traverseAtFrame += num;
-
-    for (ParentList::iterator it = parentList.begin();
-         it != parentList.end();
-         it++)
-    {
-        (*it)->decreaseTraversalForce(num);
-    }
-}
-
-bool VrmlNode::isModified() const
-{
-    return d_modified;
-}
-
-void VrmlNode::clearFlags()
-{
-    d_flag = false;
-}
-
-// Render
-
-void VrmlNode::render(Viewer *)
-{
-    clearModified();
-}
-
-// Accumulate transformations for proper rendering of bindable nodes.
-
-void VrmlNode::accumulateTransform(VrmlNode *)
-{
-    ;
-}
-
-VrmlNode *VrmlNode::getParentTransform() { return 0; }
-
-void VrmlNode::inverseTransform(Viewer *v)
-{
-    VrmlNode *parentTransform = getParentTransform();
-    if (parentTransform)
-        parentTransform->inverseTransform(v);
-}
-
-void VrmlNode::inverseTransform(double *m)
-{
-    VrmlNode *parentTransform = getParentTransform();
-    if (parentTransform)
-        parentTransform->inverseTransform(m);
-    else
-        Midentity(m);
-}
-
-bool VrmlNode::isOnlyGeometry() const
-{
-    if (d_routes)
-    {
-        //std::cerr << "Nr" << std::flush;
-        return false;
-    }
-    if (d_incomingRoutes)
-    {
-        //std::cerr << "Ni" << std::flush;
-        return false;
-    }
-
-    if (strstr(name(), "NotCached") != NULL || strstr(name(), "NoCache") != NULL)
-    {
-        //std::cerr << "Nn" << std::flush;
-        return false;
-    }
-
-	if (strstr(name(), "coMirror") != NULL)
-	{
-		//std::cerr << "Nn" << std::flush;
-		return false;
-	}
-    //std::cerr << "N(" << nodeType()->getName() << ")" << std::flush;
-    return true;
 }
 
 // Pass a named event to this node.
@@ -671,142 +741,13 @@ void VrmlNode::eventIn(double timeStamp,
             setModified();
         }
         else
-            cerr << "Error: unhandled eventIn " << nodeType()->getName()
-                 << "::" << name() << "." << origEventName << endl;
+            std::cerr << "Error: unhandled eventIn " << nodeType()->getName()
+                 << "::" << name() << "." << origEventName << std::endl;
     }
 
     else
-        cerr << "Error: unhandled eventIn " << nodeType()->getName()
-             << "::" << name() << "." << origEventName << endl;
-}
-
-// Send a named event from this node.
-
-void VrmlNode::eventOut(double timeStamp,
-                        const char *eventOut,
-                        const VrmlField &fieldValue)
-{
-#ifdef DEBUG
-    fprintf(stderr, "%s::%s 0x%x eventOut %s\n",
-            nodeType()->getName(), name(),
-            (unsigned)this, eventOut);
-#endif
-
-    // Find routes from this eventOut
-    Route *r;
-    for (r = d_routes; r; r = r->next())
-    {
-        if ((strcmp(eventOut, r->fromEventOut()) == 0) || ((strncmp(eventOut, r->fromEventOut(), strlen(eventOut)) == 0) && (strlen(r->fromEventOut()) > 8) && (strcmp(r->fromEventOut() + strlen(r->fromEventOut()) - 8, "_changed") == 0)))
-        {
-#ifdef DEBUG
-            cerr << "  => "
-                 << r->toNode()->nodeType()->getName()
-                 << "::"
-                 << r->toNode()->name()
-                 << "."
-                 << r->toEventIn()
-                 << endl;
-#endif
-            VrmlField *eventValue = fieldValue.clone();
-            d_scene->queueEvent(timeStamp, eventValue,
-                                r->toNode(), r->toEventIn());
-        }
-    }
-}
-
-namespace vrml
-{
-std::ostream &operator<<(std::ostream &os, const VrmlNode &f)
-{
-    return f.print(os, 0);
-}
-}
-
-std::ostream &VrmlNode::print(std::ostream &os, int indent) const
-{
-    const char *nm = name();
-    for (int i = 0; i < indent; ++i)
-        os << ' ';
-
-    if (nm && *nm)
-        os << "DEF " << nm << " ";
-
-    os << nodeType()->getName() << " { ";
-
-    // cast away const-ness for now...
-    if (d_metadata.get())
-        PRINT_FIELD(metadata);
-    VrmlNode *n = (VrmlNode *)this;
-    n->printFields(os, indent + INDENT_INCREMENT);
-
-    os << " }";
-
-    return os;
-}
-
-// This should probably generate an error...
-// Might be nice to make this non-virtual (each node would have
-// to provide a getField(const char* name) method and specify
-// default values in the addField(). The VrmlNodeType class would
-// have to make the fields list public.
-
-std::ostream &VrmlNode::printFields(std::ostream &os, int /*indent*/)
-{
-    os << "# Error: " << nodeType()->getName()
-       << "::printFields unimplemented.\n";
-    return os;
-}
-
-std::ostream &VrmlNode::printField(std::ostream &os,
-                                   int indent,
-                                   const char *name,
-                                   const VrmlField &f)
-{
-    os << endl;
-    for (int i = 0; i < indent; ++i)
-        os << ' ';
-    os << name << ' ' << f;
-    return os;
-}
-
-// Set the value of one of the node fields. No fields exist at the
-// top level, so reaching this indicates an error.
-
-void VrmlNode::setField(const char *fieldName, const VrmlField &fieldValue)
-{
-    auto metaTypes = {"MetadataBoolean", "MetadataDouble", "MetadataFloat", "MetadataInteger", "MetadataSet", "MetadataString"};
-    if (strcmp(fieldName, "metaData") == 0)
-    {
-        const VrmlSFNode *x = fieldValue.toSFNode();
-        if(x && x->get() && x->get()->is<VrmlNodeMetadataBoolean,
-                                         VrmlNodeMetadataDouble,
-                                         VrmlNodeMetadataFloat,
-                                         VrmlNodeMetadataInteger,
-                                         VrmlNodeMetadataSet,
-                                         VrmlNodeMetadataString>())
-                                         {
-                                            d_metadata = *x;
-                                         } else {
-                                             System::the->error("Invalid type (%s) for %s field of %s node (expected Metadata*).\n",
-                                             fieldValue.fieldTypeName(), fieldName, nodeType()->getName());
-                                         }
-    } 
-    else
-        System::the->error("%s::setField: no such field (%s)\n",
-                           nodeType()->getName(), fieldName);
-}
-
-// Get the value of a field or eventOut.
-
-const VrmlField *VrmlNode::getField(const char *fieldName) const
-{
-    if (strcmp(fieldName, "metadata") == 0)
-        return &d_metadata;
-
-    System::the->error("%s(%s)::getField: no such field or eventOut (%s)\n",
-                       name(), nodeType()->getName(), fieldName);
-
-    return 0;
+        std::cerr << "Error: unhandled eventIn " << nodeType()->getName()
+             << "::" << name() << "." << origEventName << std::endl;
 }
 
 // Retrieve a named eventOut/exposedField value.
@@ -852,19 +793,172 @@ const VrmlField *VrmlNode::getEventOut(const char *fieldName) const
     return 0;
 }
 
-//
-//  VrmlNodeChild- should move to its own file
-//
-#include "VrmlNodeChild.h"
-
-void VrmlNodeChild::initFields(VrmlNodeChild *node, VrmlNodeType *t)
+void VrmlNode::render(Viewer *)
 {
-    //space for future implementations
+    clearModified();
 }
 
-VrmlNodeChild::VrmlNodeChild(VrmlScene *scene, const std::string& name)
-    : VrmlNodeTemplate(scene, name)
+// Accumulate transformations for proper rendering of bindable nodes.
+void VrmlNode::accumulateTransform(VrmlNode *)
 {
+    // Do nothing by default
 }
 
+VrmlNode *VrmlNode::getParentTransform() { return nullptr; }
+
+void VrmlNode::inverseTransform(Viewer *v)
+{
+    VrmlNode *parentTransform = getParentTransform();
+    if (parentTransform)
+        parentTransform->inverseTransform(v);
+}
+
+void VrmlNode::inverseTransform(double *m)
+{
+    VrmlNode *parentTransform = getParentTransform();
+    if (parentTransform)
+        parentTransform->inverseTransform(m);
+    else
+        Midentity(m);
+}
+
+bool VrmlNode::isOnlyGeometry() const
+{
+    if (d_routes || d_incomingRoutes)
+        return false;
+
+    if (strstr(name(), "NotCached") != NULL || strstr(name(), "NoCache") != NULL)
+        return false;
+
+	if (strstr(name(), "coMirror") != NULL)
+		return false;
+    
+    return true;
+}
+
+// Send a named event from this node.
+
+void VrmlNode::eventOut(double timeStamp,
+                        const char *eventOut,
+                        const VrmlField &fieldValue)
+{
+#ifdef DEBUG
+    fprintf(stderr, "%s::%s 0x%x eventOut %s\n",
+            nodeType()->getName(), name(),
+            (unsigned)this, eventOut);
 #endif
+
+    // Find routes from this eventOut
+    Route *r;
+    for (r = d_routes; r; r = r->next())
+    {
+        if ((strcmp(eventOut, r->fromEventOut()) == 0) || ((strncmp(eventOut, r->fromEventOut(), strlen(eventOut)) == 0) && (strlen(r->fromEventOut()) > 8) && (strcmp(r->fromEventOut() + strlen(r->fromEventOut()) - 8, "_changed") == 0)))
+        {
+#ifdef DEBUG
+            cerr << "  => "
+                 << r->toNode()->nodeType()->getName()
+                 << "::"
+                 << r->toNode()->name()
+                 << "."
+                 << r->toEventIn()
+                 << endl;
+#endif
+            VrmlField *eventValue = fieldValue.clone();
+            d_scene->queueEvent(timeStamp, eventValue,
+                                r->toNode(), r->toEventIn());
+        }
+    }
+}
+
+// true if this node is on the static node stack
+bool VrmlNode::isOnStack(VrmlNode *node)
+{
+    VrmlNodeList::iterator i;
+
+    for (i = nodeStack.begin(); i != nodeStack.end(); ++i)
+        if (*i == node)
+        {
+            return true;
+            break;
+        }
+    return false;
+}
+
+template<typename VrmlType>
+void VrmlNode::registerField(VrmlNode *node, const std::string& name, VrmlType *field, const FieldUpdateCallback<VrmlType> &updateCb)
+{
+    return node->m_impl->registerField<VrmlType>(name, field, updateCb);
+}
+
+template <typename VrmlType>
+void addField(VrmlNodeType *t, const std::string &name, VrmlType &field) {
+    t->addField(name.c_str(), toEnumType<std::remove_reference_t<VrmlType>>());
+}
+
+template <typename VrmlType>
+void addExposedField(VrmlNodeType *t, const std::string &name, VrmlType &field) {
+    t->addExposedField(name.c_str(), toEnumType<std::remove_reference_t<VrmlType>>());
+}
+
+template <typename VrmlType>
+void VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Private> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value, field.updateCb);
+    if (t) 
+        addField(t, field.name, *field.value);
+}
+
+template <typename VrmlType>
+void VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Exposed> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value, field.updateCb);
+    if (t) 
+        addExposedField(t, field.name, *field.value);
+}
+
+template <typename VrmlType>
+void VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventIn> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value, field.updateCb);
+    if (t) 
+        t->addEventIn(field.name.c_str(), toEnumType<VrmlType>());
+}
+
+template <typename VrmlType>
+void VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventOut> &field)
+{
+    if (node) 
+        registerField(node, field.name, field.value, field.updateCb);
+    if (t) 
+        t->addEventOut(field.name.c_str(), toEnumType<VrmlType>());
+}
+
+#define VRMLNODECHILD2_TEMPLATE_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNode::registerField<VrmlType>(VrmlNode *node, const std::string& name, VrmlType *field, const FieldUpdateCallback<VrmlType> &updateCb);
+FOR_ALL_VRML_TYPES(VRMLNODECHILD2_TEMPLATE_IMPL)
+
+#define TO_VRML_FIELD_TYPES_IMPL(VrmlType) \
+template VrmlField::VrmlFieldType VRMLEXPORT toEnumType(const VrmlType *t);
+FOR_ALL_VRML_TYPES(TO_VRML_FIELD_TYPES_IMPL)
+
+#define INIT_FIELDS_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Private> &field); 
+FOR_ALL_VRML_TYPES(INIT_FIELDS_HELPER_IMPL)
+
+#define INIT_EXPOSED_FIELDS_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::Exposed> &field); 
+FOR_ALL_VRML_TYPES(INIT_EXPOSED_FIELDS_HELPER_IMPL)
+
+#define INIT_EVENT_IN_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventIn> &field); 
+FOR_ALL_VRML_TYPES(INIT_EVENT_IN_HELPER_IMPL)
+
+#define INIT_EVENT_OUT_HELPER_IMPL(VrmlType) \
+template void VRMLEXPORT VrmlNode::initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldAccessibility::EventOut> &field); 
+FOR_ALL_VRML_TYPES(INIT_EVENT_OUT_HELPER_IMPL)
+
+
+} // vrml

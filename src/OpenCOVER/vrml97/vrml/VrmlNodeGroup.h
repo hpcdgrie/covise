@@ -37,7 +37,6 @@ public:
     virtual ~VrmlNodeGroup();
     void flushRemoveList();
 
-    virtual VrmlNode *cloneMe() const override;
     virtual void cloneChildren(VrmlNamespace *) override;
 
     virtual bool isModified() const override;

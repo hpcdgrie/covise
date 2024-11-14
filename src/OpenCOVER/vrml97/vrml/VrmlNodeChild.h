@@ -15,13 +15,13 @@
 #ifndef _VRMLNODECHILD_
 #define _VRMLNODECHILD_
 
-#include "VrmlNodeTemplate.h"
+#include "VrmlNode.h"
 
 namespace vrml
 {
 class VRMLEXPORT VrmlNodeScene;
 
-class VRMLEXPORT VrmlNodeChild : public VrmlNodeTemplate
+class VRMLEXPORT VrmlNodeChild : public VrmlNode
 {
 
 public:

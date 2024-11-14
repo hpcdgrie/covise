@@ -15,13 +15,13 @@
 #ifndef _VRMLNODENORMAL_
 #define _VRMLNODENORMAL_
 
-#include "VrmlNodeTemplate.h"
+#include "VrmlNode.h"
 #include "VrmlMFVec3f.h"
 
 namespace vrml
 {
 
-class VRMLEXPORT VrmlNodeNormal : public VrmlNodeTemplate
+class VRMLEXPORT VrmlNodeNormal : public VrmlNode
 {
 
 public:

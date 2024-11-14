@@ -213,7 +213,7 @@ void VrmlNodeMovieTexture::eventIn(double timeStamp,
     {
         if (!d_isActive.get())
         {
-            setFieldByName(eventName, *fieldValue);
+            setField(eventName, *fieldValue);
             eventOut(timeStamp, "speed_changed", *fieldValue);
             movProp.speed = d_speed.get();
             setModified();
@@ -223,7 +223,7 @@ void VrmlNodeMovieTexture::eventIn(double timeStamp,
     {
         if (!d_isActive.get())
         {
-            setFieldByName(eventName, *fieldValue);
+            setField(eventName, *fieldValue);
             eventOut(timeStamp, "start_changed", *fieldValue);
             movProp.start = d_startTime.get();
             setModified();
@@ -233,7 +233,7 @@ void VrmlNodeMovieTexture::eventIn(double timeStamp,
     {
         if (!d_isActive.get())
         {
-            setFieldByName(eventName, *fieldValue);
+            setField(eventName, *fieldValue);
             eventOut(timeStamp, "stop_changed", *fieldValue);
             movProp.stop = d_stopTime.get();
             setModified();
@@ -380,7 +380,7 @@ const VrmlField *VrmlNodeMovieTexture::getField(const char *fieldName) const
     else if (strcmp(fieldName, "isActive") == 0)
         return &d_isActive;
 
-    return VrmlNodeTemplate::getField(fieldName); // Parent class
+    return VrmlNode::getField(fieldName); // Parent class
 }
 
 // Set the value of one of the node fields.

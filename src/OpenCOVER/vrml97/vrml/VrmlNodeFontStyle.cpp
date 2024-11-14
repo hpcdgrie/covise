@@ -20,7 +20,7 @@ using namespace vrml;
 
 void VrmlNodeFontStyle::initFields(VrmlNodeFontStyle *node, VrmlNodeType *t)
 {
-    VrmlNodeTemplate::initFieldsHelper(node, t,
+    VrmlNode::initFieldsHelper(node, t,
                                        exposedField("family", node->d_family),
                                        exposedField("horizontal", node->d_horizontal),
                                        exposedField("justify", node->d_justify),
@@ -36,7 +36,7 @@ const char *VrmlNodeFontStyle::name() { return "FontStyle"; }
 
 
 VrmlNodeFontStyle::VrmlNodeFontStyle(VrmlScene *scene)
-    : VrmlNodeTemplate(scene, name())
+    : VrmlNode(scene, name())
     , d_family("SERIF")
     , d_horizontal(true)
     , d_justify("BEGIN")
