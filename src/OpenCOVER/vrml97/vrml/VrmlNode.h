@@ -75,11 +75,11 @@ public:
 
     template<typename Derived>
     Derived *as() {
-        return dynamic_cast<Derived*>(this);
+        return dynamic_cast<Derived*>(getThisProto());
     }
     template<typename Derived>
     const Derived *as() const {
-        return dynamic_cast<const Derived*>(this);
+        return dynamic_cast<const Derived*>(getThisProto());
     }
     template<typename...Deriveds>
     bool is() const {
@@ -189,7 +189,8 @@ protected:
     {
         INDENT_INCREMENT = 4
     };
-
+    virtual VrmlNode *getThisProto(){return this;}
+    virtual const VrmlNode *getThisProto() const {return this;}
     // Send a named event from this node.
     void eventOut(double timeStamp,
                   const char *eventName,

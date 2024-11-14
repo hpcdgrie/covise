@@ -315,6 +315,17 @@ VrmlNode *VrmlNodeProto::firstNode() const
                 : d_nodeType->firstNode());
 }
 
+VrmlNode *VrmlNodeProto::getThisProto()
+{
+    return firstNode();
+}
+
+const VrmlNode *VrmlNodeProto::getThisProto() const 
+{
+    return firstNode();
+}
+
+
 bool VrmlNodeProto::isModified() const
 {
     if (d_modified)

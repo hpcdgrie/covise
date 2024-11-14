@@ -83,7 +83,8 @@ public:
 
 private:
     VrmlNode *firstNode() const;
-
+    VrmlNode *getThisProto() override;
+    const VrmlNode *getThisProto() const override;
     // Instantiate the proto by cloning the node type implementation nodes.
     void instantiate(const char* relUrl = nullptr, int parentId = -1);
 
