@@ -319,7 +319,6 @@ Vrml97Plugin::Vrml97Plugin()
 , viewer(NULL)
 , vrmlScene(NULL)
 , player(NULL)
-, sensorList(NULL)
 {
     //fprintf(stderr,"Vrml97Plugin::Vrml97Plugin\n");
     if (plugin)
@@ -352,8 +351,6 @@ bool Vrml97Plugin::init()
         this->player = listener->createPlayer();
         cover->registerPlayer(player);
     }
-
-    sensorList = new coSensorList();
 
     coVRFileManager::instance()->registerFileHandler(&handlers[0]);
     coVRFileManager::instance()->registerFileHandler(&handlers[1]);
@@ -424,9 +421,6 @@ Vrml97Plugin::~Vrml97Plugin()
 
     coEventQueue::unregisterEventType(&VrmlNodeARSensor::AREventType);
 
-    delete sensorList;
-    sensorList = NULL;
-
     delete System::the;
 }
 
@@ -435,8 +429,6 @@ Vrml97Plugin::update()
 {
     bool render = false;
 
-    if (this->sensorList)
-        sensorList->update();
     if (this->viewer)
     {
         render = this->viewer->update();
