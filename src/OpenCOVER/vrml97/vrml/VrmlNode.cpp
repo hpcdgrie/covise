@@ -89,147 +89,137 @@ class VrmlNodeUpdateRegistry
 public:
     VrmlNodeUpdateRegistry(VrmlNode *nodeChild)
     : m_nodeChild(nodeChild)
-    {}
+    {
+        
+    }
 
 
 private:
-    //use pointers to avoid memory overhead for arrays
-    
-    using VrmlTypesVariant = tuple_to_variant_ptr<VrmlTypesTuple>;
-
-    template<typename VrmlType>
-    struct VrmlTypeStruct{
-        VrmlType *value;
+    struct VrmlTypeStructBase
+    {
+        VrmlTypeStructBase(const std::string &name)
+        : name(name)
+        {
+        }
+        virtual ~VrmlTypeStructBase() = default;
+        virtual void setField(const VrmlField &fieldValue) = 0;
+        virtual const VrmlField *getField() const = 0;
+        virtual void print(std::ostream &os) const = 0;
+        virtual std::unique_ptr<VrmlTypeStructBase> copy() const = 0;
         bool initialized = false;
+        const std::string name;
+    };
+    template<typename VrmlType>
+    struct VrmlTypeStruct : public VrmlTypeStructBase{
+        VrmlTypeStruct(const std::string &name, VrmlType *value, const VrmlNode::FieldUpdateCallback<VrmlType> &updateCb)
+        : VrmlTypeStructBase(name)
+        , value(value)
+        , updateCb(updateCb)
+        {
+        }
+        void setField(const VrmlField &fieldValue) override {
+            auto val = dynamic_cast<const VrmlType*>(&fieldValue);
+            if(!val){
+                System::the->error("Invalid VrmlType (%s) for %s field.\n",
+                    fieldValue.fieldTypeName(), name);
+                return;
+            }
+            *value = *val;
+            initialized = true;
+            if(updateCb){
+                updateCb(val);
+            }
+        }
+
+        const VrmlField *getField() const override {
+            return value;
+        }
+
+        void print(std::ostream &os) const override {
+            os << *value;
+        }
+
+        std::unique_ptr<VrmlTypeStructBase> copy() const override {
+            return std::make_unique<VrmlTypeStruct<VrmlType>>(*this);
+        }
+        //use pointers to avoid memory overhead for arrays
+        VrmlType *value;
         VrmlNode::FieldUpdateCallback<VrmlType> updateCb;
         // const VrmlType defaultValue;
     };
 
-
-    template<typename Tuple, std::size_t... Indices>
-    static std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...> tuple_to_VrmlTypeStruct_impl(std::index_sequence<Indices...>) {
-        return std::variant<VrmlTypeStruct<std::tuple_element_t<Indices, Tuple>>...>{};
-    }
-
-
-    template<typename Tuple>
-    using tuple_to_VrmlTypeStruct = decltype(tuple_to_VrmlTypeStruct_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>{}));
-
-    using VrmlTypeStructs = tuple_to_VrmlTypeStruct<VrmlTypesTuple>;
-    
-    std::map<std::string, VrmlTypeStructs> m_fields;
+    std::vector<std::unique_ptr<VrmlTypeStructBase>> m_fields;
     VrmlNode *m_nodeChild;
+    std::function<void(const char *, const VrmlField &)> m_setFieldFunc;
 
 public:
     const VrmlField *getField(const char *fieldName) const
     {
-        auto it = m_fields.find(fieldName);
+        auto it = std::find_if(m_fields.begin(), m_fields.end(), [fieldName](const auto& f){
+            return f->name == fieldName;
+        });
         if(it == m_fields.end()){
-            return m_nodeChild->getField(fieldName);
+            return nullptr;
         }
-        const VrmlTypeStructs& field = it->second;
-        
-        return std::visit([](auto&& arg){
-            return static_cast<const VrmlField*>(arg.value);
-        }, field);
-        return nullptr;
+        return it->get()->getField();
     }
     
-    void setField(const char *fieldName, const VrmlField &fieldValue) {
-        auto it = m_fields.find(fieldName);
+    inline void setField(const char *fieldName, const VrmlField &fieldValue) {
+        auto it = std::find_if(m_fields.begin(), m_fields.end(), [fieldName](const auto& f){
+            return f->name == fieldName;
+        });
         if(it == m_fields.end()){
-            m_nodeChild->setField(fieldName, fieldValue);
             return;
         }
-        auto& field = it->second;
-        std::visit([fieldName, &fieldValue, this](auto&& arg){
-            auto val = dynamic_cast<const std::remove_pointer_t<decltype(arg.value)>*>(&fieldValue);
-            if(arg.value) //events do not have a field
-            {
-                if(!val){
-                    System::the->error("Invalid VrmlType (%s) for %s field.\n",
-                        fieldValue.fieldTypeName(), fieldName);
-                    return;
-                }
-                *arg.value = *val;
-            }
-            arg.initialized = true;
-            if(arg.updateCb){
-                arg.updateCb(val);
-            }
-
-        }, field);
+        (*it)->setField(fieldValue);
     }
     
     template<typename VrmlType>
     void registerField(const std::string& name, VrmlType *field, const VrmlNode::FieldUpdateCallback<VrmlType> &updateCb = VrmlNode::FieldUpdateCallback<VrmlType>{}){
-        m_fields[name] = VrmlTypeStruct<VrmlType>{ field, false, updateCb};
+        m_fields.push_back(std::make_unique<VrmlTypeStruct<VrmlType>>(name, field, updateCb));
     }
 
     bool initialized(const std::string& name){
-        auto it = m_fields.find(name);
+        auto it = std::find_if(m_fields.begin(), m_fields.end(), [&name](const auto& f){
+            return f->name == name;
+        });
         if(it == m_fields.end()){
             return false;
         }
-        std::visit([](auto&& arg){
-            return arg.initialized;
-        }, it->second);
-        return false;
+        return it->get()->initialized;
     }
 
     bool allInitialized(const std::vector<std::string>& exceptions){
         bool retval = true;
-        for(auto& [name, field] : m_fields){
-            if(std::find(exceptions.begin(), exceptions.end(), name) != exceptions.end()){
+        for(auto& field : m_fields){
+            if(std::find(exceptions.begin(), exceptions.end(), field->name) != exceptions.end()){
                 continue;
             }
-            std::visit([&retval](auto&& arg){
-                if(!arg.initialized){
-                    retval = false;
-                }
-            }, field);
+            if(!field.get()->initialized){
+                retval = false;
+            }
         }
         return retval;
     }
 
-    template<typename VrmlType>
-    VrmlType* copy(const VrmlType* other){
-        return new VrmlType(*other);
-    }
-
-    // use new pointers with this inital values of other
     VrmlNodeUpdateRegistry(const VrmlNodeUpdateRegistry& other)
-    : m_fields(other.m_fields)
     {
-        for(auto& [name, field] : m_fields){
-            std::visit([this, &field](auto&& arg){
-                arg.value = copy(arg.value);
-            }, field);
+        for(auto& field : other.m_fields){
+            m_fields.push_back(field->copy());
         }
     }
 
-    template<typename VrmlType>
-    void deleter(VrmlType* t){
-        delete t;
-    }
     std::ostream &printFields(std::ostream &os, int indent) const
     {
-        for(auto& [name, field] : m_fields){
-            os << std::string(indent, ' ') << name << " : ";
-            std::visit([&os](auto&& arg){
-                os << *arg.value;
-            }, field);
+        for(auto& field : m_fields){
+            os << std::string(indent, ' ') << field->name << " : ";
+            field->print(os);
             os << std::endl;
         }
         return os;
     }
 };
 
-template<>
-VrmlField* VrmlNodeUpdateRegistry::copy(const VrmlField* other){
-    assert(!("can not copy abstract VrmlField"));
-    return nullptr;
-}
 
 //VrmlNode
 //--------------------------------------------------------------------------------------------------
