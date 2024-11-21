@@ -47,7 +47,35 @@
 #include "VrmlSFVec2f.h"
 #include "VrmlSFVec3d.h"
 #include "VrmlSFVec3f.h"
+
+#include <chrono>
 namespace vrml{
+
+class TimeTracker
+{
+public:
+    TimeTracker(const std::string &name)
+        : m_name(name), m_start(std::chrono::steady_clock::now()) {}
+
+    ~TimeTracker()
+    {
+        // auto end = std::chrono::steady_clock::now();
+        // std::chrono::duration<double> duration = end - m_start;
+
+        // std::cerr << m_name << " took: " << duration.count() << " seconds" << std::endl;
+    }
+    double getTIme()
+    {
+        auto end = std::chrono::steady_clock::now();
+        std::chrono::duration<double> duration = end - m_start;
+        return duration.count();
+    }
+
+private:
+    static std::map<std::string, std::chrono::steady_clock::time_point> m_timers;
+    const std::string m_name;
+    std::chrono::steady_clock::time_point m_start;
+};
 
 class VrmlScene;
 class Viewer;
@@ -58,6 +86,10 @@ class VRMLEXPORT VrmlNode
     friend class VrmlNodeUpdateRegistry;
     friend std::ostream &operator<<(std::ostream &os, const VrmlNode &f);   
 public:
+
+    static double timeSpentInSetField;
+    static size_t numSetFieldCalls;
+    static size_t numIsModifiedCalls;
 
     static void initFields(VrmlNode *node, VrmlNodeType *t);
 

@@ -91,6 +91,8 @@
 
 #include <cover/ui/Action.h>
 
+#include <chrono>
+
 using namespace covise;
 using namespace grmsg;
 
@@ -427,6 +429,24 @@ Vrml97Plugin::~Vrml97Plugin()
 bool
 Vrml97Plugin::update()
 {
+    std::cerr << "VrmlNode numIsModifiedCalls: " << VrmlNode::numIsModifiedCalls << std::endl;
+    VrmlNode::numIsModifiedCalls = 0;
+    static int numCalls = 0;
+    static std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ++numCalls;
+    if(numCalls == 20000)
+    {
+        auto end = std::chrono::steady_clock::now();
+        std::chrono::duration<double> duration = end - start;
+        start = end;
+        std::cerr << "average fps: " << numCalls / duration.count() << std::endl;
+        numCalls = 0;
+        std::cerr << "time spent in setField: " << VrmlNode::timeSpentInSetField << "s, num calls: " << VrmlNode::numSetFieldCalls << std::endl;
+        std::cerr << "average time per setField: " << VrmlNode::timeSpentInSetField / VrmlNode::numSetFieldCalls << "s" << std::endl;
+
+        VrmlNode::timeSpentInSetField = 0.0;
+        VrmlNode::numSetFieldCalls = 0;
+    }
     bool render = false;
 
     if (this->viewer)

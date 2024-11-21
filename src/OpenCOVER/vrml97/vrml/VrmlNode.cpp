@@ -377,9 +377,17 @@ bool VrmlNode::allFieldsInitialized() const
     return m_impl->allInitialized({"metadata"});
 }
 
+double VrmlNode::timeSpentInSetField = 0.0;
+size_t VrmlNode::numSetFieldCalls = 0;
+size_t VrmlNode::numIsModifiedCalls = 0;
+
 void VrmlNode::setField(const char *fieldName, const VrmlField &fieldValue) 
 {
+    // std::cerr << "setField " << fieldName << " of node " << m_constructor->first << std::endl;
+    TimeTracker tt("setField");
     m_impl->setField(fieldName, fieldValue);
+    timeSpentInSetField += tt.getTIme();
+    ++numSetFieldCalls;
 }
 
 std::ostream &VrmlNode::printFields(std::ostream &os, int indent) const
@@ -473,6 +481,7 @@ void VrmlNode::clearModified()
 
 bool VrmlNode::isModified() const
 {
+    ++numIsModifiedCalls;
     return d_modified;
 }
 
