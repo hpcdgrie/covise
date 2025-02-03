@@ -74,7 +74,7 @@ void BoneFinder::apply(osg::Node& node) {
 
 osg::Node *FbxProvider::loadModel(const std::string &filename)
 {
-    osg::ref_ptr trans = new osg::MatrixTransform;
+    auto trans = new osg::MatrixTransform;
     auto scale = osg::Matrix::scale(osg::Vec3f(10, 10, 10));
     auto rot1 = osg::Matrix::rotate(osg::PI / 2, 1,0,0);
     auto rot2 = osg::Matrix::rotate(osg::PI, 0,0,1);
@@ -109,16 +109,16 @@ osg::Node *FbxProvider::loadModel(const std::string &filename)
     anim->setName("hand");
     m_animationFinder.m_am->registerAnimation(anim);
 
-    for(const auto & anim : m_animations)
+    for(const auto & a : m_animations)
     {
-        std::cerr << "avatar has animation " << i++ << " " << anim->getName() << std::endl;
-        anim->setPlayMode(osgAnimation::Animation::PlayMode::LOOP);
-        auto slider = new ui::Slider(fbxMenu, anim->getName());
+        std::cerr << "avatar has animation " << i++ << " " << a->getName() << std::endl;
+        a->setPlayMode(osgAnimation::Animation::PlayMode::LOOP);
+        auto slider = new ui::Slider(fbxMenu, a->getName());
         slider->setBounds(0,1);
-        slider->setCallback([this, &anim](double val, bool x){
-            m_animationFinder.m_am->playAnimation(anim, 1, val);
+        slider->setCallback([this, &a](double val, bool x){
+            m_animationFinder.m_am->playAnimation(a, 1, val);
         });
-        m_animationFinder.m_am->stopAnimation(anim);
+        m_animationFinder.m_am->stopAnimation(a);
     }
 
     auto moveBone = new ui::Action(fbxMenu, "move right hand");
