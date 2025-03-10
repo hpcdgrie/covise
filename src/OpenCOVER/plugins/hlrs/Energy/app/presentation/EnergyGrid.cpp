@@ -102,6 +102,7 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
 
   const auto &points = m_config.points;
   for (auto i = 0; i < indices.size(); ++i) {
+    const auto &from = *points[i];
     for (auto j = 0; j < indices[i].size(); ++j) {
       std::unique_ptr<grid::ConnectionData<grid::Point>> data;
 
@@ -110,7 +111,6 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
         std::cerr << "Invalid Index for points: " << i << "\n";
         continue;
       }
-      const auto &from = *points[i];
 
       if (indice >= points.size() || indice < 0) {
         std::cerr << "Invalid Index for points: " << indice << "\n";

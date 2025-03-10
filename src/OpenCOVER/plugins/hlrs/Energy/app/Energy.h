@@ -28,6 +28,7 @@
 #include "presentation/PrototypeBuilding.h"
 
 // core
+#include <cover/coTUIListener.h>
 #include <lib/core/simulation/grid.h>
 #include <lib/core/simulation/heating.h>
 #include <lib/core/interfaces/IEnergyGrid.h>
@@ -80,6 +81,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace core::simulation;
@@ -125,7 +127,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region typedef */
-  typedef HeatingSimulationUI<core::interface::IEnergyGrid> EGHeatingSimulationUI;
+  typedef std::unordered_map<int, std::string> IDLookupTable;
+  typedef HeatingSimulationUI<core::interface::IEnergyGrid> HeatingSimUI;
   typedef PowerSimulationUI<core::interface::IEnergyGrid> EGPowerSimulationUI;
   typedef const ennovatis::Building *building_const_ptr;
   typedef const ennovatis::Buildings *buildings_const_Ptr;
@@ -226,13 +229,15 @@ class EnergyPlugin : public opencover::coVRPlugin,
       opencover::utils::read::CSVStream &stream, float &max, float &min, float &sum,
       int &timesteps);
   std::unique_ptr<core::simulation::grid::Points> createPowerGridPoints(
-      opencover::utils::read::CSVStream &stream, const float &sphereRadius,
-      const std::vector<std::string> &busNames);
+      opencover::utils::read::CSVStream &stream, size_t &numPoints, const float &sphereRadius,
+      const IDLookupTable &busNames);
   std::pair<std::unique_ptr<core::simulation::grid::Indices>,
             std::unique_ptr<core::simulation::grid::DataList>>
   getPowerGridIndicesAndOptionalData(opencover::utils::read::CSVStream &stream,
-                                     const size_t &numBus);
-  std::unique_ptr<std::vector<std::string>> getBusNames(
+                                     const size_t &numPoints);
+  //   std::unique_ptr<std::vector<std::string>> getBussesWithNames(
+  //       opencover::utils::read::CSVStream &stream);
+  std::unique_ptr<IDLookupTable> retrieveBusNameIdMapping(
       opencover::utils::read::CSVStream &stream);
 
   bool checkBoxSelection_powergrid(const std::string &tableName,
@@ -271,7 +276,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #region COOLINGGRID */
   void buildCoolingGrid();
   /* #endregion */
-
+  void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
   /* #endregion*/
 
   // general
