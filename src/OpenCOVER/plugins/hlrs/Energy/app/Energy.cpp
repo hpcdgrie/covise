@@ -1481,9 +1481,8 @@ void EnergyPlugin::readSimulationDataStream(
       }
     }
   }
-  m_heatingSimUI =
-      std::make_unique<EGHeatingSimulationUI>(m_heatingSim, m_heatingGrid,
-                                            m_colorMapMenu->getColorMap());
+  m_heatingSimUI = std::make_unique<HeatingSimUI>(
+      m_heatingSim, m_heatingGrid, m_colorMapMenu->getColorMap());
   m_heatingSimUI->updateTimestepColors("mass_flow");
 
   auto timesteps = m_heatingSim->getTimesteps("mass_flow");

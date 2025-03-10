@@ -358,7 +358,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::shared_ptr<PowerSimulation> m_powerSim;
 
   std::unique_ptr<EGPowerSimulationUI> m_powerSimUI;
-  std::unique_ptr<EGHeatingSimulationUI> m_heatingSimUI;
+  std::unique_ptr<HeatingSimUI> m_heatingSimUI;
 };
 
 #endif
