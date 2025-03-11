@@ -1039,7 +1039,6 @@ std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
           values.insert({cityGMLBuildingName, {value}});
         else
           values[cityGMLBuildingName].push_back(value);
-        // }
       }
       ++timesteps;
     }
@@ -1444,7 +1443,6 @@ void EnergyPlugin::buildPowerGrid() {
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   m_powerGroup->setName("PowerGrid");
-  //   m_powerGrid = std::make_unique<core::EnergyGrid>(core::EnergyGridConfig{
   m_powerGrid = std::make_shared<EnergyGrid>(
       EnergyGridConfig{"POWER", *points, *indices, m_powerGroup, 0.5f, *optData,
                        infoboardAttributes});
