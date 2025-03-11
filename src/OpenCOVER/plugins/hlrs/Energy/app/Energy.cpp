@@ -1027,19 +1027,19 @@ std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
     while (stream >> row) {
       for (auto cityGMLBuildingName : headers) {
         auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
-        if (sensor != m_cityGMLObjs.end()) {
-          float value = 0;
-          ACCESS_CSV_ROW(row, cityGMLBuildingName, value);
-          if (value > max)
-            max = value;
-          else if (value < min || min == -1)
-            min = value;
-          sum += value;
-          if (values.find(cityGMLBuildingName) == values.end())
-            values.insert({cityGMLBuildingName, {value}});
-          else
-            values[cityGMLBuildingName].push_back(value);
-        }
+        if (sensor == m_cityGMLObjs.end()) continue;
+        float value = 0;
+        ACCESS_CSV_ROW(row, cityGMLBuildingName, value);
+        if (value > max)
+          max = value;
+        else if (value < min || min == -1)
+          min = value;
+        sum += value;
+        if (values.find(cityGMLBuildingName) == values.end())
+          values.insert({cityGMLBuildingName, {value}});
+        else
+          values[cityGMLBuildingName].push_back(value);
+        // }
       }
       ++timesteps;
     }
@@ -1175,14 +1175,12 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
       } else {
         checkBox->setState(powerGridSelection[i]);
       }
-      //   checkBoxMap.insert({col, checkBox});
       checkBoxMap.push_back(checkBox);
       ++i;
     }
     if (auto it = m_powerGridCheckboxes.find(menu);
         it != m_powerGridCheckboxes.end()) {
       auto &[_, chBxMap] = *it;
-      //   chBxMap.insert(checkBoxMap.begin(), checkBoxMap.end());
       std::move(checkBoxMap.begin(), checkBoxMap.end(), std::back_inserter(chBxMap));
     } else {
       m_powerGridCheckboxes.emplace(menu, checkBoxMap);
@@ -1339,6 +1337,33 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
   return std::make_unique<Points>(points);
 }
 
+void EnergyPlugin::processGeoBuses(core::simulation::grid::Indices &indices,
+                                   int &from,
+                                   const std::string &geoBuses_comma_seperated,
+                                   core::simulation::grid::DataList &additionalData,
+                                   core::simulation::grid::Data &data) {
+  std::stringstream ss(geoBuses_comma_seperated);
+  std::string bus("");
+  int from_last = from - 1;
+  while (std::getline(ss, bus, ',')) {
+    auto to_new = std::stoi(bus) - 1;
+    if (from_last == to_new) continue;
+    auto &last_indices_vec = indices[from_last];
+    auto &to_indices_vec = indices[to_new];
+    // get rid of redundant connections
+    if (std::find(last_indices_vec.begin(), last_indices_vec.end(), to_new) !=
+            last_indices_vec.end() ||
+        std::find(to_indices_vec.begin(), to_indices_vec.end(), from_last) !=
+            to_indices_vec.end()) {
+      from_last = to_new;
+      continue;
+    }
+    last_indices_vec.push_back(to_new);
+    from_last = to_new;
+    additionalData.push_back(data);
+  }
+}
+
 std::pair<std::unique_ptr<core::simulation::grid::Indices>,
           std::unique_ptr<core::simulation::grid::DataList>>
 EnergyPlugin::getPowerGridIndicesAndOptionalData(
@@ -1365,32 +1390,13 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(
 
     ACCESS_CSV_ROW(line, "geo_buses", geoBuses);
     ACCESS_CSV_ROW(line, "from_bus", from);
-    ACCESS_CSV_ROW(line, "to_bus", to);
 
     if (geoBuses.empty()) {
+      ACCESS_CSV_ROW(line, "to_bus", to);
       indices[from].push_back(to);
       additionalData.push_back(data);
     } else {
-      std::stringstream ss(geoBuses);
-      std::string bus("");
-      int from_last = from - 1;
-      while (std::getline(ss, bus, ',')) {
-        auto to_new = std::stoi(bus) - 1;
-        if (from_last == to_new) continue;
-        auto &last_indices_vec = indices[from_last];
-        auto &to_indices_vec = indices[to_new];
-        // get rid of redundant connections
-        if (std::find(last_indices_vec.begin(), last_indices_vec.end(), to_new) !=
-                last_indices_vec.end() ||
-            std::find(to_indices_vec.begin(), to_indices_vec.end(), from_last) !=
-                to_indices_vec.end()) {
-          from_last = to_new;
-          continue;
-        }
-        last_indices_vec.push_back(to_new);
-        from_last = to_new;
-        additionalData.push_back(data);
-      }
+      processGeoBuses(indices, from, geoBuses, additionalData, data);
     }
   }
   return std::make_pair(std::make_unique<Indices>(indices),

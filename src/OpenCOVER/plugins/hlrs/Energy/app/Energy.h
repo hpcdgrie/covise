@@ -229,14 +229,16 @@ class EnergyPlugin : public opencover::coVRPlugin,
       opencover::utils::read::CSVStream &stream, float &max, float &min, float &sum,
       int &timesteps);
   std::unique_ptr<core::simulation::grid::Points> createPowerGridPoints(
-      opencover::utils::read::CSVStream &stream, size_t &numPoints, const float &sphereRadius,
-      const IDLookupTable &busNames);
+      opencover::utils::read::CSVStream &stream, size_t &numPoints,
+      const float &sphereRadius, const IDLookupTable &busNames);
+  void processGeoBuses(grid::Indices &indices, int &from,
+                       const std::string &geoBuses,
+                       core::simulation::grid::DataList &additionalData,
+                       core::simulation::grid::Data &data);
   std::pair<std::unique_ptr<core::simulation::grid::Indices>,
             std::unique_ptr<core::simulation::grid::DataList>>
   getPowerGridIndicesAndOptionalData(opencover::utils::read::CSVStream &stream,
                                      const size_t &numPoints);
-  //   std::unique_ptr<std::vector<std::string>> getBussesWithNames(
-  //       opencover::utils::read::CSVStream &stream);
   std::unique_ptr<IDLookupTable> retrieveBusNameIdMapping(
       opencover::utils::read::CSVStream &stream);
 
