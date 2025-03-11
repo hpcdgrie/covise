@@ -3,6 +3,8 @@
 #include <config/CoviseConfig.h>
 #include <config/coConfig.h>
 #include <cover/VRViewer.h>
+#include <cover/coVRConfig.h>
+#include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/CovconfigLink.h>
 #include <cover/ui/Slider.h>
@@ -27,7 +29,8 @@ using namespace std;
 using namespace opencover;
 
 osg::Quat covise::createRotationMatrixQuat(double headingDegrees,
-                                           double pitchDegrees, double rollDegrees) {
+                                           double pitchDegrees, double rollDegrees,
+                                           RotationType type) {
   // Convert degrees to radians
   double headingRadians = osg::DegreesToRadians(headingDegrees);
   double pitchRadians = osg::DegreesToRadians(pitchDegrees);
@@ -39,13 +42,27 @@ osg::Quat covise::createRotationMatrixQuat(double headingDegrees,
   osg::Quat rollQuat(rollRadians, osg::Vec3(0, 0, 1));        // Roll (around Z-axis)
 
   // Combine the quaternions (order matters!)
-  return rollQuat * pitchQuat * headingQuat;
+  osg::Quat combinedQuat;
+  switch (type) {
+    case HPR:
+      combinedQuat = rollQuat * pitchQuat * headingQuat;
+      break;
+    case PHR:
+      combinedQuat = pitchQuat * headingQuat * rollQuat;
+      break;
+  }
+  return combinedQuat;
 }
 
 osg::Matrix covise::createRotationMatrix(double headingDegrees, double pitchDegrees,
-                                         double rollDegrees) {
-  return osg::Matrix(
-      covise::createRotationMatrixQuat(headingDegrees, pitchDegrees, rollDegrees));
+                                         double rollDegrees, RotationType type) {
+  return osg::Matrix(covise::createRotationMatrixQuat(headingDegrees, pitchDegrees,
+                                                      rollDegrees, type));
+}
+
+osg::Matrix PLUGIN_UTILEXPORT covise::createRotationMatrix(const osg::Vec3 &hpr,
+                                                           RotationType type) {
+  return createRotationMatrix(hpr[0], hpr[1], hpr[2], type);
 }
 
 covise::ColorMaps covise::readColorMaps() {
@@ -425,6 +442,7 @@ void covise::ColorMapRenderObject::render() {
     osg::Vec3d scale, translation;
     osg::Quat rotationNoScale, scaleOrientation;
     transformMatrix.decompose(translation, rotationNoScale, scale, scaleOrientation);
+
     auto transformMatrixNoScale =
         osg::Matrixd::rotate(rotationNoScale) * osg::Matrixd::translate(translation);
 
@@ -551,6 +569,16 @@ void covise::ColorMapUI::initColorMapSettings() {
         rebuildColorMap();
       },
       m_colorMapSettingsMenu);
+
+  m_rotationType = new ui::SelectionList(m_colorMapSettingsMenu, "RotationType");
+  m_rotationType->append("HPR");
+  m_rotationType->append("PHR");
+  m_rotationType->select(0);
+
+  m_rotationType->setCallback([this](int index) {
+    m_renderObject->getConfig().RotationType() = static_cast<RotationType>(index);
+    rebuildColorMap();
+  });
 }
 
 void covise::ColorMapUI::initUI() {

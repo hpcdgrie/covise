@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include "config/CoviseConfig.h"
 #include "util/coExport.h"
 
 namespace covise {
@@ -50,6 +51,8 @@ struct ColorMapLabelConfig {
   float charSize = 0.04f;
 };
 
+enum RotationType { HPR, PHR };
+
 typedef std::map<std::string, ColorMap> ColorMaps;
 PLUGIN_UTILEXPORT ColorMaps readColorMaps();
 osg::Vec4 PLUGIN_UTILEXPORT getColor(float val, const ColorMap &colorMap,
@@ -57,12 +60,19 @@ osg::Vec4 PLUGIN_UTILEXPORT getColor(float val, const ColorMap &colorMap,
 // same logic as colors module, but sets linear sampling points
 ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm, int numSteps);
 ColorMap PLUGIN_UTILEXPORT upscale(const ColorMap &baseMap, size_t numSteps);
+
 osg::Quat PLUGIN_UTILEXPORT createRotationMatrixQuat(double headingDegrees,
                                                      double pitchDegrees,
-                                                     double rollDegrees);
+                                                     double rollDegrees,
+                                                     RotationType type = HPR);
+
 osg::Matrix PLUGIN_UTILEXPORT createRotationMatrix(double headingDegrees,
                                                    double pitchDegrees,
-                                                   double rollDegrees);
+                                                   double rollDegrees,
+                                                   RotationType type = HPR);
+
+osg::Matrix PLUGIN_UTILEXPORT createRotationMatrix(const osg::Vec3 &hpr,
+                                                   RotationType type = HPR);
 
 class PLUGIN_UTILEXPORT ColorMapSelector {
  public:
@@ -89,9 +99,12 @@ class ColorMapRenderConfig {
         rotationAngleX(45.0f),
         rotationAngleY(90.0f),
         rotationAngleZ(90.0f),
+        rotationType(HPR),
+        hudScale(
+            covise::coCoviseConfig::getFloat("COVER.Plugin.ColorBar.HudScale", 0.5)),
         objectPositionInBase(-0.6f, 1.6f, -0.4f),
         colorMapRotation(createRotationMatrixQuat(rotationAngleY, rotationAngleX,
-                                                  rotationAngleZ)) {}
+                                                  rotationAngleZ, rotationType)) {}
   void setRotationAngleX(float rotationX) {
     this->rotationAngleX = rotationX;
     recomputeColorMapRotation();
@@ -110,6 +123,8 @@ class ColorMapRenderConfig {
   auto &DistanceX() { return objectPositionInBase.x(); }
   auto &DistanceY() { return objectPositionInBase.y(); }
   auto &DistanceZ() { return objectPositionInBase.z(); }
+  auto &HUDScale() { return hudScale; }
+  auto &RotationType() { return rotationType; }
   const auto &RotationAngleX() const { return rotationAngleX; }
   const auto &RotationAngleY() const { return rotationAngleY; }
   const auto &RotationAngleZ() const { return rotationAngleZ; }
@@ -118,13 +133,15 @@ class ColorMapRenderConfig {
 
  private:
   void recomputeColorMapRotation() {
-    colorMapRotation =
-        createRotationMatrixQuat(rotationAngleY, rotationAngleX, rotationAngleZ);
+    colorMapRotation = createRotationMatrixQuat(rotationAngleY, rotationAngleX,
+                                                rotationAngleZ, rotationType);
   }
 
   bool multisample;
   float rotationAngleX, rotationAngleY, rotationAngleZ;
+  float hudScale;
   ColorMapLabelConfig labelConfig;
+  enum RotationType rotationType;
 
   osg::Vec3d objectPositionInBase;
   osg::Vec3d objectUp;
@@ -228,6 +245,8 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   opencover::ui::Slider *m_rotation_x = nullptr;
   opencover::ui::Slider *m_rotation_y = nullptr;
   opencover::ui::Slider *m_rotation_z = nullptr;
+
+  opencover::ui::SelectionList *m_rotationType = nullptr;
 
   opencover::ui::Slider *m_charSize = nullptr;
 
