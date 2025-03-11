@@ -25,6 +25,8 @@
 #include <osgText/Text>
 #include <sstream>
 
+#include "osg/Camera"
+
 using namespace std;
 using namespace opencover;
 
@@ -398,32 +400,68 @@ void covise::ColorMapRenderObject::show(bool on) {
   }
 }
 
-// vruiMatrix *coUIElement::getMatrixFromPositionHprScale(float x, float y, float z,
-// float h, float p, float r, float scale)
-// {
-//     vruiMatrix *transMatrix = vruiRendererInterface::the()->createMatrix();
-//     vruiMatrix *rotateMatrix = vruiRendererInterface::the()->createMatrix();
-//     vruiMatrix *scaleMatrix = vruiRendererInterface::the()->createMatrix();
-//     vruiMatrix *matrix = vruiRendererInterface::the()->createMatrix();
-//     vruiMatrix *rxMatrix = vruiRendererInterface::the()->createMatrix();
+void covise::ColorMapRenderObject::initHUD() {
+  // Create HUD camera
+  osg::ref_ptr<osg::Camera> hudCamera = new osg::Camera;
+  hudCamera->setProjectionMatrix(
+      osg::Matrix::ortho2D(0, 1, 0, 1));                // Adjust viewport as needed
+  hudCamera->setViewport(0, 0, 100, 100);               // Set HUD viewport
+  hudCamera->setClearMask(GL_DEPTH_BUFFER_BIT);         // Clear depth buffer
+  hudCamera->setRenderOrder(osg::Camera::POST_RENDER);  // Render after main scene
+  hudCamera->setAllowEventFocus(false);
+  hudCamera->addChild(m_colormapTransform);
 
-//     transMatrix->makeTranslate(x, y, z);
-//     rotateMatrix->makeEuler(h, p, r);
-//     scaleMatrix->makeScale(scale, scale, scale);
-//     rxMatrix->makeEuler(0.0, 90.0, 0.0);
+  VRViewer::instance()->addCamera(hudCamera);
+}
 
-//     matrix->makeIdentity();
-//     matrix->mult(rxMatrix);
-//     matrix->mult(scaleMatrix);
-//     matrix->mult(rotateMatrix);
-//     matrix->mult(transMatrix);
+osg::Matrixd covise::ColorMapRenderObject::getMatrixFromPositionRotationScale(
+    const osg::Vec3 &position, const osg::Vec3 &hpr, float scale) {
+  osg::Matrix translationMatrix;
+  osg::Matrix rotateMatrix = createRotationMatrix(hpr, m_config.RotationType());
+  osg::Matrix rxMatrix =
+      createRotationMatrix(0.0, 90.0, 0.0, m_config.RotationType());
+  osg::Matrix scaleMatrix;
+  osg::Matrixd transformationMatrix;
 
-//     vruiRendererInterface::the()->deleteMatrix(transMatrix);
-//     vruiRendererInterface::the()->deleteMatrix(rotateMatrix);
-//     vruiRendererInterface::the()->deleteMatrix(scaleMatrix);
-//     vruiRendererInterface::the()->deleteMatrix(rxMatrix);
+  translationMatrix.makeTranslate(position);
+  scaleMatrix.makeScale(scale, scale, scale);
 
-//     return matrix;
+  transformationMatrix = rxMatrix * scaleMatrix * rotateMatrix * translationMatrix;
+
+  return transformationMatrix;
+}
+
+// void covise::ColorMapRenderObject::computeHUDPosition() {
+//   osg::Vec3 bottomLeft, hpr, offset;
+//   if (coVRMSController::instance()->isMaster() &&
+//       coVRConfig::instance()->numScreens() > 0) {
+//     const auto &screen0 = coVRConfig::instance()->screens[0];
+//     hpr = screen0.hpr;
+//     auto screenSizeVector = osg::Vec3(screen0.hsize, 0., screen0.vsize);
+//     osg::Matrix hprRotationMatrix =
+//         createRotationMatrix(hpr, m_config.RotationType());
+//     bottomLeft = screen0.xyz - screenSizeVector * hprRotationMatrix * 0.5;
+//     auto minSize = std::min(screen0.hsize, screen0.vsize);
+//     bottomLeft += osg::Vec3(minSize, 0., minSize) * hprRotationMatrix * 0.02;
+//     offset = osg::Vec3(screen0.vsize / 2.5, 0, 0) * hprRotationMatrix *
+//              m_config.HUDScale();
+//   }
+
+//   for (int i = 0; i < 3; ++i) {
+//     coVRMSController::instance()->syncData(&bottomLeft[i], sizeof(bottomLeft[i]));
+//     coVRMSController::instance()->syncData(&hpr[i], sizeof(hpr[i]));
+//     coVRMSController::instance()->syncData(&offset[i], sizeof(offset[i]));
+//   }
+
+//   // for (size_t i=0; i<visibleHuds.size(); ++i)
+//   // {
+//   //     auto mod = visibleHuds[i];
+//   //     mod->colorbar->setHudPosition(bottomLeft, hpr, offset[0]/480);
+//   //     bottomLeft += offset;
+//   // }
+
+//   m_colormapTransform->setMatrix(
+//       getMatrixFromPositionRotationScale(bottomLeft, hpr, offset[0] / 480));
 // }
 
 void covise::ColorMapRenderObject::render() {
@@ -455,6 +493,7 @@ void covise::ColorMapRenderObject::render() {
     matrix.makeRotate(m_config.ColorMapRotation() * rotationNoScale);
     matrix.setTrans(objectPositionInViewer);
     m_colormapTransform->setMatrix(matrix);
+    // computeHUDPosition();
   }
 }
 

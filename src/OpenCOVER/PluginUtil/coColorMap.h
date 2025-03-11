@@ -10,6 +10,7 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/SelectionList.h>
 #include <cover/ui/Slider.h>
+#include <cover/ui/View.h>
 
 #include <map>
 #include <memory>
@@ -42,7 +43,7 @@ constexpr const char *COLORMAP_FRAGMENT_EMISSION_SHADER =
 struct ColorMap {
   std::vector<float> r, g, b, a, samplingPoints;
   float min = 0.0, max = 0.0;
-  int steps = 32;
+  int steps = 5;
 };
 
 struct ColorMapLabelConfig {
@@ -153,6 +154,7 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
   ColorMapRenderObject(std::shared_ptr<ColorMap> colorMap)
       : m_colormap(colorMap), m_config() {
     opencover::cover->getUpdateManager()->add(this);
+    initHUD();
   }
   ~ColorMapRenderObject() override {
     opencover::cover->getUpdateManager()->remove(this);
@@ -169,6 +171,7 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
 
  private:
   void render();
+  void initHUD();
   osg::ref_ptr<osg::Geode> createColorMapPlane(const ColorMap &colorMap);
   osg::ref_ptr<osg::Texture2D> createVerticalColorMapTexture(
       const ColorMap &colorMap);
@@ -177,6 +180,9 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
   void applyEmissionShader(osg::ref_ptr<osg::StateSet> objectStateSet,
                            osg::ref_ptr<osg::Texture2D> colormapTexture);
   void initShader();
+  void computeHUDPosition();
+  osg::Matrixd getMatrixFromPositionRotationScale(const osg::Vec3 &position,
+                                                  const osg::Vec3 &hpr, float scale);
 
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
