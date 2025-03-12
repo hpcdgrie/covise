@@ -532,7 +532,7 @@ opencover::ui::Slider *covise::ColorMapUI::createSlider(
 
 void covise::ColorMapUI::initSteps() {
   m_numSteps = createSlider(
-      "steps", 1, 1024, ui::Slider::AsDial, 1, [this](float value, bool moving) {
+      "steps", 1, 1024, ui::Slider::AsDial, m_colorMap->steps, [this](float value, bool moving) {
         if (value < 1) return;
         if (!moving) return;
         *m_colorMap = covise::interpolateColorMap(m_selector->selectedMap(), value);
@@ -540,7 +540,7 @@ void covise::ColorMapUI::initSteps() {
       });
   m_numSteps->setScale(ui::Slider::Linear);
   m_numSteps->setIntegral(true);
-  m_numSteps->setLinValue(32);
+  m_numSteps->setLinValue(m_colorMap->steps);
 }
 
 void covise::ColorMapUI::initColorMap() {
