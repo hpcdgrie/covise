@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "config/CoviseConfig.h"
+#include "cover/VRViewer.h"
 #include "util/coExport.h"
 
 namespace covise {
@@ -156,8 +157,9 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
     opencover::cover->getUpdateManager()->add(this);
     initHUD();
   }
-  ~ColorMapRenderObject() override {
+  ~ColorMapRenderObject() {
     opencover::cover->getUpdateManager()->remove(this);
+    opencover::VRViewer::instance()->removeCamera(m_hudCamera);
   }
   void show(bool on = false);
 
@@ -187,6 +189,7 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
   osg::ref_ptr<osg::Program> m_shader;
+  osg::ref_ptr<osg::Camera> m_hudCamera;
   ColorMapRenderConfig m_config;
 };
 

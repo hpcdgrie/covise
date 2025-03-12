@@ -402,16 +402,16 @@ void covise::ColorMapRenderObject::show(bool on) {
 
 void covise::ColorMapRenderObject::initHUD() {
   // Create HUD camera
-  osg::ref_ptr<osg::Camera> hudCamera = new osg::Camera;
-  hudCamera->setProjectionMatrix(
+  m_hudCamera = new osg::Camera;
+  m_hudCamera->setProjectionMatrix(
       osg::Matrix::ortho2D(0, 1, 0, 1));                // Adjust viewport as needed
-  hudCamera->setViewport(0, 0, 100, 100);               // Set HUD viewport
-  hudCamera->setClearMask(GL_DEPTH_BUFFER_BIT);         // Clear depth buffer
-  hudCamera->setRenderOrder(osg::Camera::POST_RENDER);  // Render after main scene
-  hudCamera->setAllowEventFocus(false);
-  hudCamera->addChild(m_colormapTransform);
+  m_hudCamera->setViewport(0, 0, 100, 100);               // Set HUD viewport
+  m_hudCamera->setClearMask(GL_DEPTH_BUFFER_BIT);         // Clear depth buffer
+  m_hudCamera->setRenderOrder(osg::Camera::POST_RENDER);  // Render after main scene
+  m_hudCamera->setAllowEventFocus(false);
+  m_hudCamera->addChild(m_colormapTransform);
 
-  VRViewer::instance()->addCamera(hudCamera);
+  VRViewer::instance()->addCamera(m_hudCamera);
 }
 
 osg::Matrixd covise::ColorMapRenderObject::getMatrixFromPositionRotationScale(
