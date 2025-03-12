@@ -2,10 +2,14 @@
 
 #include <utils/osgUtils.h>
 
+#include <osg/MatrixTransform>
+#include <osg/Shape>
+
 namespace core::simulation::grid {
 Point::Point(const std::string &name, const float &x, const float &y, const float &z,
              const float &radius, const Data &additionalData)
-    : osg::Group(),
+    // : osg::Group(),
+    : osg::MatrixTransform(),
       m_point(new osg::Sphere(osg::Vec3(x, y, z), radius)),
       m_additionalData(additionalData) {
   osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints;
@@ -22,7 +26,8 @@ DirectedConnection::DirectedConnection(const std::string &name,
                                        const float &radius,
                                        osg::ref_ptr<osg::TessellationHints> hints,
                                        const Data &additionalData)
-    : osg::Group(),
+    // : osg::Group(),
+    : osg::MatrixTransform(),
       m_start(new osg::Vec3(start)),
       m_end(new osg::Vec3(end)),
       m_additionalData(additionalData) {

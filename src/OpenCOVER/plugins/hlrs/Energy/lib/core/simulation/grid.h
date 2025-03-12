@@ -1,8 +1,8 @@
-#ifndef _CORE_GRID_H
-#define _CORE_GRID_H
+#pragma once
 
 #include <osg/Geode>
 #include <osg/Group>
+#include <osg/MatrixTransform>
 #include <osg/ShapeDrawable>
 #include <variant>
 
@@ -11,7 +11,8 @@
 namespace core::simulation::grid {
 // grid::Data is a vector of variants that can hold int, float, or string
 typedef std::map<std::string, std::variant<float, int, std::string>> Data;
-class Point : public osg::Group {
+// class Point : public osg::Group {
+class Point : public osg::MatrixTransform {
  public:
   Point(const std::string &name, const float &x, const float &y, const float &z,
         const float &radius, const Data &additionalData = Data());
@@ -52,7 +53,8 @@ struct ConnectionData {
   Data additionalData;
 };
 
-class DirectedConnection : public osg::Group {
+// class DirectedConnection : public osg::Group {
+class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const std::string &name, const osg::Vec3 &start,
                      const osg::Vec3 &end, const float &radius,
                      osg::ref_ptr<osg::TessellationHints> hints,
