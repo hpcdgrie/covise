@@ -16,6 +16,7 @@ class Point : public osg::MatrixTransform {
  public:
   Point(const std::string &name, const float &x, const float &y, const float &z,
         const float &radius, const Data &additionalData = Data());
+  Point(const Point &p);
 
   const auto &getPosition() const { return m_point->getCenter(); }
   const Data &getAdditionalData() const { return m_additionalData; }
@@ -28,6 +29,7 @@ class Point : public osg::MatrixTransform {
   }
 
  private:
+  void init(const std::string &name);
   osg::ref_ptr<osg::ShapeDrawable> m_shape;
   osg::ref_ptr<osg::Sphere> m_point;
   Data m_additionalData;
@@ -85,6 +87,11 @@ class DirectedConnection : public osg::MatrixTransform {
   Data m_additionalData;
 };
 
+// class Line {
+//  private:
+//   std::map<std::string, osg::ref_ptr<DirectedConnection>> m_connections;
+// };
+
 typedef std::vector<osg::ref_ptr<Point>> Points;
 typedef std::vector<osg::ref_ptr<DirectedConnection>> Connections;
 // list of directed connections between points
@@ -93,6 +100,5 @@ typedef std::vector<osg::ref_ptr<DirectedConnection>> Connections;
 // using ConnectivityList = std::vector<ConnectionData<PointType>>;
 typedef std::vector<std::vector<int>> Indices;
 typedef std::vector<Data> DataList;
+// typedef std::vector<Line> Lines;
 }  // namespace core::simulation::grid
-
-#endif

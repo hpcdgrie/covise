@@ -12,6 +12,17 @@ Point::Point(const std::string &name, const float &x, const float &y, const floa
     : osg::MatrixTransform(),
       m_point(new osg::Sphere(osg::Vec3(x, y, z), radius)),
       m_additionalData(additionalData) {
+  init(name);
+}
+
+Point::Point(const Point &other) {
+  m_point = new osg::Sphere(other.m_point->getCenter(), other.m_point->getRadius());
+  m_shape = new osg::ShapeDrawable(m_point, other.m_shape->getTessellationHints());
+  m_additionalData = other.m_additionalData;
+  init(other.getName());
+}
+
+void Point::init(const std::string &name) {
   osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints;
   hints->setDetailRatio(1.5f);
   m_shape = new osg::ShapeDrawable(m_point, hints);
