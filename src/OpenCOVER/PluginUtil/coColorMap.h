@@ -98,13 +98,17 @@ class ColorMapRenderConfig {
  public:
   ColorMapRenderConfig()
       : multisample(true),
-        rotationAngleX(45.0f),
-        rotationAngleY(90.0f),
-        rotationAngleZ(90.0f),
+        // rotationAngleX(45.0f),
+        // rotationAngleY(90.0f),
+        // rotationAngleZ(90.0f),
+        rotationAngleX(180.0f),
+        rotationAngleY(-45.0f),
+        rotationAngleZ(0.0f),
         rotationType(HPR),
         hudScale(
             covise::coCoviseConfig::getFloat("COVER.Plugin.ColorBar.HudScale", 0.5)),
-        objectPositionInBase(-0.6f, 1.6f, -0.4f),
+        // objectPositionInBase(-0.6f, 1.6f, -0.4f),
+        objectPositionInBase(-1.36f, -0.72f, 0.96f),
         colorMapRotation(createRotationMatrixQuat(rotationAngleY, rotationAngleX,
                                                   rotationAngleZ, rotationType)) {}
   void setRotationAngleX(float rotationX) {

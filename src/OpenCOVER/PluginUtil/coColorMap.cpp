@@ -476,7 +476,15 @@ void covise::ColorMapRenderObject::render() {
     // Therefore, the combined result is a matrix that transforms coordinates from
     // the plugin's base coordinate system directly into the viewer's coordinate
     // system.
-    auto transformMatrix = cover->getViewerMat() * cover->getInvBaseMat();
+
+    // cover->getViewerMat() does contain head tracking information => use the main
+    // camera
+    auto viewer = VRViewer::instance();
+    auto mainCamera = viewer->getCamera();
+    auto viewerStaticWorldMatrix = mainCamera->getViewMatrix();
+
+    // auto transformMatrix = cover->getViewerMat() * cover->getInvBaseMat();
+    auto transformMatrix = viewerStaticWorldMatrix * cover->getInvBaseMat();
     osg::Vec3d scale, translation;
     osg::Quat rotationNoScale, scaleOrientation;
     transformMatrix.decompose(translation, rotationNoScale, scale, scaleOrientation);
@@ -493,6 +501,7 @@ void covise::ColorMapRenderObject::render() {
     matrix.makeRotate(m_config.ColorMapRotation() * rotationNoScale);
     matrix.setTrans(objectPositionInViewer);
     m_colormapTransform->setMatrix(matrix);
+
     // computeHUDPosition();
   }
 }
