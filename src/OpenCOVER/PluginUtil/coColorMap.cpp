@@ -232,15 +232,23 @@ covise::ColorMapRenderObject::createVerticalColorMapTexture(
   int height = colorMap.steps;
 
   osg::ref_ptr<osg::Image> image = new osg::Image;
+  // allocate pixel block
   image->allocateImage(width, height, 1, GL_RGBA, GL_FLOAT);
 
+  // obtain a pointer to the image data
   float *imageData = (float *)image->data();
-
+  // iterate over each row of the texture (each step in the color map)
   for (int y = 0; y < height; ++y) {
+    // calculate for each row the sample point by normalizing the row index to the
+    // range [0, 1] because colormaps are defined in this range
     float samplePoint = (float)y / (height - 1);
-
+    // iterate over the sampling points in the color map to find the appropriate
+    // interval for the current sample point and perform the interpolation.
     for (size_t i = 1; i < colorMap.samplingPoints.size(); ++i) {
       if (samplePoint <= colorMap.samplingPoints[i]) {
+        // interval is found => calculate the interpolation
+        // factor t and use it to interpolate the red, green, blue, and alpha
+        // components of the color.
         float t = (samplePoint - colorMap.samplingPoints[i - 1]) /
                   (colorMap.samplingPoints[i] - colorMap.samplingPoints[i - 1]);
 
@@ -380,6 +388,13 @@ void covise::ColorMapRenderObject::show(bool on) {
     osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
     colormapGroup->addChild(pat);
 
+    //              name
+    // label max    -----
+    //             |     |
+    // label mid   |     | unit
+    //             |     |
+    // label min    -----
+    //
     // add text labels for the sampling points
     for (size_t i = 0; i < colorMap->samplingPoints.size(); ++i) {
       std::stringstream ss;
