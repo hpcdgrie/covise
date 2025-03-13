@@ -157,13 +157,13 @@ class ColorMapRenderConfig {
 class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
  public:
   ColorMapRenderObject(std::shared_ptr<ColorMap> colorMap)
-      : m_colormap(colorMap), m_config() {
+      : m_colormap(colorMap),
+        m_config(),
+        m_mainCamera(opencover::VRViewer::instance()->getCamera()) {
     opencover::cover->getUpdateManager()->add(this);
-    initHUD();
   }
   ~ColorMapRenderObject() {
     opencover::cover->getUpdateManager()->remove(this);
-    opencover::VRViewer::instance()->removeCamera(m_hudCamera);
   }
   void show(bool on = false);
 
@@ -177,7 +177,6 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
 
  private:
   void render();
-  void initHUD();
   osg::ref_ptr<osg::Geode> createColorMapPlane(const ColorMap &colorMap);
   osg::ref_ptr<osg::Texture2D> createVerticalColorMapTexture(
       const ColorMap &colorMap);
@@ -186,14 +185,11 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
   void applyEmissionShader(osg::ref_ptr<osg::StateSet> objectStateSet,
                            osg::ref_ptr<osg::Texture2D> colormapTexture);
   void initShader();
-  void computeHUDPosition();
-  osg::Matrixd getMatrixFromPositionRotationScale(const osg::Vec3 &position,
-                                                  const osg::Vec3 &hpr, float scale);
 
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
   osg::ref_ptr<osg::Program> m_shader;
-  osg::ref_ptr<osg::Camera> m_hudCamera;
+  osg::ref_ptr<osg::Camera> m_mainCamera;
   ColorMapRenderConfig m_config;
 };
 
