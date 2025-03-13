@@ -43,8 +43,10 @@ constexpr const char *COLORMAP_FRAGMENT_EMISSION_SHADER =
 
 struct ColorMap {
   std::vector<float> r, g, b, a, samplingPoints;
-  float min = 0.0, max = 0.0;
+  float min = 0.0, max = 1.0;
   int steps = 5;
+  std::string name = "default";
+  std::string unit = "unit";
 };
 
 struct ColorMapLabelConfig {
@@ -98,16 +100,12 @@ class ColorMapRenderConfig {
  public:
   ColorMapRenderConfig()
       : multisample(true),
-        // rotationAngleX(45.0f),
-        // rotationAngleY(90.0f),
-        // rotationAngleZ(90.0f),
         rotationAngleX(180.0f),
         rotationAngleY(-45.0f),
         rotationAngleZ(0.0f),
         rotationType(HPR),
         hudScale(
             covise::coCoviseConfig::getFloat("COVER.Plugin.ColorBar.HudScale", 0.5)),
-        // objectPositionInBase(-0.6f, 1.6f, -0.4f),
         objectPositionInBase(-1.36f, -0.72f, 0.96f),
         colorMapRotation(createRotationMatrixQuat(rotationAngleY, rotationAngleX,
                                                   rotationAngleZ, rotationType)) {}
@@ -162,9 +160,7 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
         m_mainCamera(opencover::VRViewer::instance()->getCamera()) {
     opencover::cover->getUpdateManager()->add(this);
   }
-  ~ColorMapRenderObject() {
-    opencover::cover->getUpdateManager()->remove(this);
-  }
+  ~ColorMapRenderObject() { opencover::cover->getUpdateManager()->remove(this); }
   void show(bool on = false);
 
   bool update() override {

@@ -377,12 +377,16 @@ void covise::ColorMapRenderObject::show(bool on) {
     }
 
     auto colormapPlane = createColorMapPlane(*m_colormap.lock());
+    constexpr float colormapLabelMargin = 0.15f;
+    constexpr float colormapHeightMargin = 0.1f;
+    constexpr float colormapHeightScale = 0.8f;
+    constexpr float colormapWidthScale = 0.1f;
 
     // position colormap relative to the object
     osg::ref_ptr<osg::PositionAttitudeTransform> pat =
         new osg::PositionAttitudeTransform();
     pat->setPosition(osg::Vec3(0.0f, 0.0f, 0.0f));
-    pat->setScale(osg::Vec3(0.1f, 0.8f, 1.0f));
+    pat->setScale(osg::Vec3(colormapWidthScale, colormapHeightScale, 1.0f));
     pat->addChild(colormapPlane);
 
     osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
@@ -400,9 +404,21 @@ void covise::ColorMapRenderObject::show(bool on) {
       std::stringstream ss;
       ss << std::fixed << std::setprecision(2) << colorMap->samplingPoints[i];
       osg::ref_ptr<osg::Geode> textGeode = createTextGeode(
-          ss.str(), osg::Vec3(-0.1f, colorMap->samplingPoints[i] * 0.8f, 0.0f));
+          ss.str(),
+          osg::Vec3(-colormapLabelMargin,
+                    colorMap->samplingPoints[i] * colormapHeightScale, 0.0f));
       colormapGroup->addChild(textGeode);
     }
+
+    // add text labels for the unit and name of the colormap
+    osg::ref_ptr<osg::Geode> unit = createTextGeode(
+        colorMap->unit, osg::Vec3(0.0f, -colormapHeightMargin, 0.0f));
+    colormapGroup->addChild(unit);
+
+    osg::ref_ptr<osg::Geode> name = createTextGeode(
+        colorMap->name,
+        osg::Vec3(0.0f, colormapHeightScale + colormapHeightMargin, 0.0f));
+    colormapGroup->addChild(name);
 
     // create a transform node to move the colormap to the right position
     m_colormapTransform = new osg::MatrixTransform();
@@ -414,7 +430,6 @@ void covise::ColorMapRenderObject::show(bool on) {
     cover->getObjectsRoot()->removeChild(m_colormapTransform);
   }
 }
-
 
 void covise::ColorMapRenderObject::render() {
   if (m_colormapTransform) {
