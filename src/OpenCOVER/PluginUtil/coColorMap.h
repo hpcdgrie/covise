@@ -25,6 +25,7 @@
 
 #include "config/CoviseConfig.h"
 #include "cover/VRViewer.h"
+#include "osg/ref_ptr"
 #include "util/coExport.h"
 
 namespace covise {
@@ -44,7 +45,7 @@ constexpr const char *COLORMAP_FRAGMENT_EMISSION_SHADER =
 struct ColorMap {
   std::vector<float> r, g, b, a, samplingPoints;
   float min = 0.0, max = 1.0;
-  int steps = 5;
+  int steps = 32;
   std::string name = "default";
   std::string unit = "unit";
 };
@@ -108,7 +109,8 @@ class ColorMapRenderConfig {
             covise::coCoviseConfig::getFloat("COVER.Plugin.ColorBar.HudScale", 0.5)),
         objectPositionInBase(-1.36f, -0.72f, 0.96f),
         colorMapRotation(createRotationMatrixQuat(rotationAngleY, rotationAngleX,
-                                                  rotationAngleZ, rotationType)) {}
+                                                  rotationAngleZ, rotationType)),
+        update(false) {}
   void setRotationAngleX(float rotationX) {
     this->rotationAngleX = rotationX;
     recomputeColorMapRotation();
@@ -129,6 +131,7 @@ class ColorMapRenderConfig {
   auto &DistanceZ() { return objectPositionInBase.z(); }
   auto &HUDScale() { return hudScale; }
   auto &RotationType() { return rotationType; }
+  auto &Update() { return update; }
   const auto &RotationAngleX() const { return rotationAngleX; }
   const auto &RotationAngleY() const { return rotationAngleY; }
   const auto &RotationAngleZ() const { return rotationAngleZ; }
@@ -150,6 +153,7 @@ class ColorMapRenderConfig {
   osg::Vec3d objectPositionInBase;
   osg::Vec3d objectUp;
   osg::Quat colorMapRotation;
+  bool update;
 };
 
 class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
@@ -157,7 +161,8 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
   ColorMapRenderObject(std::shared_ptr<ColorMap> colorMap)
       : m_colormap(colorMap),
         m_config(),
-        m_mainCamera(opencover::VRViewer::instance()->getCamera()) {
+        m_mainCamera(opencover::VRViewer::instance()->getCamera()),
+        m_visible(false) {
     opencover::cover->getUpdateManager()->add(this);
   }
   ~ColorMapRenderObject() { opencover::cover->getUpdateManager()->remove(this); }
@@ -178,34 +183,61 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
       const ColorMap &colorMap);
   osg::ref_ptr<osg::Geode> createTextGeode(const std::string &text,
                                            const osg::Vec3 &position);
+  osg::ref_ptr<osg::Group> createColorMapGroup(const ColorMap &colorMap);
+  void addColorMap(osg::ref_ptr<osg::Group> colormapGroup, const ColorMap &colorMap);
+  void addLabel(const float &samplePoint, osg::ref_ptr<osg::Group> colormapGroup);
+  void addLabels(osg::ref_ptr<osg::Group> colormapGroup, const ColorMap &colorMap);
   void applyEmissionShader(osg::ref_ptr<osg::StateSet> objectStateSet,
                            osg::ref_ptr<osg::Texture2D> colormapTexture);
   void initShader();
+  void rebuild();
 
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
   osg::ref_ptr<osg::Program> m_shader;
   osg::ref_ptr<osg::Camera> m_mainCamera;
   ColorMapRenderConfig m_config;
+  bool m_visible;
 };
 
 class PLUGIN_UTILEXPORT ColorMapUI {
  public:
   ColorMapUI(opencover::ui::Group &group);
 
-  void setMinBounds(float min, float max) {
-    setSliderBounds(m_minAttribute, min, max);
+  void setName(const std::string &name) {
+    m_colorMap->name = name;
+    m_renderObject->getConfig().Update() = true;
+  }
+
+  void setUnit(const std::string &unit) {
+    m_colorMap->unit = unit;
+    m_renderObject->getConfig().Update() = true;
+  }
+
+  void setSteps(int steps) {
+    m_colorMap->steps = steps;
+    m_renderObject->getConfig().Update() = true;
   }
 
   void setMaxBounds(float min, float max) {
     setSliderBounds(m_maxAttribute, min, max);
+    m_colorMap->max = max;
+    m_renderObject->getConfig().Update() = true;
   }
 
+  void setMinBounds(float min, float max) {
+    setSliderBounds(m_minAttribute, min, max);
+    m_colorMap->min = min;
+    m_renderObject->getConfig().Update() = true;
+  }
+
+  void setMax(float max) { setMaxBounds(m_colorMap->min, max); }
+  void setMin(float min) { setMinBounds(min, m_colorMap->max); }
   void setNumStepsBounds(int min, int max) { setSliderBounds(m_numSteps, min, max); }
   void setCallback(const std::function<void(const ColorMap &)> &f);
 
-  auto getColor(float val);
-  auto getColorMap() { return m_colorMap; }
+  osg::Vec4 getColor(float val);
+  const auto &getColorMap() { return *m_colorMap; }
   const auto getMin() const { return m_minAttribute->value(); }
   const auto getMax() const { return m_maxAttribute->value(); }
   const auto getNumSteps() const { return m_numSteps->value(); }
@@ -235,7 +267,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
 
   void show(bool show);
 
-  // dont delete these pointers, they are managed by the ui
+  // dont delete these pointers, they are managed by the cover ui
   opencover::ui::Menu *m_colorMapSettingsMenu = nullptr;
   opencover::ui::Group *m_colorMapGroup = nullptr;
   opencover::ui::Slider *m_minAttribute = nullptr;
@@ -252,6 +284,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   opencover::ui::Slider *m_rotation_z = nullptr;
 
   opencover::ui::SelectionList *m_rotationType = nullptr;
+  opencover::ui::SelectionList *m_colormapInstanceSelection = nullptr;
 
   opencover::ui::Slider *m_charSize = nullptr;
 
@@ -259,6 +292,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   std::unique_ptr<ColorMapRenderObject> m_renderObject;
   //   std::unique_ptr<opencover::config::File> m_config = nullptr;
   std::shared_ptr<ColorMap> m_colorMap;
+  //   std::map<std::string, std::shared_ptr<ColorMap>> m_colorMap;
 };
 
 }  // namespace covise

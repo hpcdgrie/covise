@@ -29,6 +29,14 @@
 
 using namespace std;
 using namespace opencover;
+namespace {
+constexpr float colormapLabelMargin = 0.15f;
+constexpr float colormapHeightMargin = 0.1f;
+constexpr float colormapHeightScale = 0.8f;
+constexpr float colormapWidthScale = 0.1f;
+constexpr int maxLabels = 10;
+constexpr int maxPrecision = 2;
+}  // namespace
 
 osg::Quat covise::createRotationMatrixQuat(double headingDegrees,
                                            double pitchDegrees, double rollDegrees,
@@ -324,9 +332,9 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
   osg::ref_ptr<osgText::Text> osgText = new osgText::Text;
   osgText->setText(text);
   osgText->setFont(m_config.LabelConfig().font);
-  osgText->setCharacterSize(m_config.LabelConfig().charSize);  // Adjust size
+  osgText->setCharacterSize(m_config.LabelConfig().charSize);
   osgText->setPosition(position);
-  osgText->setColor(m_config.LabelConfig().color);  // White text
+  osgText->setColor(m_config.LabelConfig().color);
   osgText->setAlignment(osgText::Text::LEFT_CENTER);
 
   osg::ref_ptr<osg::Geode> textGeode = new osg::Geode;
@@ -367,6 +375,69 @@ void covise::ColorMapRenderObject::applyEmissionShader(
   stateSet->setAttributeAndModes(m_shader, osg::StateAttribute::ON);
 }
 
+void covise::ColorMapRenderObject::rebuild() {
+  show(false);
+  show(true);
+}
+
+void covise::ColorMapRenderObject::addLabel(const float &samplePoint,
+                                            osg::ref_ptr<osg::Group> colormapGroup) {
+  auto colormap = m_colormap.lock();
+  float value = samplePoint * (colormap->max - colormap->min) + colormap->min;
+  std::stringstream ss;
+  ss << std::fixed << std::setprecision(maxPrecision) << value;
+  osg::ref_ptr<osg::Geode> textGeode = createTextGeode(
+      ss.str(),
+      osg::Vec3(-colormapLabelMargin, samplePoint * colormapHeightScale, 0.0f));
+  colormapGroup->addChild(textGeode);
+}
+
+void covise::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGroup,
+                                             const ColorMap &colorMap) {
+  // Determine the step size to ensure no more than maxLabels are visible
+  size_t step = std::max<size_t>(1, colorMap.samplingPoints.size() / maxLabels);
+
+  // Add text labels for the sampling points
+  for (size_t i = 0; i < colorMap.samplingPoints.size(); i += step)
+    addLabel(colorMap.samplingPoints[i], colormapGroup);
+
+  if (step < colorMap.samplingPoints.size())
+    addLabel(colorMap.samplingPoints.back(), colormapGroup);
+
+  // Add text labels for the unit and name of the colormap
+  osg::ref_ptr<osg::Geode> unit =
+      createTextGeode(colorMap.unit, osg::Vec3(0.0f, -colormapHeightMargin, 0.0f));
+  colormapGroup->addChild(unit);
+
+  osg::ref_ptr<osg::Geode> name = createTextGeode(
+      colorMap.name,
+      osg::Vec3(0.0f, colormapHeightScale + colormapHeightMargin, 0.0f));
+  colormapGroup->addChild(name);
+}
+
+void covise::ColorMapRenderObject::addColorMap(
+    osg::ref_ptr<osg::Group> colormapGroup, const ColorMap &colorMap) {
+  auto colormapPlane = createColorMapPlane(*m_colormap.lock());
+
+  // position colormap relative to the object
+  osg::ref_ptr<osg::PositionAttitudeTransform> pat =
+      new osg::PositionAttitudeTransform();
+  pat->setPosition(osg::Vec3(0.0f, 0.0f, 0.0f));
+  pat->setScale(osg::Vec3(colormapWidthScale, colormapHeightScale, 1.0f));
+  pat->addChild(colormapPlane);
+
+  colormapGroup->addChild(pat);
+}
+
+osg::ref_ptr<osg::Group> covise::ColorMapRenderObject::createColorMapGroup(
+    const ColorMap &colorMap) {
+  osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
+  addColorMap(colormapGroup, colorMap);
+  addLabels(colormapGroup, colorMap);
+
+  return colormapGroup;
+}
+
 void covise::ColorMapRenderObject::show(bool on) {
   if (on) {
     auto colorMap = m_colormap.lock();
@@ -376,49 +447,7 @@ void covise::ColorMapRenderObject::show(bool on) {
       return;
     }
 
-    auto colormapPlane = createColorMapPlane(*m_colormap.lock());
-    constexpr float colormapLabelMargin = 0.15f;
-    constexpr float colormapHeightMargin = 0.1f;
-    constexpr float colormapHeightScale = 0.8f;
-    constexpr float colormapWidthScale = 0.1f;
-
-    // position colormap relative to the object
-    osg::ref_ptr<osg::PositionAttitudeTransform> pat =
-        new osg::PositionAttitudeTransform();
-    pat->setPosition(osg::Vec3(0.0f, 0.0f, 0.0f));
-    pat->setScale(osg::Vec3(colormapWidthScale, colormapHeightScale, 1.0f));
-    pat->addChild(colormapPlane);
-
-    osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
-    colormapGroup->addChild(pat);
-
-    //              name
-    // label max    -----
-    //             |     |
-    // label mid   |     | unit
-    //             |     |
-    // label min    -----
-    //
-    // add text labels for the sampling points
-    for (size_t i = 0; i < colorMap->samplingPoints.size(); ++i) {
-      std::stringstream ss;
-      ss << std::fixed << std::setprecision(2) << colorMap->samplingPoints[i];
-      osg::ref_ptr<osg::Geode> textGeode = createTextGeode(
-          ss.str(),
-          osg::Vec3(-colormapLabelMargin,
-                    colorMap->samplingPoints[i] * colormapHeightScale, 0.0f));
-      colormapGroup->addChild(textGeode);
-    }
-
-    // add text labels for the unit and name of the colormap
-    osg::ref_ptr<osg::Geode> unit = createTextGeode(
-        colorMap->unit, osg::Vec3(0.0f, -colormapHeightMargin, 0.0f));
-    colormapGroup->addChild(unit);
-
-    osg::ref_ptr<osg::Geode> name = createTextGeode(
-        colorMap->name,
-        osg::Vec3(0.0f, colormapHeightScale + colormapHeightMargin, 0.0f));
-    colormapGroup->addChild(name);
+    auto colormapGroup = createColorMapGroup(*colorMap);
 
     // create a transform node to move the colormap to the right position
     m_colormapTransform = new osg::MatrixTransform();
@@ -426,12 +455,18 @@ void covise::ColorMapRenderObject::show(bool on) {
     m_colormapTransform->setName("ColorMap");
 
     cover->getObjectsRoot()->addChild(m_colormapTransform);
+    m_visible = true;
   } else {
     cover->getObjectsRoot()->removeChild(m_colormapTransform);
+    m_visible = false;
   }
 }
 
 void covise::ColorMapRenderObject::render() {
+  if (m_config.Update() && m_visible) {
+    m_config.Update() = false;
+    rebuild();
+  }
   if (m_colormapTransform) {
     // First, cover->getInvBaseMat() transforms world coordinates into the plugin's
     // base coordinate system.
@@ -505,17 +540,17 @@ opencover::ui::Slider *covise::ColorMapUI::createSlider(
 }
 
 void covise::ColorMapUI::initSteps() {
-  m_numSteps = createSlider("steps", 1, 1024, ui::Slider::AsDial, m_colorMap->steps,
-                            [this](float value, bool moving) {
+  m_numSteps = createSlider("steps", 1, 1024, ui::Slider::AsSlider,
+                            m_colorMap->steps, [this](float value, bool moving) {
                               if (value < 1) return;
                               if (!moving) return;
+                              int num = static_cast<int>(value);
                               *m_colorMap = covise::interpolateColorMap(
-                                  m_selector->selectedMap(), value);
+                                  m_selector->selectedMap(), num);
                               rebuildColorMap();
                             });
-  m_numSteps->setScale(ui::Slider::Linear);
+  m_numSteps->setScale(ui::Slider::Logarithmic);
   m_numSteps->setIntegral(true);
-  m_numSteps->setLinValue(m_colorMap->steps);
 }
 
 void covise::ColorMapUI::initColorMap() {
@@ -602,11 +637,13 @@ void covise::ColorMapUI::initUI() {
       "min", 0, 1, ui::Slider::AsDial, 0, [this](float value, bool moving) {
         sliderCallback(m_minAttribute, m_colorMap->min, value, moving,
                        value > m_maxAttribute->value());
+        rebuildColorMap();
       });
   m_maxAttribute = createSlider(
       "max", 0, 1, ui::Slider::AsDial, 1, [this](float value, bool moving) {
         sliderCallback(m_maxAttribute, m_colorMap->max, value, moving,
                        value < m_minAttribute->value());
+        rebuildColorMap();
       });
   initSteps();
   initRenderObject();
@@ -621,10 +658,7 @@ void covise::ColorMapUI::initRenderObject() {
 void covise::ColorMapUI::init() { initUI(); }
 
 void covise::ColorMapUI::rebuildColorMap() {
-  assert(m_colorMap && "ColorMap must be initialized before rebuilding");
-  assert(m_renderObject && "RenderObject must be initialized before rebuilding");
-  m_renderObject->show(false);
-  m_renderObject->show(true);
+  m_renderObject->getConfig().Update() = true;
 }
 
 void covise::ColorMapUI::setCallback(
@@ -636,7 +670,7 @@ void covise::ColorMapUI::setCallback(
   });
 }
 
-auto covise::ColorMapUI::getColor(float val) {
+osg::Vec4 covise::ColorMapUI::getColor(float val) {
   return covise::getColor(val, *m_colorMap, m_colorMap->min, m_colorMap->max);
 }
 
