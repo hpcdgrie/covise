@@ -32,7 +32,7 @@ class Object {
 
 template <typename T>
 class ObjectContainer {
-  static_assert(std::is_base_of_v<Object, T>, "T must be derived from Base");
+  static_assert(std::is_base_of_v<Object, T>, "T must be derived from Object");
 
  public:
   void add(const std::string &name, const Data &data = {}) {
