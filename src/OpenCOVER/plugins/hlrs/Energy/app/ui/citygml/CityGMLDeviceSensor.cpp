@@ -12,7 +12,7 @@ CityGMLDeviceSensor::CityGMLDeviceSensor(
     osg::ref_ptr<osg::Group> parent,
     std::unique_ptr<core::interface::IInfoboard<std::string>> &&infoBoard,
     std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
-    std::shared_ptr<ColorMap> colorMap)
+    std::shared_ptr<covise::ColorMapUI> colorMap)
     : coPickSensor(parent),
       m_cityGMLBuilding(std::move(drawableBuilding)),
       m_infoBoard(std::move(infoBoard)),
@@ -50,14 +50,13 @@ void CityGMLDeviceSensor::disactivate() {
 }
 
 void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values) {
-  auto color_map = m_colorMapRef.lock();
+  auto colormap = m_colorMapRef.lock();
   m_colors.clear();
   m_colors.resize(values.size());
   const auto &max = m_colorMapRef;
   for (auto i = 0; i < m_colors.size(); ++i) {
     auto value = values[i];
-    auto color =
-        covise::getColor(value, *color_map, color_map->min, color_map->max);
+    auto color = colormap->getColor(value);
     m_colors[i] = color;
   }
 }

@@ -16,7 +16,8 @@ template <typename T>
 class HeatingSimulationUI : public BaseSimulationUI<T> {
  public:
   HeatingSimulationUI(std::shared_ptr<HeatingSimulation> sim,
-                      std::shared_ptr<T> parent, std::shared_ptr<ColorMap> colorMap)
+                    //   std::shared_ptr<T> parent, std::shared_ptr<ColorMap> colorMap)
+                      std::shared_ptr<T> parent, std::shared_ptr<covise::ColorMapUI> colorMap)
       : BaseSimulationUI<T>(sim, parent, colorMap) {}
   ~HeatingSimulationUI() = default;
   HeatingSimulationUI(const HeatingSimulationUI &) = delete;
@@ -47,14 +48,16 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
       return;
     }
 
+    color_map->setName(key);
+
     if (min > max) min = max;
-    color_map->max = max;
-    color_map->min = min;
+    color_map->setMax(max);
+    color_map->setMin(min);
 
     if (resetMinMax) {
       auto &[res_min, res_max] = heatingSimulationPtr()->getMinMax(key);
-      color_map->max = res_max;
-      color_map->min = res_min;
+      color_map->setMax(res_max);
+      color_map->setMin(res_min);
     }
 
     // compute colors

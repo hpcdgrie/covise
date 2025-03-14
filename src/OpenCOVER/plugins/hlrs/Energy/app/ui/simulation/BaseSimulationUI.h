@@ -15,8 +15,6 @@
 
 using namespace core::simulation;
 
-typedef covise::ColorMap ColorMap;
-
 template <typename T>
 class BaseSimulationUI {
   static_assert(std::is_base_of_v<core::interface::IDrawables, T>,
@@ -28,7 +26,7 @@ class BaseSimulationUI {
 
  public:
   BaseSimulationUI(std::shared_ptr<Simulation> sim, std::shared_ptr<T> parent,
-                   std::shared_ptr<ColorMap> colorMap)
+                   std::shared_ptr<covise::ColorMapUI> colorMap)
       : m_simulation(sim), m_parent(parent), m_colorMapRef(colorMap) {
     if (auto simulation = m_simulation.lock()) simulation->computeParameters();
   }
@@ -63,7 +61,7 @@ class BaseSimulationUI {
 
   template <typename simulationObject>
   void computeColors(
-      std::shared_ptr<ColorMap> color_map, const std::string &key, float min,
+      std::shared_ptr<covise::ColorMapUI> color_map, const std::string &key, float min,
       float max, const std::map<std::string, simulationObject> &objectContainer) {
     isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
@@ -96,7 +94,7 @@ class BaseSimulationUI {
       for (auto i = 0; i < values.size(); ++i) {
         auto interpolated_value = core::utils::math::interpolate(
             values[i], minKeyVal, maxKeyVal, min, max);
-        auto color = covise::getColor(interpolated_value, *color_map, min, max);
+        auto color = color_map->getColor(interpolated_value);
         colors[i] = color;
       }
     }
@@ -110,7 +108,7 @@ class BaseSimulationUI {
   }
 
   std::weak_ptr<T> m_parent;  // parent which manages drawable
-  std::weak_ptr<ColorMap> m_colorMapRef;
+  std::weak_ptr<covise::ColorMapUI> m_colorMapRef;
   std::weak_ptr<Simulation> m_simulation;
   std::map<std::string, std::vector<osg::Vec4>> m_colors;
 };

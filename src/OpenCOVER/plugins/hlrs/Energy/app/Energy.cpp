@@ -434,7 +434,7 @@ void EnergyPlugin::addCityGMLObject(const std::string &name,
   auto building = std::make_unique<CityGMLBuilding>(*geodes);
   auto sensor = std::make_unique<CityGMLDeviceSensor>(
       citygmlObjGroup, std::move(infoboard), std::move(building),
-      m_colorMapMenu->getColorMap());
+      m_colorMapMenu);
   m_cityGMLObjs.insert({name, std::move(sensor)});
 }
 
@@ -947,15 +947,17 @@ void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
   //   if (m_heatingGroup->getNodeMask()) {
   m_heatingSimUI->updateTimestepColors("mass_flow", m_colorMapMenu->getMin(),
                                        m_colorMapMenu->getMax(), true);
-  auto colorMap = m_colorMapMenu->getColorMap();
-  auto min_new = colorMap->min;
-  auto max_new = colorMap->max;
+    m_colorMapMenu->setUnit("kg/s");
+  } else if (m_powerGroup->getNodeMask()) {
+    // do something
+  }
 
-  m_colorMapMenu->setMinBounds(min_new, max_new);
-  m_colorMapMenu->setMaxBounds(min_new, max_new);
-  //   } else if (m_powerGroup->getNodeMask()) {
-  //     // do something
-  //   }
+  if (m_cityGML->getNodeMask()) {
+    enableCityGML(false);
+    enableCityGML(true);
+    m_colorMapMenu->setName("Leistung");
+    m_colorMapMenu->setUnit("kWh");
+  }
 }
 
 void EnergyPlugin::initSimMenu() {
@@ -1056,10 +1058,8 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
   int timesteps = 0;
   auto values = getInlfuxDataFromCSV(csvStream, max, min, sum, timesteps);
 
-  auto colorMap = m_colorMapMenu->getColorMap();
-  colorMap->max = max;
-  colorMap->min = min;
-  *colorMap = covise::interpolateColorMap(*colorMap, m_colorMapMenu->getNumSteps());
+  m_colorMapMenu->setMax(max);
+  m_colorMapMenu->setMin(min);
 
   auto distributionCenter = sum / (timesteps * values->size());
   m_colorMapMenu->setMinBounds(0, distributionCenter);
@@ -1301,7 +1301,7 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
   int busID = 0;
 
   // TODO: need to be adjusted
-  auto additionalData = getAdditionalPowerGridPointData(busNames.size());
+  auto additionalData = getAdditionalPowerGridPointData(numPoints);
 
   while (stream >> point) {
     ACCESS_CSV_ROW(point, "x", lon);
@@ -1403,7 +1403,12 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(
 }
 
 void EnergyPlugin::buildPowerGrid() {
+  using core::simulation::grid::Point;
   if (!m_powerGridStreams) return;
+
+  const float connectionsRadius(0.5f);
+  const float sphereRadius(1.0f);
+  size_t numPoints(0);
 
   // fetch bus names
   auto busData = m_powerGridStreams->find("bus");
@@ -1444,8 +1449,8 @@ void EnergyPlugin::buildPowerGrid() {
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   m_powerGroup->setName("PowerGrid");
   m_powerGrid = std::make_shared<EnergyGrid>(
-      EnergyGridConfig{"POWER", *points, *indices, m_powerGroup, 0.5f, *optData,
-                       infoboardAttributes});
+      EnergyGridConfig{"POWER", *points, *indices, m_powerGroup, connectionsRadius,
+                       *optData, infoboardAttributes});
   m_powerGrid->initDrawables();
   m_powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
@@ -1529,8 +1534,10 @@ void EnergyPlugin::readSimulationDataStream(
       }
     }
   }
-  m_heatingSimUI = std::make_unique<HeatingSimUI>(m_heatingSim, m_heatingGrid,
-                                                  m_colorMapMenu->getColorMap());
+  m_heatingSimUI =
+      std::make_unique<HeatingSimUI>(m_heatingSim, m_heatingGrid,
+                                     //   m_colorMapMenu->getColorMap());
+                                     m_colorMapMenu);
   m_heatingSimUI->updateTimestepColors("mass_flow");
 
   auto timesteps = m_heatingSim->getTimesteps("mass_flow");

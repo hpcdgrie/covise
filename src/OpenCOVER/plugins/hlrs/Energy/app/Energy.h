@@ -285,7 +285,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   static EnergyPlugin *m_plugin;
   opencover::coTUITab *coEnergyTab = nullptr;
   opencover::ui::Menu *EnergyTab = nullptr;
-  std::unique_ptr<covise::ColorMapUI> m_colorMapMenu = nullptr;
+  std::shared_ptr<covise::ColorMapUI> m_colorMapMenu = nullptr;
 
   // historical
   opencover::ui::Button *ShowGraph = nullptr;
