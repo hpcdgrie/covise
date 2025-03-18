@@ -998,8 +998,9 @@ void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
 }
 
 void EnergyPlugin::initSimMenu() {
+  checkEnergyTab();
   if (m_simulationMenu != nullptr) return;
-  m_simulationMenu = new ui::Menu(EnergyTab, "Simulation");
+  m_simulationMenu = new ui::Menu(m_EnergyTab, "Simulation");
   m_simulationMenu->setText("Simulation");
 }
 
@@ -1365,7 +1366,7 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
     }
 
     osg::ref_ptr<core::simulation::grid::Point> p =
-        new core::simulation::grid::Point(busName, lon, lat, 0.0f, sphereRadius,
+        new core::simulation::grid::Point(busName, lon, lat, m_offset[2], sphereRadius,
                                           busData);
     points.push_back(p);
     ++numPoints;
@@ -1637,7 +1638,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
 
     // create a point
     osg::ref_ptr<core::simulation::grid::Point> point =
-        new core::simulation::grid::Point(name, lon, lat, 0.0f, 1.0f, pointData);
+        new core::simulation::grid::Point(name, lon, lat, m_offset[2], 1.0f, pointData);
     points.push_back(point);
     idMap[strangeId] = idx;
 
