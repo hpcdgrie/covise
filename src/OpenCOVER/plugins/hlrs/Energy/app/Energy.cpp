@@ -16,6 +16,7 @@
  **  Marko Djuric 02.2024: add ennovatis client                            **
  **  Marko Djuric 10.2024: add citygml interface                           **
  **                                                                        **
+ **  TODO: mapdrap for z coord of EnergyGrids                              **
  **                                                                        **
 \****************************************************************************/
 
@@ -205,24 +206,7 @@ EnergyPlugin::EnergyPlugin()
 
   m_SDlist.clear();
 
-  EnergyTab = new ui::Menu("Energy_Campus", EnergyPlugin::m_plugin);
-  EnergyTab->setText("Energy Campus");
-
-  // db
-  componentGroup = new ui::ButtonGroup(EnergyTab, "ComponentGroup");
-  componentGroup->setDefaultValue(Strom);
-  componentList = new ui::Menu(EnergyTab, "Component");
-  componentList->setText("Messwerte (jährlich)");
-  StromBt = new ui::Button(componentList, "Strom", componentGroup, Strom);
-  WaermeBt = new ui::Button(componentList, "Waerme", componentGroup, Waerme);
-  KaelteBt = new ui::Button(componentList, "Kaelte", componentGroup, Kaelte);
-  componentGroup->setCallback(
-      [this](int value) { setComponent(Components(value)); });
-
-  initEnnovatisUI();
-  initCityGMLUI();
-  initSimUI();
-
+  initUI();
   m_offset =
       configFloatArray("General", "offset", std::vector<double>{0, 0, 0})->value();
 }
@@ -245,6 +229,45 @@ EnergyPlugin::~EnergyPlugin() {
 
   config()->save();
   m_plugin = nullptr;
+}
+
+void EnergyPlugin::initUI() {
+  m_EnergyTab = new ui::Menu("Energy_Campus", EnergyPlugin::m_plugin);
+  m_EnergyTab->setText("Energy Campus");
+
+  initOverview();
+  initHistoricUI();
+  initEnnovatisUI();
+  initCityGMLUI();
+  initSimUI();
+}
+
+void EnergyPlugin::initOverview() {
+  checkEnergyTab();
+  m_controlPanel = new ui::Menu(m_EnergyTab, "Control");
+  m_controlPanel->setText("Control_Panel");
+
+  m_energySwitchControlButton = new ui::Button(m_controlPanel, "EnergySwitch");
+  m_energySwitchControlButton->setText("EnergySwitch");
+  m_energySwitchControlButton->setCallback([this](bool value) {
+    if (value) {
+      m_Energy->addChild(m_switch);
+    } else {
+      m_Energy->removeChild(m_switch);
+    }
+  });
+  m_energySwitchControlButton->setState(true);
+
+  m_gridControlButton = new ui::Button(m_controlPanel, "GridSwitch");
+  m_energySwitchControlButton->setText("GridSwitch");
+  m_gridControlButton->setCallback([this](bool value) {
+    if (value) {
+      m_Energy->addChild(m_grid);
+    } else {
+      m_Energy->removeChild(m_grid);
+    }
+  });
+  m_gridControlButton->setState(true);
 }
 
 std::pair<PJ *, PJ_COORD> EnergyPlugin::initProj() {
@@ -381,7 +404,8 @@ void EnergyPlugin::setAnimationTimesteps(size_t maxTimesteps, const void *who) {
 
 /* #region CITYGML */
 void EnergyPlugin::initCityGMLUI() {
-  m_cityGMLMenu = new ui::Menu(EnergyTab, "CityGML");
+  checkEnergyTab();
+  m_cityGMLMenu = new ui::Menu(m_EnergyTab, "CityGML");
   m_cityGMLEnable = new ui::Button(m_cityGMLMenu, "Enable");
   m_cityGMLEnable->setCallback([this](bool on) { enableCityGML(on); });
 }
@@ -433,8 +457,7 @@ void EnergyPlugin::addCityGMLObject(const std::string &name,
       infoboardPos, name, "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
   auto building = std::make_unique<CityGMLBuilding>(*geodes);
   auto sensor = std::make_unique<CityGMLDeviceSensor>(
-      citygmlObjGroup, std::move(infoboard), std::move(building),
-      m_colorMapMenu);
+      citygmlObjGroup, std::move(infoboard), std::move(building), m_colorMapMenu);
   m_cityGMLObjs.insert({name, std::move(sensor)});
 }
 
@@ -498,7 +521,8 @@ void EnergyPlugin::restoreCityGMLDefaultStatesets() {
 
 /* #region ENNOVATIS */
 void EnergyPlugin::initEnnovatisUI() {
-  m_ennovatisMenu = new ui::Menu(EnergyTab, "Ennovatis");
+  checkEnergyTab();
+  m_ennovatisMenu = new ui::Menu(m_EnergyTab, "Ennovatis");
   m_ennovatisMenu->setText("Ennovatis");
 
   m_ennovatisSelectionsList =
@@ -757,6 +781,19 @@ EnergyPlugin::updateEnnovatisBuildings(const DeviceList &deviceList) {
 /* #endregion */
 
 /* #region HISTORIC */
+
+void EnergyPlugin::initHistoricUI() {
+  checkEnergyTab();
+  componentGroup = new ui::ButtonGroup(m_EnergyTab, "ComponentGroup");
+  componentGroup->setDefaultValue(Strom);
+  componentList = new ui::Menu(m_EnergyTab, "Component");
+  componentList->setText("Messwerte (jährlich)");
+  StromBt = new ui::Button(componentList, "Strom", componentGroup, Strom);
+  WaermeBt = new ui::Button(componentList, "Waerme", componentGroup, Waerme);
+  KaelteBt = new ui::Button(componentList, "Kaelte", componentGroup, Kaelte);
+  componentGroup->setCallback(
+      [this](int value) { setComponent(Components(value)); });
+}
 
 void EnergyPlugin::reinitDevices(int comp) {
   for (auto s : m_SDlist) {
@@ -1136,7 +1173,7 @@ void EnergyPlugin::updatePowerGridSelection(bool on) {
 
 void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip) {
   if (!m_powerGridStreams) initPowerGridStreams();
-  m_powerGridMenu = new opencover::ui::Menu("PowerGridData", EnergyTab);
+  m_powerGridMenu = new opencover::ui::Menu("PowerGridData", m_EnergyTab);
 
   m_updatePowerGridSelection = new opencover::ui::Button(m_powerGridMenu, "Update");
   m_updatePowerGridSelection->setState(false);

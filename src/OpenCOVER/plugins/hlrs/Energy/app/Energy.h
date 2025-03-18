@@ -142,12 +142,17 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region GENERAL */
+  inline void checkEnergyTab() {
+    assert(m_EnergyTab && "EnergyTab must be initialized before");
+  }
   void switchTo(const osg::ref_ptr<osg::Node> child,
                 osg::ref_ptr<osg::Switch> parent);
   std::pair<PJ *, PJ_COORD> initProj();
   void projTransLatLon(float &lat, float &lon);
   CSVStreamMapPtr getCSVStreams(const boost::filesystem::path &dirPath);
   void setAnimationTimesteps(size_t maxTimesteps, const void *who);
+  void initOverview();
+  void initUI();
   /* #endregion */
 
   /* #region HISTORIC */
@@ -164,6 +169,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   bool loadDBFile(const std::string &fileName, const ProjTrans &projTrans);
   bool loadDB(const std::string &path, const ProjTrans &projTrans);
   void reinitDevices(int comp);
+  void initHistoricUI();
   /* #endregion */
 
   /* #region ENNOVATIS */
@@ -283,8 +289,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   // general
   static EnergyPlugin *m_plugin;
-  opencover::coTUITab *coEnergyTab = nullptr;
-  opencover::ui::Menu *EnergyTab = nullptr;
+  opencover::coTUITab *m_coEnergyTabPanel = nullptr;
+  opencover::ui::Menu *m_EnergyTab = nullptr;
+  opencover::ui::Menu *m_controlPanel = nullptr;
+  opencover::ui::Button *m_gridControlButton = nullptr;
+  opencover::ui::Button *m_energySwitchControlButton = nullptr;
+
   std::shared_ptr<covise::ColorMapUI> m_colorMapMenu = nullptr;
 
   // historical
