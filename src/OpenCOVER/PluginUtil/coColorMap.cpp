@@ -394,12 +394,16 @@ void covise::ColorMapRenderObject::addLabel(const float &samplePoint,
 
 void covise::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGroup,
                                              const ColorMap &colorMap) {
+  auto size = colorMap.samplingPoints.size();
   // Determine the step size to ensure no more than maxLabels are visible
-  size_t step = std::max<size_t>(1, colorMap.samplingPoints.size() / maxLabels);
+  size_t step = std::max<size_t>(1, size / maxLabels);
 
   // Add text labels for the sampling points
-  for (size_t i = 0; i < colorMap.samplingPoints.size(); i += step)
-    addLabel(colorMap.samplingPoints[i], colormapGroup);
+  for (size_t i = 0; i < size; i += step) {
+    auto samplingPoint = colorMap.samplingPoints[i];
+    if (samplingPoint > 0.93) continue;
+    addLabel(samplingPoint, colormapGroup);
+  }
 
   if (step < colorMap.samplingPoints.size())
     addLabel(colorMap.samplingPoints.back(), colormapGroup);
