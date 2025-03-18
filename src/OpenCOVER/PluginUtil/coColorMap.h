@@ -105,23 +105,18 @@ class ColorMapRenderConfig {
         rotationAngleY(-45.0f),
         rotationAngleZ(0.0f),
         rotationType(HPR),
-        hudScale(
-            covise::coCoviseConfig::getFloat("COVER.Plugin.ColorBar.HudScale", 0.5)),
         objectPositionInBase(-1.36f, -0.72f, 0.96f),
         colorMapRotation(createRotationMatrixQuat(rotationAngleY, rotationAngleX,
                                                   rotationAngleZ, rotationType)),
         update(false) {}
   void setRotationAngleX(float rotationX) {
-    this->rotationAngleX = rotationX;
-    recomputeColorMapRotation();
+    setRotationAngle(rotationAngleX, rotationX);
   }
   void setRotationAngleY(float rotationY) {
-    this->rotationAngleY = rotationY;
-    recomputeColorMapRotation();
+    setRotationAngle(rotationAngleY, rotationY);
   }
   void setRotationAngleZ(float rotationZ) {
-    this->rotationAngleZ = rotationZ;
-    recomputeColorMapRotation();
+    setRotationAngle(rotationAngleZ, rotationZ);
   }
 
   auto &Mutlisample() { return multisample; }
@@ -129,7 +124,6 @@ class ColorMapRenderConfig {
   auto &DistanceX() { return objectPositionInBase.x(); }
   auto &DistanceY() { return objectPositionInBase.y(); }
   auto &DistanceZ() { return objectPositionInBase.z(); }
-  auto &HUDScale() { return hudScale; }
   auto &RotationType() { return rotationType; }
   auto &Update() { return update; }
   const auto &RotationAngleX() const { return rotationAngleX; }
@@ -143,10 +137,13 @@ class ColorMapRenderConfig {
     colorMapRotation = createRotationMatrixQuat(rotationAngleY, rotationAngleX,
                                                 rotationAngleZ, rotationType);
   }
+  void setRotationAngle(float &angle, float value) {
+    angle = value;
+    recomputeColorMapRotation();
+  }
 
   bool multisample;
   float rotationAngleX, rotationAngleY, rotationAngleZ;
-  float hudScale;
   ColorMapLabelConfig labelConfig;
   enum RotationType rotationType;
 
