@@ -6,11 +6,11 @@ std::unique_ptr<osg::Vec4> ColorMap::getColor(float value, float maxValue) const
   maxValue = std::max(maxValue, 1.f);
   float valueNormiert = value / maxValue;
 
-  auto col =
-      std::make_unique<osg::Vec4>(max.r() * valueNormiert + min.r() * (1 - valueNormiert),
-                                  max.g() * valueNormiert + min.g() * (1 - valueNormiert),
-                                  max.b() * valueNormiert + min.b() * (1 - valueNormiert),
-                                  max.a() * valueNormiert + min.a() * (1 - valueNormiert));
+  auto col = std::make_unique<osg::Vec4>(
+      max.r() * valueNormiert + min.r() * (1 - valueNormiert),
+      max.g() * valueNormiert + min.g() * (1 - valueNormiert),
+      max.b() * valueNormiert + min.b() * (1 - valueNormiert),
+      max.a() * valueNormiert + min.a() * (1 - valueNormiert));
   return col;
 }
 
@@ -27,7 +27,9 @@ void overrideGeodeColor(osg::Geode *geode, const osg::Vec4 &color,
 }
 
 void overrideGeodeMaterial(osg::Geode *geode, osg::Material *material) {
-  geode->getOrCreateStateSet()->setAttribute(material,
-                                             osg::StateAttribute::OVERRIDE);
+  if (!geode) return;
+  auto stateSet = geode->getOrCreateStateSet();
+  if (!stateSet) return;
+  stateSet->setAttribute(material, osg::StateAttribute::OVERRIDE);
 }
 }  // namespace core::utils::color
