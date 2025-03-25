@@ -46,6 +46,21 @@ struct EnergyGridConfig {
                        50, 50, 2.0f, 0.1, 2);
 };
 
+class InfoboardSensor : public coPickSensor {
+ public:
+  InfoboardSensor(osg::ref_ptr<osg::Group> parent,
+                  std::unique_ptr<interface::IInfoboard<std::string>> &&infoboard,
+                  const std::string &content = "");
+
+  void updateDrawable() { m_infoBoard->updateDrawable(); }
+  void activate() override;
+  void update() override;
+
+ private:
+  bool m_enabled = false;
+  std::unique_ptr<interface::IInfoboard<std::string>> m_infoBoard;
+};
+
 /**
  * @class EnergyGrid
  * @brief A class representing an energy grid, inheriting from interface::EnergyGrid.
@@ -58,6 +73,9 @@ class EnergyGrid : public interface::IEnergyGrid {
  public:
   EnergyGrid(EnergyGridConfig &&data);
   void initDrawables() override;
+  void update() override {
+    for (auto &infoboard : m_infoboards) infoboard->update();
+  }
   void updateColor(const osg::Vec4 &color) override;
   void updateDrawables() override;
   void updateTime(int timestep) override {}
@@ -75,26 +93,6 @@ class EnergyGrid : public interface::IEnergyGrid {
   }
 
  private:
-  class InfoboardSensor : public coPickSensor {
-   public:
-    InfoboardSensor(osg::ref_ptr<osg::Group> parent,
-                    std::unique_ptr<interface::IInfoboard<std::string>> &&infoboard,
-                    const std::string &content = "");
-
-    void updateDrawable() { m_infoBoard->updateDrawable(); }
-    int hit(vrui::vruiHit *hit) override;
-
-    void update() override {
-      updateDrawable();
-      coPickSensor::update();
-    }
-
-    interface::IInfoboard<std::string> *getInfoboard() { return m_infoBoard.get(); }
-
-   private:
-    std::unique_ptr<interface::IInfoboard<std::string>> m_infoBoard;
-  };
-
   void initConnections(const grid::Indices &indices, const float &radius,
                        const grid::DataList &additionalConnectionData);
   void initDrawableConnections();

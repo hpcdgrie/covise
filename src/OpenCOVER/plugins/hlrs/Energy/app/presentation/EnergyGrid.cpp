@@ -27,64 +27,34 @@ auto get_string = [](const auto &data) {
   return ss.str();
 };
 }  // namespace
-// #include "cover/coBillboard.h"
 
-// namespace {
-// class BillboardTextCallback : public osg::NodeCallback {
-//  public:
-//   BillboardTextCallback(osg::Camera *camera) : _camera(camera) {}
-
-//   void operator()(osg::Node *node, osg::NodeVisitor *nv) {
-//     // Get the PositionAttitudeTransform
-//     osg::PositionAttitudeTransform *pat =
-//         dynamic_cast<osg::PositionAttitudeTransform *>(node);
-//     if (pat) {
-//       // Update the position of the text in front of the camera
-//       osg::Vec3 cameraPosition = _camera->getViewMatrix().getTrans();
-//       osg::Vec3 eye, center, up;
-//       _camera->getViewMatrixAsLookAt(eye, center, up);
-//       osg::Vec3 cameraDirection = center - eye;
-//       pat->setPosition(cameraPosition +
-//                        cameraDirection * 5.0f);  // Adjust the distance as needed
-
-//       // Update the orientation of the text to face the camera
-//       pat->setAttitude(osg::Quat());  // Reset attitude to face the camera
-//     }
-
-//     traverse(node, nv);
-//   }
-
-//  private:
-//   osg::ref_ptr<osg::Camera> _camera;
-// };
-// }  // namespace
-
-EnergyGrid::InfoboardSensor::InfoboardSensor(
+InfoboardSensor::InfoboardSensor(
     osg::ref_ptr<osg::Group> parent,
     std::unique_ptr<interface::IInfoboard<std::string>> &&infoboard,
     const std::string &content)
-    : coPickSensor(parent), m_infoBoard(std::move(infoboard)) {
+    : coPickSensor(parent), m_enabled(false), m_infoBoard(std::move(infoboard)) {
   m_infoBoard->initInfoboard();
   m_infoBoard->initDrawable();
   m_infoBoard->updateInfo(content);
+
   parent->addChild(m_infoBoard->getDrawable());
 }
 
-int EnergyGrid::InfoboardSensor::hit(vrui::vruiHit *hit) {
-  if (!interaction) return 0;
-
-  // click on object and hold to show info
-  if (interaction->wasStarted() && !active) {
+void InfoboardSensor::activate() {
+  if (!m_enabled) {
     m_infoBoard->showInfo();
-    active = true;
-  }
-  // release to hide info if your not out of the object
-  // otherwise the billboard will be shown until you click again
-  if (interaction->wasStopped() && active) {
+    m_enabled = true;
+  } else {
     m_infoBoard->hideInfo();
-    active = false;
+    m_enabled = false;
   }
-  return coPickSensor::hit(hit);
+
+  coPickSensor::activate();
+}
+
+void InfoboardSensor::update() {
+  updateDrawable();
+  coPickSensor::update();
 }
 
 EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {

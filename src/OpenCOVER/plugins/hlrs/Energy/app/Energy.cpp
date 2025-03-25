@@ -320,6 +320,9 @@ bool EnergyPlugin::update() {
 
   for (auto &[name, sensor] : m_cityGMLObjs) sensor->update();
 
+  m_powerGrid->update();
+  m_heatingGrid->update();
+
   return false;
 }
 
