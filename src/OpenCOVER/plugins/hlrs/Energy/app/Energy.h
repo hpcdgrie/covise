@@ -129,7 +129,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #region typedef */
   typedef std::unordered_map<int, std::string> IDLookupTable;
   typedef HeatingSimulationUI<core::interface::IEnergyGrid> HeatingSimUI;
-  typedef PowerSimulationUI<core::interface::IEnergyGrid> EGPowerSimulationUI;
+  typedef PowerSimulationUI<core::interface::IEnergyGrid> PowerSimUI;
   typedef const ennovatis::Building *building_const_ptr;
   typedef const ennovatis::Buildings *buildings_const_Ptr;
   typedef std::vector<building_const_ptr> const_buildings;
@@ -374,7 +374,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::shared_ptr<HeatingSimulation> m_heatingSim;
   std::shared_ptr<PowerSimulation> m_powerSim;
 
-  std::unique_ptr<EGPowerSimulationUI> m_powerSimUI;
+  std::unique_ptr<PowerSimUI> m_powerSimUI;
   std::unique_ptr<HeatingSimUI> m_heatingSimUI;
 };
 
