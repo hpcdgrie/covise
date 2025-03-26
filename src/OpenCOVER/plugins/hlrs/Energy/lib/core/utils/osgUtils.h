@@ -4,6 +4,7 @@
 #include <memory>
 #include <osg/BoundingBox>
 #include <osg/Geode>
+#include <osg/Geometry>
 #include <osgText/Text>
 #include <vector>
 
@@ -35,5 +36,12 @@ osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
                                           const char *fontFile,
                                           const float &maxWidth,
                                           const float &margin);
+void setTransparency(osg::ref_ptr<osg::Geode> geode, float alpha);
+osg::ref_ptr<osg::Geometry> createBackgroundGeometryForText(
+    osg::ref_ptr<osgText::Text> text, float padding,
+    const osg::Vec4 &backgroundColor, float depthOffset = 0.1f);
+osg::ref_ptr<osg::Geometry> createBackgroundQuadGeometry(const osg::Vec3 &center,
+                                                         float width, float height,
+                                                         const osg::Vec4 &color);
 }  // namespace core::utils::osgUtils
 #endif
