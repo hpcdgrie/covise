@@ -63,7 +63,7 @@ void TxtInfoboard::updateInfo(const std::string &info) {
   osg::ref_ptr<osg::Group> geoTextGroup = new osg::Group();
   geoTextGroup->addChild(geoText);
 
-  osg::Vec4 backgroundColor(1.0f, 1.0f, 1.0f, 0.6f);
+  osg::Vec4 backgroundColor(0.2f, 0.2f, 0.2f, 0.8f);
   osg::BoundingBox bb;
   bb.expandBy(textBoxTitle->getBound());
   bb.expandBy(textBoxContent->getBound());
@@ -72,7 +72,7 @@ void TxtInfoboard::updateInfo(const std::string &info) {
   float width = bb.xMax() - bb.xMin() + 2 * 0.5f;
   float height = bb.zMax() - bb.zMin() + 2 * 0.5f;
   osg::Vec3 center = bb.center();
-  center.y() += 0.2f;
+  center.y() += 0.5f;
   auto backgroundGeometry = utils::osgUtils::createBackgroundQuadGeometry(
       center, width, height, backgroundColor);
 
