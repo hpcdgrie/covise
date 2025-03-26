@@ -82,6 +82,7 @@ void TxtInfoboard::updateInfo(const std::string &info) {
   utils::color::overrideGeodeColor(geo, backgroundColor,
                                    osg::Material::FRONT_AND_BACK);
   utils::osgUtils::setTransparency(geo, backgroundColor.a());
+  utils::osgUtils::enableLighting(geo, false);
 
   m_TextGeode = new osg::Group();
   m_TextGeode->setName("TextGroup");
