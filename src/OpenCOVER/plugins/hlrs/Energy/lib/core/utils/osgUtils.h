@@ -43,5 +43,6 @@ osg::ref_ptr<osg::Geometry> createBackgroundGeometryForText(
 osg::ref_ptr<osg::Geometry> createBackgroundQuadGeometry(const osg::Vec3 &center,
                                                          float width, float height,
                                                          const osg::Vec4 &color);
+void enableLighting(osg::ref_ptr<osg::Geode> geode, bool enable = true);
 }  // namespace core::utils::osgUtils
 #endif

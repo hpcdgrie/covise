@@ -40,6 +40,15 @@ osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
   return textBox;
 }
 
+void enableLighting(osg::ref_ptr<osg::Geode> geode, bool enable) {
+  osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
+  if (enable) {
+    stateset->setMode(GL_LIGHTING, osg::StateAttribute::ON);
+    return;
+  }
+  stateset->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+}
+
 void setTransparency(osg::ref_ptr<osg::Geode> geode, float alpha) {
   osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
 
