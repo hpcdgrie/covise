@@ -3,6 +3,7 @@
 #include <cover/coVRFileManager.h>
 #include <lib/core/utils/osgUtils.h>
 
+#include <osg/Billboard>
 #include <osg/BlendFunc>
 #include <osg/Depth>
 #include <osg/Geode>
@@ -23,6 +24,8 @@ void TxtInfoboard::updateTime(int timestep) {
   // TODO: implement later when needed
 }
 
+void TxtInfoboard::updateDrawable() {}
+
 void TxtInfoboard::initDrawable() {
   osg::ref_ptr<osg::MatrixTransform> trans = new osg::MatrixTransform;
   trans->setMatrix(osg::Matrix::translate(m_attributes.position));
@@ -38,12 +41,10 @@ void TxtInfoboard::initInfoboard() {
   m_BBoard->setMode(opencover::coBillboard::POINT_ROT_EYE);
 }
 
-void TxtInfoboard::updateDrawable() {}
-
 void TxtInfoboard::updateInfo(const std::string &info) {
   m_info = info;
-  utils::osgUtils::deleteChildrenRecursive(m_BBoard);
   m_BBoard->removeChild(m_TextGeode);
+  utils::osgUtils::deleteChildrenRecursive(m_BBoard);
   osg::Vec3 pos = osg::Vec3(0, 0, 0);
   auto contentPos = pos;
   contentPos.z() -= m_attributes.height * m_attributes.titleHeightPercentage;
@@ -60,8 +61,6 @@ void TxtInfoboard::updateInfo(const std::string &info) {
   geoText->setName("TextBox");
   geoText->addDrawable(textBoxTitle);
   geoText->addDrawable(textBoxContent);
-  osg::ref_ptr<osg::Group> geoTextGroup = new osg::Group();
-  geoTextGroup->addChild(geoText);
 
   osg::Vec4 backgroundColor(0.2f, 0.2f, 0.2f, 0.8f);
   osg::BoundingBox bb;
@@ -87,7 +86,6 @@ void TxtInfoboard::updateInfo(const std::string &info) {
   m_TextGeode = new osg::Group();
   m_TextGeode->setName("TextGroup");
   m_TextGeode->addChild(geo);
-  m_TextGeode->addChild(geoTextGroup);
 
   if (m_enabled) showInfo();
 }
