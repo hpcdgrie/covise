@@ -270,6 +270,14 @@ void EnergyPlugin::initOverview() {
   m_gridControlButton->setState(true);
 }
 
+bool EnergyPlugin::isActiv(osg::ref_ptr<osg::Switch> switchToCheck,
+                           osg::ref_ptr<osg::Group> group) {
+  if (!switchToCheck || !group) return false;
+  const auto valueList = switchToCheck->getValueList();
+  const auto idx = switchToCheck->getChildIndex(group);
+  return valueList[idx];
+}
+
 std::pair<PJ *, PJ_COORD> EnergyPlugin::initProj() {
   ProjTrans pjTrans;
   pjTrans.projFrom = configString("General", "projFrom", "default")->value();
@@ -983,16 +991,19 @@ void EnergyPlugin::initColorMap() {
 }
 
 void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
+  if (isActiv(m_grid, m_heatingGroup)) {
   // heating simulation
-  //   if (m_heatingGroup->getNodeMask()) {
   m_heatingSimUI->updateTimestepColors("mass_flow", m_colorMapMenu->getMin(),
                                        m_colorMapMenu->getMax(), true);
     m_colorMapMenu->setUnit("kg/s");
-  } else if (m_powerGroup->getNodeMask()) {
+    std::cout << "Active child at index " << m_heatingGroup->getName() << std::endl;
+  } else if (isActiv(m_grid, m_powerGroup)) {
+    std::cout << "Active child at index " << m_powerGroup->getName() << std::endl;
     // do something
   }
 
-  if (m_cityGML->getNodeMask()) {
+  if (isActiv(m_switch, m_cityGML)) {
+    std::cout << "Active child at index " << m_cityGML->getName() << std::endl;
     enableCityGML(false);
     enableCityGML(true);
     m_colorMapMenu->setName("Leistung");
@@ -1369,8 +1380,8 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
     }
 
     osg::ref_ptr<core::simulation::grid::Point> p =
-        new core::simulation::grid::Point(busName, lon, lat, m_offset[2], sphereRadius,
-                                          busData);
+        new core::simulation::grid::Point(busName, lon, lat, m_offset[2],
+                                          sphereRadius, busData);
     points.push_back(p);
     ++numPoints;
   }
@@ -1641,7 +1652,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
 
     // create a point
     osg::ref_ptr<core::simulation::grid::Point> point =
-        new core::simulation::grid::Point(name, lon, lat, m_offset[2], 1.0f, pointData);
+        new core::simulation::grid::Point(name, lon, lat, m_offset[2], 1.0f,
+                                          pointData);
     points.push_back(point);
     idMap[strangeId] = idx;
 

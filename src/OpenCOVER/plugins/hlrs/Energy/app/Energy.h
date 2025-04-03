@@ -145,6 +145,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   inline void checkEnergyTab() {
     assert(m_EnergyTab && "EnergyTab must be initialized before");
   }
+  bool isActiv(osg::ref_ptr<osg::Switch> switchToCheck,
+               osg::ref_ptr<osg::Group> group);
   void switchTo(const osg::ref_ptr<osg::Node> child,
                 osg::ref_ptr<osg::Switch> parent);
   std::pair<PJ *, PJ_COORD> initProj();
