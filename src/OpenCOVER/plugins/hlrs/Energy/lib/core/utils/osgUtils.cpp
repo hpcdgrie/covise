@@ -3,6 +3,7 @@
 #include <utils/color.h>
 
 #include <memory>
+#include <osg/Array>
 #include <osg/BlendFunc>
 #include <osg/BoundingBox>
 #include <osg/BoundingSphere>
@@ -11,12 +12,14 @@
 #include <osg/Geometry>
 #include <osg/Material>
 #include <osg/Matrixd>
+#include <osg/PrimitiveSet>
 #include <osg/Shape>
 #include <osg/ShapeDrawable>
 #include <osg/Vec3>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
 #include <osgText/Text>
+#include <osgUtil/SmoothingVisitor>
 
 namespace core::utils::osgUtils {
 
@@ -212,4 +215,128 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
 
   return geode;
 }
+
+osg::Vec3 cubicBezier(float t, const osg::Vec3 &p0, const osg::Vec3 &p1,
+                      const osg::Vec3 &p2, const osg::Vec3 &p3) {
+  float u = 1 - t;
+  float tt = t * t;
+  float uu = u * u;
+  float uuu = uu * u;
+  float ttt = tt * t;
+
+  osg::Vec3 p = p0 * uuu;
+  p += p1 * (3 * uu * t);
+  p += p2 * (3 * u * tt);
+  p += p3 * ttt;
+
+  return p;
+}
+
+osg::ref_ptr<osg::Geode> createBezierTube(const osg::Vec3 &p1, const osg::Vec3 &p2,
+                                          float midPointOffset, float tubeRadius,
+                                          int numSegments, const osg::Vec4 &color) {
+  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+  osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+
+  osg::Vec3 midPoint = (p1 + p2) * 0.5f;
+  osg::Vec3 direction = (p2 - p1);
+  direction.normalize();
+
+  // Find a vector perpendicular to the direction.
+  // osg::Vec3 up(0.0f, 1.0f, 0.0f); // Default up vector.
+  osg::Vec3 up(0.0f, 0.0f, 1.0f);  // Default up vector.
+  osg::Vec3 right = direction ^ up;
+  if (right.length2() < 1e-6) {
+    // If direction is parallel to up, use another up.
+    up.set(0.0f, 1.0f, 0.0f);
+    right = direction ^ up;
+  }
+  right.normalize();
+  osg::Vec3 newUp = direction ^ right;
+  newUp.normalize();
+
+  // Calculate the offset point.
+  osg::Vec3 offsetPoint = midPoint + newUp * midPointOffset;
+
+  // Create control points for the cubic Bezier curve.
+  osg::Vec3 controlPoint1 = p1 + (offsetPoint - p1) * 0.33f;
+  osg::Vec3 controlPoint2 = p2 + (offsetPoint - p2) * 0.33f;
+
+  // Generate vertices along the Bezier curve.
+  std::vector<osg::Vec3> bezierPoints;
+  for (int i = 0; i <= numSegments; ++i) {
+    float t = static_cast<float>(i) / numSegments;
+    bezierPoints.push_back(cubicBezier(t, p1, controlPoint1, controlPoint2, p2));
+  }
+
+  // Generate tube vertices and normals.
+  for (size_t i = 0; i < bezierPoints.size(); ++i) {
+    osg::Vec3 currentPoint = bezierPoints[i];
+
+    // Calculate tangent, normal, and binormal.
+    osg::Vec3 tangent;
+    if (i == 0) {
+      tangent = bezierPoints[1] - bezierPoints[0];
+      tangent.normalize();
+    } else if (i == bezierPoints.size() - 1) {
+      tangent = bezierPoints[i] - bezierPoints[i - 1];
+      tangent.normalize();
+    } else {
+      osg::Vec3 tangent1 = bezierPoints[i + 1] - bezierPoints[i];
+      tangent1.normalize();
+      osg::Vec3 tangent2 = bezierPoints[i] - bezierPoints[i - 1];
+      tangent2.normalize();
+      tangent = (tangent1 + tangent2);
+      tangent.normalize();
+    }
+
+    osg::Vec3 normal = right ^ tangent;
+    normal.normalize();
+    osg::Vec3 binormal = tangent ^ normal;
+    binormal.normalize();
+
+    // Generate vertices around the tube.
+    for (int j = 0; j <= numSegments; ++j) {
+      float angle = 2.0f * osg::PI * static_cast<float>(j) / numSegments;
+      osg::Vec3 vertex =
+          currentPoint + (normal * cos(angle) + binormal * sin(angle)) * tubeRadius;
+      vertices->push_back(vertex);
+
+      osg::Vec3 outwardNormal = (normal * cos(angle) + binormal * sin(angle));
+      outwardNormal.normalize();
+      normals->push_back(outwardNormal);
+    }
+  }
+
+  // Generate indices.
+  osg::ref_ptr<osg::DrawElementsUInt> indices =
+      new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLE_STRIP);
+  for (int i = 0; i < numSegments; ++i) {
+    for (int j = 0; j <= numSegments; ++j) {
+      indices->push_back((i + 0) * (numSegments + 1) + j);
+      indices->push_back((i + 1) * (numSegments + 1) + j);
+    }
+  }
+
+  geometry->setVertexArray(vertices.get());
+  geometry->setNormalArray(normals.get(), osg::Array::BIND_PER_VERTEX);
+  geometry->addPrimitiveSet(indices.get());
+
+  osgUtil::SmoothingVisitor sv;
+  geometry->accept(sv);
+
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+  geode->addDrawable(geometry.get());
+
+  // Add Material
+  osg::ref_ptr<osg::Material> material = new osg::Material;
+  material->setAmbient(osg::Material::FRONT_AND_BACK,
+                       osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
+  material->setDiffuse(osg::Material::FRONT_AND_BACK, color);
+  geode->getOrCreateStateSet()->setAttribute(material.get());
+
+  return geode;
+}
+
 }  // namespace core::utils::osgUtils

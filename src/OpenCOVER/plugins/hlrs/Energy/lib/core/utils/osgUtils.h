@@ -31,6 +31,13 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
     osg::Vec3 start, osg::Vec3 end, float radius, osg::Vec4 cylinderColor,
     osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints());
 
+osg::Vec3 cubicBezier(float t, const osg::Vec3 &p0, const osg::Vec3 &p1,
+                      const osg::Vec3 &p2, const osg::Vec3 &p3);
+osg::ref_ptr<osg::Geode> createBezierTube(
+    const osg::Vec3 &p1, const osg::Vec3 &p2, float midPointOffset, float tubeRadius,
+    int numSegments = 50,
+    const osg::Vec4 &color = osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
+
 osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
                                           const osg::Vec3 &position, int charSize,
                                           const char *fontFile,
