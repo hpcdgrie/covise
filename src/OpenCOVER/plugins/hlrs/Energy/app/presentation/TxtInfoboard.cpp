@@ -38,7 +38,7 @@ void TxtInfoboard::initInfoboard() {
   m_BBoard = new opencover::coBillboard();
   m_BBoard->setNormal(osg::Vec3(0, -1, 0));
   m_BBoard->setAxis(osg::Vec3(0, 0, 1));
-  m_BBoard->setMode(opencover::coBillboard::POINT_ROT_EYE);
+  m_BBoard->setMode(opencover::coBillboard::AXIAL_ROT);
 }
 
 void TxtInfoboard::updateInfo(const std::string &info) {
@@ -85,6 +85,7 @@ void TxtInfoboard::updateInfo(const std::string &info) {
 
   m_TextGeode = new osg::Group();
   m_TextGeode->setName("TextGroup");
+  m_TextGeode->addChild(geoText);
   m_TextGeode->addChild(geo);
 
   if (m_enabled) showInfo();
