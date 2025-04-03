@@ -6,14 +6,11 @@
 #include <lib/core/utils/osgUtils.h>
 
 #include <cassert>
-// #include <osg/MatrixTransform>
-// #include <osg/PositionAttitudeTransform>
-#include <cstddef>
+#include <memory>
 #include <osg/Shape>
-// #include <osg/Transform>
+#include <osg/Vec4>
 #include <osg/ref_ptr>
 #include <osgText/Text>
-// #include <osgViewer/Viewer>
 #include <sstream>
 #include <variant>
 
@@ -76,11 +73,12 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
     for (auto j = 0; j < indices[i].size(); ++j) {
       std::unique_ptr<grid::ConnectionData<grid::Point>> data;
 
-      const auto indice = indices[i][j];
       if (i < 0 || i >= points.size()) {
         std::cerr << "Invalid Index for points: " << i << "\n";
         continue;
       }
+
+      const auto indice = indices[i][j];
 
       if (indice >= points.size() || indice < 0) {
         std::cerr << "Invalid Index for points: " << indice << "\n";
@@ -90,6 +88,7 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
 
       std::string name(from.getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX +
                        " " + to.getName());
+
       core::simulation::grid::Data additionalData{};
       if (hasAdditionalData)
         if (additionalConnectionData.size() > i + j)
@@ -143,8 +142,6 @@ void EnergyGrid::initDrawableConnections() {
   osg::ref_ptr<osg::Group> connections = new osg::Group;
   connections->setName("Connections");
 
-  //   auto viewer = opencover::VRViewer::instance();
-  //   auto camera = viewer->getCamera();
   for (auto &connection : m_connections) {
     m_drawables.push_back(connection);
     connections->addChild(connection);
@@ -155,7 +152,6 @@ void EnergyGrid::initDrawableConnections() {
           UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
     }
     auto center = connection->getCenter();
-    auto connectionBB = connection->getGeode()->getBoundingBox();
     center.z() += 30;
     auto name = connection->getName();
 
@@ -164,38 +160,6 @@ void EnergyGrid::initDrawableConnections() {
     TxtInfoboard infoboard(m_config.infoboardAttributes);
     m_infoboards.push_back(std::make_unique<InfoboardSensor>(
         connection, std::make_unique<TxtInfoboard>(infoboard), toPrint));
-
-    // TODO: use the position of the viewer to determine the position of the
-    // infoboard
-    // auto iboard = m_infoboards.back()->getInfoboard();
-    // iboard->showInfo(); //otherwise the infoboard would have geode attached
-    // auto mt = dynamic_cast<osg::MatrixTransform *>(iboard->getDrawable().get());
-    // if (!mt)
-    //     std::cout << "Error: Could not get MatrixTransform from infoboard
-    //     drawable\n";
-    // auto bboard = dynamic_cast<osg::Transform *>(mt->getChild(0));
-    // if (!bboard)
-    //     std::cout << "Error: Could not get Billboard from infoboard drawable\n";
-    // auto geo = bboard->getChild(0)->asGeode();
-    // if (!geo)
-    //     std::cout << "Error: Could not get Geode from infoboard drawable\n";
-
-    // auto geo =
-    // iboard->getDrawable()->asMatrixTransform()->getChild(0)->asGeode(); if
-    // (!geo) {
-    //     std::cout << "Error: Could not get Geode from infoboard drawable\n";
-    //     return;
-    // }
-
-    // auto parent = dynamic_cast<osg::MatrixTransform *>(geo->getParent(0));
-    // osg::ref_ptr<osg::PositionAttitudeTransform> pat = new
-    // osg::PositionAttitudeTransform; mt->addChild(pat);
-
-    // pat->addChild(geo);
-    // mt->removeChild(geo);
-
-    // mt->setUpdateCallback(new BillboardTextCallback(camera));
-    // iboard->getDrawable()->setUpdateCallback(new BillboardTextCallback(camera));
   }
 
   m_config.parent->addChild(connections);
