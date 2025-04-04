@@ -93,8 +93,9 @@ class EnergyGrid : public interface::IEnergyGrid {
   }
 
  private:
-  void initConnections(const grid::Indices &indices, const float &radius,
-                       const grid::DataList &additionalConnectionData);
+  void initConnections();
+  void initConnectionsByIndex(const grid::Indices &indices, const float &radius,
+                              const grid::ConnectionDataList &additionalConnectionData);
   void initDrawableConnections();
   void initDrawablePoints();
 

@@ -9,9 +9,8 @@
 #include "../utils/color.h"
 
 namespace core::simulation::grid {
-// grid::Data is a vector of variants that can hold int, float, or string
+// grid::Data is a map of std::string and variants that can hold int, float, or string
 typedef std::map<std::string, std::variant<float, int, std::string>> Data;
-// class Point : public osg::Group {
 class Point : public osg::MatrixTransform {
  public:
   Point(const std::string &name, const float &x, const float &y, const float &z,
@@ -98,7 +97,9 @@ typedef std::vector<osg::ref_ptr<DirectedConnection>> Connections;
 // TODO: write a concept for PointType
 // template <typename PointType>
 // using ConnectivityList = std::vector<ConnectionData<PointType>>;
+typedef std::vector<osg::ref_ptr<Point>> Points;
 typedef std::vector<std::vector<int>> Indices;
-typedef std::vector<Data> DataList;
-// typedef std::vector<Line> Lines;
+typedef std::vector<Data> PointDataList;
+typedef std::vector<std::vector<Data>> ConnectionDataList;
+
 }  // namespace core::simulation::grid

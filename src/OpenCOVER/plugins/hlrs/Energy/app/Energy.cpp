@@ -112,6 +112,7 @@ namespace fs = boost::filesystem;
 namespace {
 
 constexpr bool debug = build_options.debug_ennovatis;
+constexpr bool skipRedundance = false;
 // regex for dd.mm.yyyy
 const std::regex dateRgx(
     R"(((0[1-9])|([12][0-9])|(3[01]))\.((0[0-9])|(1[012]))\.((20[012]\d|19\d\d)|(1\d|2[0123])))");
@@ -1279,7 +1280,7 @@ std::unique_ptr<EnergyPlugin::IDLookupTable> EnergyPlugin::retrieveBusNameIdMapp
 }
 
 void EnergyPlugin::helper_getAdditionalPowerGridPointData_addData(
-    int busId, core::simulation::grid::DataList &additionalData,
+    int busId, core::simulation::grid::PointDataList &additionalData,
     const core::simulation::grid::Data &data) {
   if (busId > -1 && busId < additionalData.size()) {
     auto &existingData = additionalData[busId];
@@ -1299,12 +1300,12 @@ void EnergyPlugin::helper_getAdditionalPowerGridPointData_handleDuplicate(
     duplicateMap.insert({name, 0});
 }
 
-std::unique_ptr<core::simulation::grid::DataList>
+std::unique_ptr<core::simulation::grid::PointDataList>
 EnergyPlugin::getAdditionalPowerGridPointData(const std::size_t &numOfBus) {
-  using DataList = core::simulation::grid::DataList;
+  using PDL = core::simulation::grid::PointDataList;
 
   // additional bus data
-  DataList additionalData(numOfBus);
+  PDL additionalData(numOfBus);
 
   for (auto &[tableName, tableStream] : *m_powerGridStreams) {
     auto header = tableStream->getHeader();
@@ -1338,7 +1339,7 @@ EnergyPlugin::getAdditionalPowerGridPointData(const std::size_t &numOfBus) {
       helper_getAdditionalPowerGridPointData_addData(busId, additionalData, data);
     }
   }
-  return std::make_unique<DataList>(additionalData);
+  return std::make_unique<PDL>(additionalData);
 }
 
 std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoints(
@@ -1388,44 +1389,61 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
   return std::make_unique<Points>(points);
 }
 
-void EnergyPlugin::processGeoBuses(core::simulation::grid::Indices &indices,
-                                   int &from,
+void EnergyPlugin::processGeoBuses(
+    core::simulation::grid::Indices &indices, int &from,
                                    const std::string &geoBuses_comma_seperated,
-                                   core::simulation::grid::DataList &additionalData,
+    core::simulation::grid::ConnectionDataList &additionalData,
                                    core::simulation::grid::Data &data) {
   std::stringstream ss(geoBuses_comma_seperated);
   std::string bus("");
+
+  // index is not corresponding to the bus id => index = bus_id - 1
   int from_last = from - 1;
   while (std::getline(ss, bus, ',')) {
     auto to_new = std::stoi(bus) - 1;
     if (from_last == to_new) continue;
-    auto &last_indices_vec = indices[from_last];
-    auto &to_indices_vec = indices[to_new];
+    auto &lastIndicesVec = indices[from_last];
+    auto &additionalDataVec = additionalData[from_last];
+    auto &toIndicesVec = indices[to_new];
+
+    // NOTE: test implementing skip redundance
+    if constexpr (skipRedundance) {
     // get rid of redundant connections
-    if (std::find(last_indices_vec.begin(), last_indices_vec.end(), to_new) !=
-            last_indices_vec.end() ||
-        std::find(to_indices_vec.begin(), to_indices_vec.end(), from_last) !=
-            to_indices_vec.end()) {
+      if (std::find(lastIndicesVec.begin(), lastIndicesVec.end(), to_new) !=
+              lastIndicesVec.end() ||
+          std::find(toIndicesVec.begin(), toIndicesVec.end(), from_last) !=
+              toIndicesVec.end()) {
       from_last = to_new;
       continue;
     }
-    last_indices_vec.push_back(to_new);
+    }
+
+    // binary insertion to keep the indices sorted
+    if (auto lower = std::lower_bound(lastIndicesVec.begin(),
+                                      lastIndicesVec.end(), to_new);
+        lower == lastIndicesVec.end()) {
+      lastIndicesVec.push_back(to_new);
+      additionalDataVec.push_back(data);
+    } else {
+      auto dataIndex = std::distance(lastIndicesVec.begin(), lower);
+      lastIndicesVec.insert(lower, to_new);
+      additionalDataVec.insert(additionalDataVec.begin() + dataIndex, data);
+    }
     from_last = to_new;
-    additionalData.push_back(data);
   }
 }
 
 std::pair<std::unique_ptr<core::simulation::grid::Indices>,
-          std::unique_ptr<core::simulation::grid::DataList>>
+          std::unique_ptr<core::simulation::grid::ConnectionDataList>>
 EnergyPlugin::getPowerGridIndicesAndOptionalData(
     opencover::utils::read::CSVStream &stream, const size_t &numPoints) {
   using Indices = core::simulation::grid::Indices;
-  using DataList = core::simulation::grid::DataList;
+  using CDL = core::simulation::grid::ConnectionDataList;
   Indices indices(numPoints);
+  CDL additionalData(numPoints);
   CSVStream::CSVRow line;
   int from = 0, to = 0;
   std::string geoBuses = "";
-  core::simulation::grid::DataList additionalData;
   auto header = stream.getHeader();
   while (stream >> line) {
     core::simulation::grid::Data data;
@@ -1445,13 +1463,14 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(
     if (geoBuses.empty()) {
       ACCESS_CSV_ROW(line, "to_bus", to);
       indices[from].push_back(to);
-      additionalData.push_back(data);
+      additionalData[from].push_back(data);
+      //   additionalData.push_back(data);
     } else {
       processGeoBuses(indices, from, geoBuses, additionalData, data);
     }
   }
   return std::make_pair(std::make_unique<Indices>(indices),
-                        std::make_unique<DataList>(additionalData));
+                        std::make_unique<CDL>(additionalData));
 }
 
 void EnergyPlugin::buildPowerGrid() {
@@ -1475,8 +1494,6 @@ void EnergyPlugin::buildPowerGrid() {
   // create points
   auto pointsData = m_powerGridStreams->find("bus_geodata");
   std::unique_ptr<core::simulation::grid::Points> points(nullptr);
-  size_t numPoints(0);
-  float sphereRadius(1.0f);
   if (pointsData != m_powerGridStreams->end()) {
     auto &[name, pointStream] = *pointsData;
     points = createPowerGridPoints(*pointStream, numPoints, sphereRadius, *busNames);
@@ -1485,7 +1502,7 @@ void EnergyPlugin::buildPowerGrid() {
   // create line
   auto lineData = m_powerGridStreams->find("line");
   std::unique_ptr<core::simulation::grid::Indices> indices = nullptr;
-  std::unique_ptr<core::simulation::grid::DataList> optData = nullptr;
+  std::unique_ptr<core::simulation::grid::ConnectionDataList> optData = nullptr;
   if (lineData != m_powerGridStreams->end()) {
     auto &[name, lineStream] = *lineData;
     std::tie(indices, optData) =
@@ -1538,7 +1555,7 @@ void EnergyPlugin::initHeatingGrid() {
 std::vector<int> EnergyPlugin::createHeatingGridIndices(
     const std::string &pointName,
     const std::string &connectionsStrWithCommaDelimiter,
-    core::simulation::grid::DataList &additionalConnectionData) {
+    core::simulation::grid::ConnectionDataList &additionalConnectionData) {
   std::vector<int> connectivityList{};
   std::stringstream ss(connectionsStrWithCommaDelimiter);
   std::string connection("");
@@ -1547,7 +1564,8 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
     core::simulation::grid::Data connectionData{
         {"name", pointName + "_" + connection}};
-    additionalConnectionData.emplace_back(connectionData);
+    additionalConnectionData.emplace_back(std::vector{connectionData});
+    // additionalConnectionData.emplace_back("name", pointName + "_" + connection);
     connectivityList.push_back(std::stoi(connection));
   }
   return connectivityList;
@@ -1612,7 +1630,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   int maxId = 0;
   core::simulation::grid::Points points{};
   core::simulation::grid::Indices indices{};
-  core::simulation::grid::DataList additionalConnectionData{};
+  core::simulation::grid::ConnectionDataList additionalConnectionData{};
   core::simulation::grid::Data pointData{};
   std::map<int, int> idMap{};
   m_heatingGroup = new osg::Group();

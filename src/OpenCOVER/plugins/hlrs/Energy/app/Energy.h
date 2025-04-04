@@ -241,10 +241,10 @@ class EnergyPlugin : public opencover::coVRPlugin,
       const float &sphereRadius, const IDLookupTable &busNames);
   void processGeoBuses(grid::Indices &indices, int &from,
                        const std::string &geoBuses,
-                       core::simulation::grid::DataList &additionalData,
+                       core::simulation::grid::ConnectionDataList &additionalData,
                        core::simulation::grid::Data &data);
   std::pair<std::unique_ptr<core::simulation::grid::Indices>,
-            std::unique_ptr<core::simulation::grid::DataList>>
+            std::unique_ptr<core::simulation::grid::ConnectionDataList>>
   getPowerGridIndicesAndOptionalData(opencover::utils::read::CSVStream &stream,
                                      const size_t &numPoints);
   std::unique_ptr<IDLookupTable> retrieveBusNameIdMapping(
@@ -253,12 +253,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
   bool checkBoxSelection_powergrid(const std::string &tableName,
                                    const std::string &paramName);
   void helper_getAdditionalPowerGridPointData_addData(
-      int busId, core::simulation::grid::DataList &additionalData,
+      int busId, core::simulation::grid::PointDataList &additionalData,
       const core::simulation::grid::Data &data);
   void helper_getAdditionalPowerGridPointData_handleDuplicate(
       std::string &name, std::map<std::string, uint> &duplicateMap);
-  std::unique_ptr<core::simulation::grid::DataList> getAdditionalPowerGridPointData(
-      const std::size_t &numOfBus);
+  std::unique_ptr<core::simulation::grid::PointDataList>
+  getAdditionalPowerGridPointData(const std::size_t &numOfBus);
   void applyStaticInfluxToCityGML(const std::string &filePath);
   void applySimulationDataToPowerGrid();
   void updatePowerGridSelection(bool on);
@@ -280,7 +280,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
-      core::simulation::grid::DataList &additionalData);
+      core::simulation::grid::ConnectionDataList &additionalData);
   /* #endregion */
 
   /* #region COOLINGGRID */

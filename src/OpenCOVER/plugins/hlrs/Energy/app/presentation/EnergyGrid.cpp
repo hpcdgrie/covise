@@ -59,12 +59,18 @@ EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
     m_config.parent = new osg::Group;
     m_config.parent->setName(m_config.name);
   }
-  initConnections(m_config.indices, m_config.connectionRadius,
-                  m_config.additionalConnectionData);
+  initConnections();
 };
 
-void EnergyGrid::initConnections(const grid::Indices &indices, const float &radius,
-                                 const grid::DataList &additionalConnectionData) {
+void EnergyGrid::initConnections() {
+  assert(m_config.valid() && "EnergyGridConfig is not valid");
+  initConnectionsByIndex(m_config.indices, m_config.connectionRadius,
+                  m_config.additionalConnectionData);
+}
+
+void EnergyGrid::initConnectionsByIndex(
+    const grid::Indices &indices, const float &radius,
+    const grid::ConnectionDataList &additionalConnectionData) {
   bool hasAdditionalData = !additionalConnectionData.empty();
 
   const auto &points = m_config.points;
@@ -89,10 +95,11 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
       std::string name(from.getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX +
                        " " + to.getName());
 
-      core::simulation::grid::Data additionalData{};
+      grid::Data additionalData{};
       if (hasAdditionalData)
-        if (additionalConnectionData.size() > i + j)
-          additionalData = additionalConnectionData[i + j];
+        if (additionalConnectionData.size() > i)
+          if (additionalConnectionData[i].size() > j)
+            additionalData = additionalConnectionData[i][j];
       data = std::make_unique<grid::ConnectionData<grid::Point>>(
           name, from, to, radius, nullptr, additionalData);
       m_connections.push_back(new grid::DirectedConnection(*data));
@@ -142,7 +149,7 @@ void EnergyGrid::initDrawableConnections() {
   osg::ref_ptr<osg::Group> connections = new osg::Group;
   connections->setName("Connections");
 
-  for (auto &connection : m_connections) {
+  for (auto connection : m_connections) {
     m_drawables.push_back(connection);
     connections->addChild(connection);
 
