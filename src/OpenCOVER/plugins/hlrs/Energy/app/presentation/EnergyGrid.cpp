@@ -64,8 +64,9 @@ EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
 
 void EnergyGrid::initConnections() {
   assert(m_config.valid() && "EnergyGridConfig is not valid");
-  initConnectionsByIndex(m_config.indices, m_config.connectionRadius,
-                  m_config.additionalConnectionData);
+  if (m_config.connectionType == EnergyGridConnectionType::Index)
+    initConnectionsByIndex(m_config.indices, m_config.connectionRadius,
+                           m_config.additionalConnectionData);
 }
 
 void EnergyGrid::initConnectionsByIndex(
@@ -107,6 +108,30 @@ void EnergyGrid::initConnectionsByIndex(
   }
 }
 
+void EnergyGrid::initDrawableLines() {
+  osg::ref_ptr<osg::Group> lines = new osg::Group;
+  lines->setName("Lines");
+  for (auto &line : m_config.lines) {
+    m_drawables.push_back(line);
+    lines->addChild(line);
+    std::string toPrint = "";
+    // for (const auto &[name, data] : line->getAdditionalData()) {
+    //   toPrint +=
+    //       UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
+    // }
+    auto center = line->getCenter();
+    center.z() += 30;
+    auto name = line->getName();
+
+    m_config.infoboardAttributes.position = center;
+    m_config.infoboardAttributes.title = name;
+    TxtInfoboard infoboard(m_config.infoboardAttributes);
+    m_infoboards.push_back(std::make_unique<InfoboardSensor>(
+        line, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+  }
+  m_config.parent->addChild(lines);
+}
+
 void EnergyGrid::initDrawablePoints() {
   osg::ref_ptr<osg::Group> points = new osg::Group;
   points->setName("Points");
@@ -119,7 +144,6 @@ void EnergyGrid::initDrawablePoints() {
           UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
     }
     auto center = point->getPosition();
-    auto pointBB = point->getGeode()->getBoundingBox();
     center.z() += 30;
     auto name = point->getName();
 
@@ -174,7 +198,16 @@ void EnergyGrid::initDrawableConnections() {
 
 void EnergyGrid::initDrawables() {
   initDrawablePoints();
-  initDrawableConnections();
+  switch (m_config.connectionType) {
+    case EnergyGridConnectionType::Index:
+      initDrawableConnections();
+      break;
+    case EnergyGridConnectionType::Line:
+      initDrawableLines();
+      break;
+    default:
+      std::cerr << "Invalid connection type\n";
+  }
 }
 
 void EnergyGrid::updateColor(const osg::Vec4 &color) {

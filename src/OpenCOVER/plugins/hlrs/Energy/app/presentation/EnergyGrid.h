@@ -19,6 +19,8 @@
 using namespace core;
 using namespace core::simulation;
 
+enum class EnergyGridConnectionType { Index, Line };
+
 /**
  * @struct EnergyGridConfig
  * @brief A struct representing the data needed to create an energy grid.
@@ -38,12 +40,22 @@ struct EnergyGridConfig {
   grid::Points points;
   grid::Indices indices;
   // optional
-  osg::ref_ptr<osg::Group> parent = nullptr;
-  float connectionRadius = 1.0f;
-  grid::DataList additionalConnectionData = grid::DataList();
-  TxtBoxAttributes infoboardAttributes =
+  osg::ref_ptr<osg::Group> parent{nullptr};
+  float connectionRadius{1.0f};
+  grid::ConnectionDataList additionalConnectionData{grid::ConnectionDataList()};
+  TxtBoxAttributes infoboardAttributes{
       TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText", "DejaVuSans-Bold.ttf",
-                       50, 50, 2.0f, 0.1, 2);
+                       50, 50, 2.0f, 0.1, 2)};
+  EnergyGridConnectionType connectionType{EnergyGridConnectionType::Index};
+  grid::Lines lines{};
+  //   grid::LineMap lineMap{};
+
+  bool valid() const {
+    bool isMandatoryValid = !name.empty() || !points.empty() || !indices.empty();
+    return connectionType == EnergyGridConnectionType::Index
+               ? isMandatoryValid
+               : !lines.empty();
+  }
 };
 
 class InfoboardSensor : public coPickSensor {
@@ -94,13 +106,17 @@ class EnergyGrid : public interface::IEnergyGrid {
 
  private:
   void initConnections();
-  void initConnectionsByIndex(const grid::Indices &indices, const float &radius,
-                              const grid::ConnectionDataList &additionalConnectionData);
+  void initConnectionsByIndex(
+      const grid::Indices &indices, const float &radius,
+      const grid::ConnectionDataList &additionalConnectionData);
   void initDrawableConnections();
+  void initDrawableLines();
   void initDrawablePoints();
+  bool validPointIdx(int idx) { return idx < 0 || idx >= m_config.points.size(); }
 
   EnergyGridConfig m_config;
   grid::Connections m_connections;
+  grid::Lines m_lines;
   std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
 };
 #endif
