@@ -44,8 +44,8 @@ DirectedConnection::DirectedConnection(const std::string &name,
       m_additionalData(additionalData) {
   switch (type) {
     case ConnectionType::Line:
-  m_geode = utils::osgUtils::createCylinderBetweenPoints(
-      start, end, radius, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), hints);
+      m_geode = utils::osgUtils::createCylinderBetweenPoints(
+          start, end, radius, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), hints);
       break;
     case ConnectionType::Arc:
       m_geode = utils::osgUtils::createBezierTube(

@@ -993,9 +993,9 @@ void EnergyPlugin::initColorMap() {
 
 void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
   if (isActiv(m_grid, m_heatingGroup)) {
-  // heating simulation
-  m_heatingSimUI->updateTimestepColors("mass_flow", m_colorMapMenu->getMin(),
-                                       m_colorMapMenu->getMax(), true);
+    // heating simulation
+    m_heatingSimUI->updateTimestepColors("mass_flow", m_colorMapMenu->getMin(),
+                                         m_colorMapMenu->getMax(), true);
     m_colorMapMenu->setUnit("kg/s");
     std::cout << "Active child at index " << m_heatingGroup->getName() << std::endl;
   } else if (isActiv(m_grid, m_powerGroup)) {
@@ -1391,9 +1391,9 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
 
 void EnergyPlugin::processGeoBuses(
     core::simulation::grid::Indices &indices, int &from,
-                                   const std::string &geoBuses_comma_seperated,
+    const std::string &geoBuses_comma_seperated,
     core::simulation::grid::ConnectionDataList &additionalData,
-                                   core::simulation::grid::Data &data) {
+    core::simulation::grid::Data &data) {
   std::stringstream ss(geoBuses_comma_seperated);
   std::string bus("");
 
@@ -1408,14 +1408,14 @@ void EnergyPlugin::processGeoBuses(
 
     // NOTE: test implementing skip redundance
     if constexpr (skipRedundance) {
-    // get rid of redundant connections
+      // get rid of redundant connections
       if (std::find(lastIndicesVec.begin(), lastIndicesVec.end(), to_new) !=
               lastIndicesVec.end() ||
           std::find(toIndicesVec.begin(), toIndicesVec.end(), from_last) !=
               toIndicesVec.end()) {
-      from_last = to_new;
-      continue;
-    }
+        from_last = to_new;
+        continue;
+      }
     }
 
     // binary insertion to keep the indices sorted
