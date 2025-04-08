@@ -5,6 +5,7 @@
 #include <osg/BoundingBox>
 #include <osg/Geode>
 #include <osg/Geometry>
+#include <osg/ref_ptr>
 #include <osgText/Text>
 #include <vector>
 
@@ -51,5 +52,8 @@ osg::ref_ptr<osg::Geometry> createBackgroundQuadGeometry(const osg::Vec3 &center
                                                          float width, float height,
                                                          const osg::Vec4 &color);
 void enableLighting(osg::ref_ptr<osg::Geode> geode, bool enable = true);
+osg::ref_ptr<osg::Geode> createBoundingBoxVisualization(const osg::BoundingBox &bb);
+osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(const osg::BoundingSphere& bs);
+
 }  // namespace core::utils::osgUtils
 #endif

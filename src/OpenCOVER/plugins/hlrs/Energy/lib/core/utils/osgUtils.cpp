@@ -10,10 +10,12 @@
 #include <osg/Drawable>
 #include <osg/Geode>
 #include <osg/Geometry>
+#include <osg/LineWidth>
 #include <osg/Material>
 #include <osg/Matrixd>
 #include <osg/PrimitiveSet>
 #include <osg/Shape>
+#include <osg/PolygonMode>
 #include <osg/ShapeDrawable>
 #include <osg/Vec3>
 #include <osg/Vec4>
@@ -338,5 +340,95 @@ osg::ref_ptr<osg::Geode> createBezierTube(const osg::Vec3 &p1, const osg::Vec3 &
 
   return geode;
 }
+
+osg::ref_ptr<osg::Geode> createBoundingBoxVisualization(const osg::BoundingBox &bb) {
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry();
+
+  // Vertices of the bounding box
+  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+  vertices->push_back(osg::Vec3(bb.xMin(), bb.yMin(), bb.zMin()));  // 0
+  vertices->push_back(osg::Vec3(bb.xMax(), bb.yMin(), bb.zMin()));  // 1
+  vertices->push_back(osg::Vec3(bb.xMax(), bb.yMax(), bb.zMin()));  // 2
+  vertices->push_back(osg::Vec3(bb.xMin(), bb.yMax(), bb.zMin()));  // 3
+  vertices->push_back(osg::Vec3(bb.xMin(), bb.yMin(), bb.zMax()));  // 4
+  vertices->push_back(osg::Vec3(bb.xMax(), bb.yMin(), bb.zMax()));  // 5
+  vertices->push_back(osg::Vec3(bb.xMax(), bb.yMax(), bb.zMax()));  // 6
+  vertices->push_back(osg::Vec3(bb.xMin(), bb.yMax(), bb.zMax()));  // 7
+
+  geometry->setVertexArray(vertices);
+
+  // Indices for the edges of the bounding box
+  osg::ref_ptr<osg::DrawElementsUInt> lines =
+      new osg::DrawElementsUInt(osg::PrimitiveSet::LINES, 0);
+  lines->push_back(0);
+  lines->push_back(1);
+  lines->push_back(1);
+  lines->push_back(2);
+  lines->push_back(2);
+  lines->push_back(3);
+  lines->push_back(3);
+  lines->push_back(0);
+  lines->push_back(4);
+  lines->push_back(5);
+  lines->push_back(5);
+  lines->push_back(6);
+  lines->push_back(6);
+  lines->push_back(7);
+  lines->push_back(7);
+  lines->push_back(4);
+  lines->push_back(0);
+  lines->push_back(4);
+  lines->push_back(1);
+  lines->push_back(5);
+  lines->push_back(2);
+  lines->push_back(6);
+  lines->push_back(3);
+  lines->push_back(7);
+
+  geometry->addPrimitiveSet(lines);
+
+  // Set the color of the lines (e.g., red)
+  osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+  colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));  // Red
+  geometry->setColorArray(colors);
+  geometry->setColorBinding(osg::Geometry::BIND_OVERALL);
+
+  // Make the lines thicker
+  osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(2.0f);
+  geometry->getOrCreateStateSet()->setAttributeAndModes(lineWidth,
+                                                        osg::StateAttribute::ON);
+
+  geode->addDrawable(geometry);
+
+  return geode;
+}
+
+osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(const osg::BoundingSphere& bs) {
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+
+    // Create a wireframe sphere using osg::ShapeDrawable
+    osg::ref_ptr<osg::Sphere> sphere = new osg::Sphere(bs.center(), bs.radius());
+    osg::ref_ptr<osg::ShapeDrawable> shapeDrawable = new osg::ShapeDrawable(sphere);
+
+    // Set wireframe mode
+    osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode;
+    polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
+    shapeDrawable->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::ON);
+
+    // Set color (e.g., green)
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+    colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green
+    shapeDrawable->setColorArray(colors);
+    shapeDrawable->setColorBinding(osg::Geometry::BIND_OVERALL);
+
+    // Make the lines thicker
+    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(2.0f);
+    shapeDrawable->getOrCreateStateSet()->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
+
+    geode->addDrawable(shapeDrawable);
+
+    return geode;
+  }
 
 }  // namespace core::utils::osgUtils
