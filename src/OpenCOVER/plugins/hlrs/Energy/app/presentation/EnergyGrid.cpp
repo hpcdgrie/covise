@@ -7,22 +7,27 @@
 
 #include <cassert>
 #include <memory>
+#include <osg/BoundingBox>
 #include <osg/Shape>
+#include <osg/Vec3>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
 #include <osgText/Text>
 #include <sstream>
+#include <utility>
 #include <variant>
 
 #include "TxtInfoboard.h"
 #include "cover/VRViewer.h"
 
 namespace {
+
 auto get_string = [](const auto &data) {
   std::stringstream ss;
   ss << data << "\n\n";
   return ss.str();
 };
+
 }  // namespace
 
 InfoboardSensor::InfoboardSensor(
@@ -54,8 +59,9 @@ void InfoboardSensor::update() {
   coPickSensor::update();
 }
 
-EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
-  if (m_config.parent == nullptr) {
+// EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
+EnergyGrid::EnergyGrid(const EnergyGridConfig &data) : m_config(data) {
+  if (!m_config.parent.valid()) {
     m_config.parent = new osg::Group;
     m_config.parent->setName(m_config.name);
   }
@@ -76,9 +82,9 @@ void EnergyGrid::initConnectionsByIndex(
 
   const auto &points = m_config.points;
   for (auto i = 0; i < indices.size(); ++i) {
-    const auto &from = *points[i];
+    auto from = points[i];
     for (auto j = 0; j < indices[i].size(); ++j) {
-      std::unique_ptr<grid::ConnectionData<grid::Point>> data;
+      std::unique_ptr<grid::ConnectionData> data;
 
       if (i < 0 || i >= points.size()) {
         std::cerr << "Invalid Index for points: " << i << "\n";
@@ -91,27 +97,83 @@ void EnergyGrid::initConnectionsByIndex(
         std::cerr << "Invalid Index for points: " << indice << "\n";
         continue;
       }
-      const auto &to = *points[indice];
+      auto to = points[indice];
 
-      std::string name(from.getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX +
-                       " " + to.getName());
+      std::string name(from->getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX +
+                       " " + to->getName());
 
       grid::Data additionalData{};
       if (hasAdditionalData)
         if (additionalConnectionData.size() > i)
           if (additionalConnectionData[i].size() > j)
             additionalData = additionalConnectionData[i][j];
-      data = std::make_unique<grid::ConnectionData<grid::Point>>(
-          name, from, to, radius, nullptr, additionalData);
+      data = std::make_unique<grid::ConnectionData>(name, from, to, radius, nullptr,
+                                                    additionalData);
       m_connections.push_back(new grid::DirectedConnection(*data));
     }
   }
 }
 
+void EnergyGrid::findCorrectHeightForLine(float radius,
+                                          osg::ref_ptr<grid::Line> line,
+                                          grid::Lines &processedLines) {
+  int redundantCount = 1;
+  bool overlap = true;
+
+  std::set<osg::ref_ptr<grid::Line>> lastMatch;
+  while (overlap) {
+    overlap = false;  // Reset overlap flag for each iteration
+
+    for (auto otherLine : processedLines) {
+      if (line == otherLine) continue;  // Skip comparing the line with itself.
+      if (lastMatch.find(otherLine) != lastMatch.end()) continue;  // Skip already checked lines
+      if (!line.valid() || !otherLine.valid()) continue;
+
+        // const auto &lineBB(line->getBoundingBox());
+        // const auto &otherLineBB(otherLine->getBoundingBox());
+
+        // if (lineBB.intersects(otherLineBB)) {
+        //   line->move(osg::Vec3(0, 0, -2 * radius * redundantCount));
+        //   line->recomputeBoundingBox();
+        //   std::cerr << "redundant line: " << line->getName() << " " <<
+        //   redundantCount
+        //             << "\n";
+        //   ++redundantCount;
+        //   overlap = true;  // Set overlap flag to repeat the loop
+        // lastMatch.insert(otherLine);  // Store the last line to avoid redundant checks
+        //   break;           // No need to check other lines in this iteration
+        // }
+
+      if (line->overlap(*otherLine)) {
+        line->move(osg::Vec3(0, 0, -2 * radius * redundantCount));
+        std::cerr << "redundant line: " << line->getName() << " " << redundantCount
+                  << "\n";
+        ++redundantCount;
+        overlap = true;  // Set overlap flag to repeat the loop
+        lastMatch.insert(otherLine);  // Store the last line to avoid redundant checks
+        break;           // No need to check other lines in this iteration
+      }
+    }
+  }
+}
+
 void EnergyGrid::initDrawableLines() {
+  using namespace core::simulation::grid;
   osg::ref_ptr<osg::Group> lines = new osg::Group;
   lines->setName("Lines");
-  for (auto &line : m_config.lines) {
+//   const auto &radius = m_config.connectionRadius;
+  const auto &radius = m_config.lines[0]->getConnections().begin()->second->getStart()->getRadius();
+  grid::Lines overlappingLines;
+
+  for (auto line : m_config.lines) {
+    // move redundant line below the first one
+    findCorrectHeightForLine(radius, line, overlappingLines);
+    overlappingLines.push_back(line);
+    // auto bbVis = core::utils::osgUtils::createBoundingBoxVisualization(
+    //     line->getBoundingBox());
+    // bbVis->setName(line->getName() + "_bb");
+    // line->addChild(bbVis);
+    // m_config.parent->addChild(bbVis);
     m_drawables.push_back(line);
     lines->addChild(line);
     std::string toPrint = "";

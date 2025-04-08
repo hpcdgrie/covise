@@ -1,10 +1,12 @@
 #pragma once
 
+#include <osg/BoundingBox>
 #include <osg/Geode>
 #include <osg/Group>
 #include <osg/MatrixTransform>
 #include <osg/ShapeDrawable>
 #include <osg/Vec3>
+#include <osg/ref_ptr>
 #include <variant>
 
 #include "../utils/color.h"
@@ -19,6 +21,11 @@ class Point : public osg::MatrixTransform {
         const float &radius, const Data &additionalData = Data());
   Point(const Point &p);
 
+  void move(const osg::Vec3 &offset) {
+    setMatrix(osg::Matrix::translate(offset));
+  }
+
+  const auto &getRadius() const { return m_radius; }
   const auto &getPosition() const { return m_point->getCenter(); }
   const auto &getAdditionalData() const { return m_additionalData; }
   osg::ref_ptr<osg::Geode> getGeode() {
@@ -31,15 +38,16 @@ class Point : public osg::MatrixTransform {
 
  private:
   void init(const std::string &name);
+
+  float m_radius;
   osg::ref_ptr<osg::ShapeDrawable> m_shape;
   osg::ref_ptr<osg::Sphere> m_point;
   Data m_additionalData;
 };
 
-template <typename CoordType>
 struct ConnectionData {
-  ConnectionData(const std::string &name, const CoordType &start,
-                 const CoordType &end, const float &radius,
+  ConnectionData(const std::string &name, osg::ref_ptr<Point> start,
+                 osg::ref_ptr<Point> end, const float &radius,
                  osg::ref_ptr<osg::TessellationHints> hints = nullptr,
                  const Data &additionalData = Data())
       : name(name),
@@ -49,8 +57,8 @@ struct ConnectionData {
         hints(hints),
         additionalData(additionalData) {};
   std::string name;
-  CoordType start;
-  CoordType end;
+  osg::ref_ptr<Point> start;
+  osg::ref_ptr<Point> end;
   float radius;
   osg::ref_ptr<osg::TessellationHints> hints;
   Data additionalData;
@@ -59,32 +67,31 @@ struct ConnectionData {
 enum class ConnectionType { Line, Arc, Arrow };
 
 class DirectedConnection : public osg::MatrixTransform {
-  DirectedConnection(const std::string &name, const osg::Vec3 &start,
-                     const osg::Vec3 &end, const float &radius,
+  DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
+                     osg::ref_ptr<Point> end, const float &radius,
                      osg::ref_ptr<osg::TessellationHints> hints,
                      const Data &additionalData = Data(),
                      ConnectionType type = ConnectionType::Line);
 
  public:
-  DirectedConnection(const ConnectionData<osg::Vec3> &data,
+  DirectedConnection(const ConnectionData &data,
                      ConnectionType type = ConnectionType::Line)
       : DirectedConnection(data.name, data.start, data.end, data.radius, data.hints,
                            data.additionalData) {};
 
-  DirectedConnection(const ConnectionData<Point> &data,
-                     ConnectionType type = ConnectionType::Line)
-      : DirectedConnection(data.name, data.start.getPosition(),
-                           data.end.getPosition(), data.radius, data.hints,
-                           data.additionalData) {};
-  ~DirectedConnection() {
-    delete m_start;
-    delete m_end;
+  void move(const osg::Vec3 &offset) {
+    setMatrix(osg::Matrix::translate(offset));
+    m_start->move(offset);
+    m_end->move(offset);
   }
-
-  osg::Vec3 getDirection() const { return *m_end - *m_start; }
-  osg::Vec3 getCenter() const { return (*m_start + *m_end) / 2; }
-  osg::Vec3 getStart() const { return *m_start; }
-  osg::Vec3 getEnd() const { return *m_end; }
+  osg::Vec3 getDirection() const {
+    return m_end->getPosition() - m_start->getPosition();
+  }
+  osg::Vec3 getCenter() const {
+    return (m_start->getPosition() + m_end->getPosition()) / 2;
+  }
+  osg::ref_ptr<Point> getStart() const { return m_start; }
+  osg::ref_ptr<Point> getEnd() const { return m_end; }
   osg::ref_ptr<osg::Geode> getGeode() const { return m_geode; }
   const auto &getAdditionalData() const { return m_additionalData; }
   void updateColor(const osg::Vec4 &color) {
@@ -93,8 +100,8 @@ class DirectedConnection : public osg::MatrixTransform {
 
  private:
   osg::ref_ptr<osg::Geode> m_geode;
-  osg::Vec3 *m_start;
-  osg::Vec3 *m_end;
+  osg::ref_ptr<Point> m_start;
+  osg::ref_ptr<Point> m_end;
   Data m_additionalData;
   ConnectionType m_type;
 };
@@ -106,20 +113,25 @@ class Line : public osg::MatrixTransform {
  public:
   Line(std::string name, const Connections &connections);
 
+  void move(const osg::Vec3 &offset) {
+    for (const auto &[_, connection] : m_connections) connection->move(offset);
+  }
+
   const auto &getConnections() const { return m_connections; }
   const auto &getAdditionalData() const { return m_additionalData; }
-  osg::Vec3 getCenter() const {
-    osg::Vec3 center(0.0f, 0.0f, 0.0f);
-    for (const auto &[_, connection] : m_connections)
-      center += connection->getCenter();
-    return center / m_connections.size();
-  }
+  const auto &getName() const { return m_name; }
+  osg::Vec3 getCenter() const;
+  const osg::BoundingBox &getBoundingBox() const { return m_boundingBox; }
+  void recomputeBoundingBox() { computeBoundingBox(); }
+  bool overlap(const Line &other) const;
   bool operator==(const Line &other) const;
 
  private:
   void init(const Connections &connections);
+  void computeBoundingBox();
 
   std::string m_name;
+  osg::BoundingBox m_boundingBox;
   std::map<std::string, osg::ref_ptr<DirectedConnection>> m_connections;
   Data m_additionalData;
 };

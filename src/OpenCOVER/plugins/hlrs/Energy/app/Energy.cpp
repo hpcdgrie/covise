@@ -1460,8 +1460,8 @@ osg::ref_ptr<core::simulation::grid::Line> EnergyPlugin::createLine(
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
-    auto conData = std::make_unique<grid::ConnectionData<grid::Point>>(
-        name, *fromPoint, *toPoint, radius, nullptr, data);
+    auto conData = std::make_unique<grid::ConnectionData>(name, fromPoint, toPoint,
+                                                          radius, nullptr, data);
     connections.push_back(new grid::DirectedConnection(*conData));
     from_last = to_new;
   }
@@ -1475,7 +1475,6 @@ EnergyPlugin::getPowerGridLines(opencover::utils::read::CSVStream &stream,
   using Lines = core::simulation::grid::Lines;
   using CDL = core::simulation::grid::ConnectionDataList;
   auto numPoints = points.size();
-//   Lines lines(numPoints);
   Lines lines;
   CDL additionalData(numPoints);
 
@@ -1676,22 +1675,60 @@ void EnergyPlugin::buildPowerGrid() {
   }
 
   // create grid
-  //   if (indices == nullptr || points == nullptr) return;
+  // if (indices == nullptr || points == nullptr) return;
   if (lines == nullptr || points == nullptr) return;
 
-  m_powerGroup = new osg::Group();
+  m_powerGroup = new osg::Group;
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   m_powerGroup->setName("PowerGrid");
-  auto indices = core::simulation::grid::Indices();
-  m_powerGrid = std::make_shared<EnergyGrid>(
-      //   EnergyGridConfig{"POWER", *points, *indices, m_powerGroup,
-      //   connectionsRadius,
-      //                    *optData, infoboardAttributes});
-      EnergyGridConfig{"POWER", *points, indices, m_powerGroup, connectionsRadius,
-                       *optData, infoboardAttributes, EnergyGridConnectionType::Line, *lines});
-  //   infoboardAttributes, EnergyGridConnectionType::Line, *lines});
+  //   auto indices = core::simulation::grid::Indices();
+  //   if (!points) {
+  //     std::cerr << "Fehler: points ist nullptr!" << std::endl;
+  //     return;  // Oder eine andere Fehlerbehandlung
+  //   }
+  //   if (!optData) {
+  //     std::cerr << "Fehler: optData ist nullptr!" << std::endl;
+  //     return;
+  //   }
+  //   if (!lines) {
+  //     std::cerr << "Fehler: lines ist nullptr!" << std::endl;
+  //     return;
+  //   }
+  //   if (points) {
+  //     std::cout << "Anzahl der Punkte: " << points->size() << std::endl;
+  //     for (const auto &pointPtr : *points) {
+  //       std::cout << "Punkt-Pointer: " << pointPtr.get()
+  //                 << " referencCount: " << pointPtr->referenceCount() <<
+  //                 std::endl;
+  //       if (!pointPtr.valid()) {
+  //         std::cerr << "Fehler: Ungültiger Point-Pointer gefunden!" << std::endl;
+  //       }
+  //     }
+  //   } else {
+  //     std::cerr << "Fehler: points ist nullptr!" << std::endl;
+  //   }
+  //   std::cout << "m_powerGroup valid: " << m_powerGroup.valid() << std::endl;
+  //   std::cout << "m_powerGroup pointer: " << m_powerGroup.get() << std::endl;
+
+  EnergyGridConfig econfig("POWER", *points, core::simulation::grid::Indices(),
+                           m_powerGroup, connectionsRadius, *optData,
+                           infoboardAttributes, EnergyGridConnectionType::Line,
+                           *lines);
+  m_powerGrid = std::make_shared<EnergyGrid>(econfig);
+  //   m_powerGrid = std::make_shared<EnergyGrid>(
+  //       //   m_powerGrid = std::make_shared<EnergyGrid>(
+  //       //       // EnergyGridConfig{
+  //       //       //   "POWER", *points, *indices, m_powerGroup, connectionsRadius,
+  //       //       //                  *optData, infoboardAttributes});
+  //     //   EnergyGridConfig{"POWER", *points, core::simulation::grid::Indices(),
+  //     m_powerGroup, connectionsRadius,
+  //       EnergyGridConfig{"POWER", *points, indices, m_powerGroup,
+  //       connectionsRadius,
+  //                        *optData, infoboardAttributes,
+  //                        EnergyGridConnectionType::Line, *lines});
+  //   //   infoboardAttributes, EnergyGridConnectionType::Line, *lines});
   m_powerGrid->initDrawables();
   m_powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
