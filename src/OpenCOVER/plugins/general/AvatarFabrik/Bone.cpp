@@ -111,24 +111,25 @@ void BoneParser::update()
         if(!m_boneDummies[i])
         {
             m_boneDummies[i] = createSphere(posGlobal, 2);
+            m_boneDummies[i]->setName(std::string("dummy_") + boneNames[i]);
             m_rootBone->addChild(m_boneDummies[i]);
         }
         else
         {
             m_boneDummies[i]->setMatrix(osg::Matrix::translate(posGlobal));
         }
-        // if(!bone->getBoneParent())
-        // {
-        //     auto &stacked = dynamic_cast<osgAnimation::UpdateBone*>(bone->getUpdateCallback())->getStackedTransforms();
+        if(!bone->getBoneParent())
+        {
+            auto &stacked = dynamic_cast<osgAnimation::UpdateBone*>(bone->getUpdateCallback())->getStackedTransforms();
             
-        //     for (const auto &i : stacked)
-        //     {
-        //         if(auto translate = dynamic_cast<osgAnimation::StackedTranslateElement*>(i.get()))
-        //         {
-        //             translate->setTranslate(joint.position);
-        //         } 
-        //     }
-        // }
+            for (const auto &i : stacked)
+            {
+                if(auto translate = dynamic_cast<osgAnimation::StackedTranslateElement*>(i.get()))
+                {
+                    translate->setTranslate(joint.position);
+                } 
+            }
+        }
 
     }
 }
