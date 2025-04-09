@@ -17,5 +17,5 @@ if(NOT ${fabrik_FOUND})
 endif()
 
 
-cover_add_plugin(Avatar ${HEADERS} ${RTIK_HEADERS} )
-target_link_libraries(Avatar ${OPENSCENEGRAPH_LIBRARIES} fabrik::fabrik)
+cover_add_plugin(AvatarFabrik ${HEADERS} ${RTIK_HEADERS} )
+target_link_libraries(AvatarFabrik ${OPENSCENEGRAPH_LIBRARIES} fabrik::fabrik)
