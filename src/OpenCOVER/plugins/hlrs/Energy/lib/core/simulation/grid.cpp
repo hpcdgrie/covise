@@ -105,7 +105,31 @@ bool Line::operator==(const Line &other) const {
 
 bool Line::overlap(const Line &other) const {
   for (const auto &[name, connection] : m_connections) {
-    if (other.m_connections.find(name) != other.m_connections.end()) {
+    auto otherConnections = other.getConnections();
+    auto start = connection->getStart()->getPosition();
+    auto end = connection->getEnd()->getPosition();
+    if (std::find_if(otherConnections.begin(), otherConnections.end(),
+                     [&name, &start, &end](const auto &otherPair) {
+                       const auto &[otherName, otherCon] = otherPair;
+
+                       if (name == otherName) return true;
+
+                       auto otherStart = otherCon->getStart();
+                       auto otherEnd = otherCon->getEnd();
+
+                       // check if the name is simply reverse
+                       std::string otherReverseName =
+                           otherEnd->getName() + " > " + otherStart->getName();
+
+                       if (name == otherReverseName) return true;
+
+                       const auto &otherStartPos = otherStart->getPosition();
+                       const auto &otherEndPos = otherEnd->getPosition();
+
+                       // check if the start and end points overlap
+                       return (start == otherStartPos && end == otherEndPos) ||
+                              (end == otherStartPos || start == otherEndPos);
+                     }) != otherConnections.end()) {
       return true;
     }
   }
