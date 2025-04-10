@@ -156,10 +156,10 @@ void EnergyGrid::initDrawableLines() {
     m_drawables.push_back(line);
     lines->addChild(line);
     std::string toPrint = "";
-    // for (const auto &[name, data] : line->getAdditionalData()) {
-    //   toPrint +=
-    //       UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
-    // }
+    for (const auto &[name, data] : line->getAdditionalData()) {
+      toPrint +=
+          UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
+    }
     auto center = line->getCenter();
     center.z() += 30;
     auto name = line->getName();
