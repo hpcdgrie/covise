@@ -142,7 +142,7 @@ class Line : public osg::MatrixTransform {
 typedef std::vector<osg::ref_ptr<Point>> Points;
 typedef std::vector<osg::ref_ptr<Line>> Lines;
 typedef std::vector<std::vector<int>> Indices;
-typedef std::vector<Data> PointDataList;
+typedef std::map<int, Data> PointDataList;
 typedef std::vector<std::vector<Data>> ConnectionDataList;
 
 }  // namespace core::simulation::grid
