@@ -1761,6 +1761,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
     row.clear();
   }
 
+  // TODO: change datastructure to lines instead => indices can be used as well but lines will represent the new simulation data more accurately
   // indices are strangely mapped with random ids => make them contiguous
   for (int i = 0; i < indices.size(); ++i)
     for (int j = 0; j < indices[i].size(); ++j)
