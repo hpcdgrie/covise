@@ -1152,6 +1152,7 @@ bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
 }
 
 void EnergyPlugin::rebuildPowerGrid() {
+  m_grid->removeChild(m_powerGroup);
   initPowerGridStreams();
   buildPowerGrid();
 }
