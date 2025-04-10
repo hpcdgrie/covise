@@ -57,58 +57,11 @@ struct EnergyGridConfig {
         connectionType(gridConnectionType),
         lines(gridLines) {}
 
-  EnergyGridConfig(const EnergyGridConfig &other)
-      : name(other.name),
-        points(other.points),
-        indices(other.indices),
-        parent(other.parent),  // Wichtige Zeile: Kopiere den ref_ptr
-        connectionRadius(other.connectionRadius),
-        additionalConnectionData(other.additionalConnectionData),
-        infoboardAttributes(other.infoboardAttributes),
-        connectionType(other.connectionType),
-        lines(other.lines) {
-
-    // if (points.empty()) {
-    //   std::cerr << "Fehler: points ist nullptr!" << std::endl;
-    //   return;  // Oder eine andere Fehlerbehandlung
-    // }
-    // if (lines.empty()) {
-    //   std::cerr << "Fehler: lines ist nullptr!" << std::endl;
-    //   return;
-    // }
-    // std::cout << "Anzahl der Punkte: " << points.size() << std::endl;
-    // for (const auto &pointPtr : points) {
-    //   std::cout << "Punkt-Pointer: " << pointPtr.get()
-    //             << " referencCount: " << pointPtr->referenceCount() << std::endl;
-    //   if (!pointPtr.valid()) {
-    //     std::cerr << "Fehler: Ungültiger Point-Pointer gefunden!" << std::endl;
-    //   }
-    // }
-    // std::cout << "parent valid: " << parent.valid() << std::endl;
-    // std::cout << "parent pointer: " << parent.get() << std::endl;
-    // std::cout << "parent referenceCount: " << parent->referenceCount()
-    //           << std::endl;
-  }
-  //   EnergyGridConfig(const EnergyGridConfig &other) = default;
-  //   EnergyGridConfig(EnergyGridConfig &&other) = default;
-  //   EnergyGridConfig &operator=(const EnergyGridConfig &other) = default;
-  //   EnergyGridConfig &operator=(EnergyGridConfig &&other) = default;
-  //   ~EnergyGridConfig() = default;
-
   // mandatory
   std::string name;
   grid::Points points;
   grid::Indices indices;
   // optional
-  //   osg::ref_ptr<osg::Group> parent{nullptr};
-  //   float connectionRadius{1.0f};
-  //   grid::ConnectionDataList additionalConnectionData{grid::ConnectionDataList()};
-  //   TxtBoxAttributes infoboardAttributes{
-  //       TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText",
-  //       "DejaVuSans-Bold.ttf",
-  //                        50, 50, 2.0f, 0.1, 2)};
-  //   EnergyGridConnectionType connectionType{EnergyGridConnectionType::Index};
-  //   grid::Lines lines{};
   osg::ref_ptr<osg::Group> parent;
   float connectionRadius;
   grid::ConnectionDataList additionalConnectionData;
@@ -171,8 +124,6 @@ class EnergyGrid : public interface::IEnergyGrid {
   }
 
  private:
-  //   typedef std::set<osg::ref_ptr<grid::Line>, grid::LineOverlapComp>
-  //   OverlapLineSet;
 
   void initConnections();
   void initConnectionsByIndex(
@@ -182,9 +133,6 @@ class EnergyGrid : public interface::IEnergyGrid {
   void initDrawableLines();
   void initDrawablePoints();
   bool validPointIdx(int idx) { return idx < 0 || idx >= m_config.points.size(); }
-  //   void findCorrectHeightForLine(const float &radius, osg::ref_ptr<grid::Line>
-  //   line,
-  //                                 const OverlapLineSet &lines);
   void findCorrectHeightForLine(float radius, osg::ref_ptr<grid::Line> line,
                                 grid::Lines &lines);
 
