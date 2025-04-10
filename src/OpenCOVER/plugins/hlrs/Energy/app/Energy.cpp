@@ -1282,13 +1282,12 @@ std::unique_ptr<EnergyPlugin::IDLookupTable> EnergyPlugin::retrieveBusNameIdMapp
 void EnergyPlugin::helper_getAdditionalPowerGridPointData_addData(
     int busId, core::simulation::grid::PointDataList &additionalData,
     const core::simulation::grid::Data &data) {
-  if (busId > -1 && busId < additionalData.size()) {
-    auto &existingData = additionalData[busId];
-    if (existingData.empty())
-      additionalData[busId] = data;
-    else
-      existingData.insert(data.begin(), data.end());
-  }
+  if (busId == -1) return;
+  auto &existingDataMap = additionalData[busId];
+  if (existingDataMap.empty())
+    additionalData[busId] = data;
+  else
+    existingDataMap.insert(data.begin(), data.end());
 }
 
 void EnergyPlugin::helper_getAdditionalPowerGridPointData_handleDuplicate(
@@ -1305,7 +1304,7 @@ EnergyPlugin::getAdditionalPowerGridPointData(const std::size_t &numOfBus) {
   using PDL = core::simulation::grid::PointDataList;
 
   // additional bus data
-  PDL additionalData(numOfBus);
+  PDL additionalData;
 
   for (auto &[tableName, tableStream] : *m_powerGridStreams) {
     auto header = tableStream->getHeader();
