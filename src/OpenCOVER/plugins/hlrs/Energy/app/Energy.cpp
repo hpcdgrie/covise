@@ -1178,13 +1178,6 @@ void EnergyPlugin::updatePowerGridConfig(const std::string &tableName,
 void EnergyPlugin::updatePowerGridSelection(bool on) {
   if (!on) return;
   m_updatePowerGridSelection->setState(false);
-  for (auto i = 0; i < m_Energy->getNumChildren(); ++i) {
-    auto child = m_Energy->getChild(i);
-    if (child->getName() == "PowerGrid") {
-      m_Energy->removeChild(i);
-      break;
-    }
-  }
   rebuildPowerGrid();
 }
 
