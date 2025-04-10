@@ -31,19 +31,10 @@ Point::Point(const std::string &name, const float &x, const float &y, const floa
 }
 
 Point::Point(const Point &other)
-    : m_additionalData(other.getAdditionalData()),
-      m_radius(other.getRadius()) {
+    : m_additionalData(other.getAdditionalData()), m_radius(other.getRadius()) {
   m_point = new osg::Sphere(other.getPosition(), m_radius);
   init(other.getName());
 }
-
-// Point::Point(const Point &other) {
-//   m_point = new osg::Sphere(other.m_point->getCenter(), other.m_point->getRadius());
-//   m_shape = new osg::ShapeDrawable(m_point, other.m_shape->getTessellationHints());
-//   m_additionalData = other.m_additionalData;
-//   m_radius = other.m_radius;
-// //   init(other.getName());
-// }
 
 void Point::init(const std::string &name) {
   osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints;

@@ -126,31 +126,15 @@ void EnergyGrid::findCorrectHeightForLine(float radius,
 
     for (auto otherLine : processedLines) {
       if (line == otherLine) continue;  // Skip comparing the line with itself.
-      if (lastMatch.find(otherLine) != lastMatch.end()) continue;  // Skip already checked lines
+      if (lastMatch.find(otherLine) != lastMatch.end())
+        continue;  // Skip already checked line
       if (!line.valid() || !otherLine.valid()) continue;
-
-        // const auto &lineBB(line->getBoundingBox());
-        // const auto &otherLineBB(otherLine->getBoundingBox());
-
-        // if (lineBB.intersects(otherLineBB)) {
-        //   line->move(osg::Vec3(0, 0, -2 * radius * redundantCount));
-        //   line->recomputeBoundingBox();
-        //   std::cerr << "redundant line: " << line->getName() << " " <<
-        //   redundantCount
-        //             << "\n";
-        //   ++redundantCount;
-        //   overlap = true;  // Set overlap flag to repeat the loop
-        // lastMatch.insert(otherLine);  // Store the last line to avoid redundant checks
-        //   break;           // No need to check other lines in this iteration
-        // }
-
       if (line->overlap(*otherLine)) {
         line->move(osg::Vec3(0, 0, -2 * radius * redundantCount));
-        std::cerr << "redundant line: " << line->getName() << " " << redundantCount
-                  << "\n";
         ++redundantCount;
         overlap = true;  // Set overlap flag to repeat the loop
-        lastMatch.insert(otherLine);  // Store the last line to avoid redundant checks
+        lastMatch.insert(
+            otherLine);  // Store the last line to avoid redundant checks
         break;           // No need to check other lines in this iteration
       }
     }
@@ -161,19 +145,14 @@ void EnergyGrid::initDrawableLines() {
   using namespace core::simulation::grid;
   osg::ref_ptr<osg::Group> lines = new osg::Group;
   lines->setName("Lines");
-//   const auto &radius = m_config.connectionRadius;
-  const auto &radius = m_config.lines[0]->getConnections().begin()->second->getStart()->getRadius();
+  const auto &radius =
+      m_config.lines[0]->getConnections().begin()->second->getStart()->getRadius();
   grid::Lines overlappingLines;
 
   for (auto line : m_config.lines) {
     // move redundant line below the first one
     findCorrectHeightForLine(radius, line, overlappingLines);
     overlappingLines.push_back(line);
-    // auto bbVis = core::utils::osgUtils::createBoundingBoxVisualization(
-    //     line->getBoundingBox());
-    // bbVis->setName(line->getName() + "_bb");
-    // line->addChild(bbVis);
-    // m_config.parent->addChild(bbVis);
     m_drawables.push_back(line);
     lines->addChild(line);
     std::string toPrint = "";

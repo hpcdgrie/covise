@@ -1362,8 +1362,6 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
     ACCESS_CSV_ROW(point, "id", busID);
 
     // x = lon, y = lat
-    // no proj transformation needed => data already in epsg:25832
-    // projTransLatLon(lat, lon);
     lon += m_offset[0];
     lat += m_offset[1];
 
@@ -1575,107 +1573,14 @@ void EnergyPlugin::buildPowerGrid() {
 
   // create line
   auto lineData = m_powerGridStreams->find("line");
-  //   std::unique_ptr<core::simulation::grid::Indices> indices = nullptr;
   std::unique_ptr<core::simulation::grid::Lines> lines = nullptr;
   std::unique_ptr<core::simulation::grid::ConnectionDataList> optData = nullptr;
   if (lineData != m_powerGridStreams->end()) {
     auto &[name, lineStream] = *lineData;
-    // std::tie(indices, optData) =
-    //     getPowerGridIndicesAndOptionalData(*lineStream, numPoints);
     std::tie(lines, optData) = getPowerGridLines(*lineStream, *points);
   }
 
-  // NOTE: create additional lines for geo_buses if skipRedundance is false => create
-  // points for redundant connections, adjust z of points and indice to new created
-  // point in indices
-  if constexpr (!skipRedundance) {
-    // size_t numIndices = indices->size();
-    // // indices = vec<vec<int>>
-    // // points = vec<Point>
-    // // from = idx of indices
-    // // to = idx of indices[from]
-    // for (int from = 0; from < numIndices; ++from) {
-    //   std::vector<int> &connections = (*indices)[from];
-    //   if (connections.size() <= 1) continue;  // Skip if only one or zero
-    //   connections
-
-    //   std::vector<int> uniqueConnections;
-    //   std::vector<int> redundantConnections;
-    //   std::vector<int> connectionCounts(points->size(), 0);
-
-    //   for (int connection : connections) {
-    //     ++connectionCounts[connection];
-    //     if (connectionCounts[connection] == 1) {
-    //       uniqueConnections.push_back(connection);
-    //     } else {
-    //       redundantConnections.push_back(connection);
-    //     }
-    //   }
-
-    //   // Create new points for redundant connections
-    //   int redundancyCount(0);
-    //   for (int redundantConnection : redundantConnections) {
-    //     osg::ref_ptr<Point> newTo = new Point(*points->at(redundantConnection));
-    //     osg::ref_ptr<Point> newFrom = new Point(*points->at(from));
-
-    //     osg::Vec3 pos(0.0f, 0.0f, -(2 * ++redundancyCount * sphereRadius));
-    //     newTo->setMatrix(osg::Matrix::translate(pos));
-    //     newFrom->setMatrix(osg::Matrix::translate(pos));
-    //     points->push_back(newFrom);
-    //     points->push_back(newTo);
-    //     indices->push_back(std::vector<int>{int(points->size() - 1)});
-    //   }
-
-    //   // Update the indices list
-    //   (*indices)[from] = uniqueConnections;
-
-    // OLD APPROACH
-
-    // std::map<int, int> redundant;
-    // int count(0);
-    //   for (auto &to : (*indices)[from]) {
-    //     if (from == to) continue;
-    //     const auto &to_connections = (*indices)[to];
-    //     for (int idx = 0; idx < to_connections.size(); ++idx) {
-    //       auto to_to = to_connections[idx];
-    //       if (to_to != from) continue;
-    //       auto it = redundant.find(from);
-    //       if (it != redundant.end()) {
-    //         ++it->second;
-    //         count = it->second;
-    //       } else {
-    //         redundant.insert({from, 1});
-    //         count = 1;
-    //       }
-
-    //       auto fromPoint = (*points)[from];
-    //       auto toPoint = (*points)[to];
-
-    //       osg::ref_ptr<Point> newFromPoint = new Point(*fromPoint);
-    //       osg::ref_ptr<Point> newToPoint = new Point(*toPoint);
-
-    //       osg::Vec3 pos(0.0f, 0.0f, -(2 * count * sphereRadius));
-
-    //       newFromPoint->setMatrix(osg::Matrix::translate(pos));
-    //       newToPoint->setMatrix(osg::Matrix::translate(pos));
-
-    //       points->push_back(newFromPoint);
-    //       points->push_back(newToPoint);
-    //       auto numPoints = points->size();
-    //       int newFromIdx = numPoints - 2;
-    //       int newToIdx = numPoints - 1;
-
-    //       // delete from
-    //       (*indices)[to].erase(to_connections.begin() + idx);
-    //       indices->push_back(std::vector<int>{newFromIdx, newToIdx});
-    //       --idx;
-    //     }
-    //   }
-    //   }
-  }
-
   // create grid
-  // if (indices == nullptr || points == nullptr) return;
   if (lines == nullptr || points == nullptr) return;
 
   m_powerGroup = new osg::Group;
@@ -1683,52 +1588,12 @@ void EnergyPlugin::buildPowerGrid() {
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   m_powerGroup->setName("PowerGrid");
-  //   auto indices = core::simulation::grid::Indices();
-  //   if (!points) {
-  //     std::cerr << "Fehler: points ist nullptr!" << std::endl;
-  //     return;  // Oder eine andere Fehlerbehandlung
-  //   }
-  //   if (!optData) {
-  //     std::cerr << "Fehler: optData ist nullptr!" << std::endl;
-  //     return;
-  //   }
-  //   if (!lines) {
-  //     std::cerr << "Fehler: lines ist nullptr!" << std::endl;
-  //     return;
-  //   }
-  //   if (points) {
-  //     std::cout << "Anzahl der Punkte: " << points->size() << std::endl;
-  //     for (const auto &pointPtr : *points) {
-  //       std::cout << "Punkt-Pointer: " << pointPtr.get()
-  //                 << " referencCount: " << pointPtr->referenceCount() <<
-  //                 std::endl;
-  //       if (!pointPtr.valid()) {
-  //         std::cerr << "Fehler: Ungültiger Point-Pointer gefunden!" << std::endl;
-  //       }
-  //     }
-  //   } else {
-  //     std::cerr << "Fehler: points ist nullptr!" << std::endl;
-  //   }
-  //   std::cout << "m_powerGroup valid: " << m_powerGroup.valid() << std::endl;
-  //   std::cout << "m_powerGroup pointer: " << m_powerGroup.get() << std::endl;
 
   EnergyGridConfig econfig("POWER", *points, core::simulation::grid::Indices(),
                            m_powerGroup, connectionsRadius, *optData,
                            infoboardAttributes, EnergyGridConnectionType::Line,
                            *lines);
   m_powerGrid = std::make_shared<EnergyGrid>(econfig);
-  //   m_powerGrid = std::make_shared<EnergyGrid>(
-  //       //   m_powerGrid = std::make_shared<EnergyGrid>(
-  //       //       // EnergyGridConfig{
-  //       //       //   "POWER", *points, *indices, m_powerGroup, connectionsRadius,
-  //       //       //                  *optData, infoboardAttributes});
-  //     //   EnergyGridConfig{"POWER", *points, core::simulation::grid::Indices(),
-  //     m_powerGroup, connectionsRadius,
-  //       EnergyGridConfig{"POWER", *points, indices, m_powerGroup,
-  //       connectionsRadius,
-  //                        *optData, infoboardAttributes,
-  //                        EnergyGridConnectionType::Line, *lines});
-  //   //   infoboardAttributes, EnergyGridConnectionType::Line, *lines});
   m_powerGrid->initDrawables();
   m_powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
