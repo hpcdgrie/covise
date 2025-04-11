@@ -124,6 +124,7 @@ class EnergyGrid : public interface::IEnergyGrid {
   }
 
  private:
+  std::string createDataString(const grid::Data &data) const;
 
   void initConnections();
   void initConnectionsByIndex(

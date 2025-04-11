@@ -155,11 +155,7 @@ void EnergyGrid::initDrawableLines() {
     overlappingLines.push_back(line);
     m_drawables.push_back(line);
     lines->addChild(line);
-    std::string toPrint = "";
-    for (const auto &[name, data] : line->getAdditionalData()) {
-      toPrint +=
-          UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
-    }
+    std::string toPrint = createDataString(line->getAdditionalData());
     auto center = line->getCenter();
     center.z() += 30;
     auto name = line->getName();
@@ -173,17 +169,21 @@ void EnergyGrid::initDrawableLines() {
   m_config.parent->addChild(lines);
 }
 
+std::string EnergyGrid::createDataString(const grid::Data &data) const {
+  std::string result;
+  for (const auto &[key, value] : data) {
+    result += UIConstants::TAB_SPACES + key + ": " + std::visit(get_string, value);
+  }
+  return result;
+}
+
 void EnergyGrid::initDrawablePoints() {
   osg::ref_ptr<osg::Group> points = new osg::Group;
   points->setName("Points");
   for (auto &point : m_config.points) {
     m_drawables.push_back(point);
     points->addChild(point);
-    std::string toPrint = "";
-    for (const auto &[name, data] : point->getAdditionalData()) {
-      toPrint +=
-          UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
-    }
+    std::string toPrint(createDataString(point->getAdditionalData()));
     auto center = point->getPosition();
     center.z() += 30;
     auto name = point->getName();
@@ -218,11 +218,7 @@ void EnergyGrid::initDrawableConnections() {
     m_drawables.push_back(connection);
     connections->addChild(connection);
 
-    std::string toPrint = "";
-    for (const auto &[name, data] : connection->getAdditionalData()) {
-      toPrint +=
-          UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
-    }
+    std::string toPrint(createDataString(connection->getAdditionalData()));
     auto center = connection->getCenter();
     center.z() += 30;
     auto name = connection->getName();
