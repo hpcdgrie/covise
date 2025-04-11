@@ -124,6 +124,22 @@ class EnergyGrid : public interface::IEnergyGrid {
   }
 
  private:
+  template <typename T>
+  void initDrawableGridObject(osg::ref_ptr<osg::Group> parent, const T &gridObj) {
+    m_drawables.push_back(gridObj);
+    parent->addChild(gridObj);
+    std::string toPrint(createDataString(gridObj->getAdditionalData()));
+    auto center = gridObj->getCenter();
+    center.z() += 30;
+    auto name = gridObj->getName();
+
+    m_config.infoboardAttributes.position = center;
+    m_config.infoboardAttributes.title = name;
+    TxtInfoboard infoboard(m_config.infoboardAttributes);
+    m_infoboards.push_back(std::make_unique<InfoboardSensor>(
+        gridObj, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+  }
+
   std::string createDataString(const grid::Data &data) const;
 
   void initConnections();

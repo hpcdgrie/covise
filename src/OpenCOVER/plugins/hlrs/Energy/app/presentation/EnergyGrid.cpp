@@ -153,18 +153,7 @@ void EnergyGrid::initDrawableLines() {
     // move redundant line below the first one
     findCorrectHeightForLine(radius, line, overlappingLines);
     overlappingLines.push_back(line);
-    m_drawables.push_back(line);
-    lines->addChild(line);
-    std::string toPrint = createDataString(line->getAdditionalData());
-    auto center = line->getCenter();
-    center.z() += 30;
-    auto name = line->getName();
-
-    m_config.infoboardAttributes.position = center;
-    m_config.infoboardAttributes.title = name;
-    TxtInfoboard infoboard(m_config.infoboardAttributes);
-    m_infoboards.push_back(std::make_unique<InfoboardSensor>(
-        line, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+    initDrawableGridObject(lines, line);
   }
   m_config.parent->addChild(lines);
 }
@@ -181,18 +170,7 @@ void EnergyGrid::initDrawablePoints() {
   osg::ref_ptr<osg::Group> points = new osg::Group;
   points->setName("Points");
   for (auto &point : m_config.points) {
-    m_drawables.push_back(point);
-    points->addChild(point);
-    std::string toPrint(createDataString(point->getAdditionalData()));
-    auto center = point->getPosition();
-    center.z() += 30;
-    auto name = point->getName();
-
-    m_config.infoboardAttributes.position = center;
-    m_config.infoboardAttributes.title = name;
-    TxtInfoboard infoboard(m_config.infoboardAttributes);
-    m_infoboards.push_back(std::make_unique<InfoboardSensor>(
-        point, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+    initDrawableGridObject(points, point);
   }
   m_config.parent->addChild(points);
 }
@@ -215,19 +193,7 @@ void EnergyGrid::initDrawableConnections() {
   connections->setName("Connections");
 
   for (auto connection : m_connections) {
-    m_drawables.push_back(connection);
-    connections->addChild(connection);
-
-    std::string toPrint(createDataString(connection->getAdditionalData()));
-    auto center = connection->getCenter();
-    center.z() += 30;
-    auto name = connection->getName();
-
-    m_config.infoboardAttributes.position = center;
-    m_config.infoboardAttributes.title = name;
-    TxtInfoboard infoboard(m_config.infoboardAttributes);
-    m_infoboards.push_back(std::make_unique<InfoboardSensor>(
-        connection, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+    initDrawableGridObject(connections, connection);
   }
 
   m_config.parent->addChild(connections);
