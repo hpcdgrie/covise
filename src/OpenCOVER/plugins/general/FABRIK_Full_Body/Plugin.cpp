@@ -98,7 +98,7 @@ std::vector<float> getBoneTwistConstraints(const std::string &filename)
 
 osg::Vec4 getColorFromCount(size_t count) {
     
-    if(count > 1 && count <= 4) //right arm
+    if(count >= 1 && count <= 4) //right arm
     {
         return osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
     }
@@ -134,13 +134,40 @@ osg::MatrixTransform* createSphere(const osg::Vec3& pos, float radius, const std
     return mt;
 }
 
+std::vector<std::pair<size_t, size_t>> connectedJoints{
+        //upper body
+        {0, 1},
+        {1, 5},
+        {5, 0},
+        //lower body
+        {0, 9},
+        {9, 10},
+        {10, 0},
+        //right arm
+        {1, 2},
+        {2, 3},
+        {3, 4},
+        //left arm
+        {5, 6},
+        {6, 7},
+        {7, 8},
+        //right leg
+        {9, 11},
+        {11, 12},
+        {12, 13},
+        //left leg
+        {10, 14},
+        {14, 15},
+        {15, 16},
+        //neck
+        {17, 18}
+    };
+
+
 FabrikPlugin::FabrikPlugin()
     : coVRPlugin(COVER_PLUGIN_NAME)
 {
-
-
-
-    const std::string dir = "C:/Users/Dennis/Apps/FBRIK_Full_Body/FABRIK_Full_Body_C++/test/inputs/";
+    const std::string dir = FABRIK_CONFIG_DIR + std::string("/");
 
     auto joints_position = getPositions(dir + "joints_position.txt");
     auto joints_position_fixed = getPositions(dir + "joints_position_fixed.txt");
@@ -168,17 +195,27 @@ FabrikPlugin::FabrikPlugin()
     }
 
     osg::Matrix m;
-    auto interSize = 0.2;
-    m.setTrans(m_skeleton[9].position);
-    m_interactor.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
-    m_interactor->enableIntersection();
-    m_interactor->show();
+    auto interSize = 0.1;
+    m.setTrans(m_skeleton[0].position);
+    m_interactors.emplace_back(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    m_interactors.back()->enableIntersection();
+    m_interactors.back()->show();
 
+    for(const auto & connection : connectedJoints)
+    {
+        auto line = std::make_unique<ConnectionLine>(m_boneDummies[connection.first], m_boneDummies[connection.second]);
+        m_connectionLines.push_back(std::move(line));
+    }
 }
 
 bool FabrikPlugin::update()
 {
-    auto target = m_interactor->getMatrix();
+    // auto t1 = m_interactors[0]->getMatrix();
+    // auto t2 = m_interactors[1]->getMatrix();
+    // m_boneDummies[0]->setMatrix(t1);
+    // m_boneDummies[1]->setMatrix(t2);
+    
+    auto target = m_interactors[0]->getMatrix();
     Fabrik fabrik(m_skeleton, target.getTrans(), target.getRotate());
     fabrik.solve();
     for (size_t i = 0; i < m_skeleton.size(); i++)
@@ -186,6 +223,10 @@ bool FabrikPlugin::update()
         auto m = m_boneDummies[i]->getMatrix();
         m.setTrans(m_skeleton[i].position);
         m_boneDummies[i]->setMatrix(m);
+    }
+    for(auto & line : m_connectionLines)
+    {
+        line->update();
     }
     return true;
 }
