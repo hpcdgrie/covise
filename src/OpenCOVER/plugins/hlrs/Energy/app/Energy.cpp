@@ -502,7 +502,8 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
     if (fs::is_regular_file(file) && file.path().extension() == ".obj") {
       auto path = file.path();
       auto name = path.stem().string();
-      if (name.find("solarpanel_1k") == std::string::npos) continue;
+      //   if (name.find("solarpanel_1k") == std::string::npos) continue;
+      if (name.find("solarpanel_1k_resized") == std::string::npos) continue;
       osg::ref_ptr<osgDB::Options> options = new osgDB::Options;
       options->setOptionString("DIFFUSE=0 SPECULAR=1 SPECULAR_EXPONENT=2 OPACITY=3");
 
@@ -514,7 +515,6 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
       }
 
       auto masterGeometryData = instancing::extractAllGeometryData(masterPanel);
-
       if (masterGeometryData.empty()) continue;
       for (const auto &[id, data] : pvDataMap) {
         auto &cityGMLObj = m_cityGMLObjs[id];
@@ -531,42 +531,50 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
             auto maxBB = bb._max;
             auto roofWidth = maxBB.x() - minBB.x();
             auto roofHeight = maxBB.y() - minBB.y();
+            auto roofCenter = bb.center();
             auto z = maxBB.z() + zOffset;
 
             osg::ref_ptr<osg::MatrixTransform> pvPanelsTransform =
                 new osg::MatrixTransform();
             pvPanelsTransform->setName("PVPanels");
 
-            int maxPanels = data.numPanelsMax / 10;
-            if (maxPanels ==0)
-                maxPanels = 1;
+            int maxPanels = data.numPanelsMax;
+            if (maxPanels == 0) maxPanels = 1;
 
             int numPanelsPerRow = static_cast<int>(std::sqrt(maxPanels));
-            int numPanelRows =
-                (maxPanels + numPanelsPerRow - 1) / numPanelsPerRow;
+            int numPanelRows = (maxPanels + numPanelsPerRow - 1) / numPanelsPerRow;
+
+            float availableWidthForSpacingX =
+                roofWidth - (numPanelsPerRow * panelWidth);
+            float availableHeightForSpacingY =
+                roofHeight - (numPanelRows * panelHeight);
 
             float spacingX = (numPanelsPerRow > 1)
-                                 ? (roofWidth - (numPanelsPerRow * panelWidth)) /
-                                       (numPanelsPerRow - 1)
+                                 ? std::min(0.5f, availableWidthForSpacingX /
+                                                      (numPanelsPerRow - 1))
                                  : 0.0f;
-            float spacingY = (numPanelRows > 1)
-                                 ? (roofHeight - (numPanelRows * panelHeight)) /
-                                       (numPanelRows - 1)
-                                 : 0.0f;
+            float spacingY =
+                (numPanelRows > 1)
+                    ? std::min(0.5f, availableHeightForSpacingY / (numPanelRows - 1))
+                    : 0.0f;
 
-            auto startX = minBB.x() + (panelWidth / 2.0f);
-            auto startY = minBB.y() + (panelHeight / 2.0f);
+            float totalWidthOfPanelsX =
+                (numPanelsPerRow * panelWidth) + ((numPanelsPerRow - 1) * spacingX);
+            float totalHeightOfPanelsY =
+                (numPanelRows * panelHeight) + ((numPanelRows - 1) * spacingY);
+
+            auto startX =
+                roofCenter.x() - (totalWidthOfPanelsX / 2.0f) + (panelWidth / 2.0f);
+            auto startY = roofCenter.y() - (totalHeightOfPanelsY / 2.0f) +
+                          (panelHeight / 2.0f);
 
             for (int i = 0; i < maxPanels; ++i) {
               int row = i / numPanelsPerRow;
               int col = i % numPanelsPerRow;
 
-              // Berechne die Position des aktuellen Panels unter Berücksichtigung
-              // des Abstands
               auto x = startX + (col * (panelWidth + spacingX));
               auto y = startY + (row * (panelHeight + spacingY));
 
-              // Erstelle den Positionierungsvektor
               auto position = osg::Vec3(x, y, z);
               auto solarPanelInstance =
                   instancing::createInstance(masterGeometryData, osg::Matrix());
@@ -588,67 +596,6 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
           }
         }
       }
-      //   for (const auto &[id, data] : pvDataMap) {
-      //     auto &cityGMLObj = m_cityGMLObjs[id];
-      //     auto drawables = cityGMLObj->getDrawables();
-      //     for (auto drawable : drawables) {
-      //       const auto &name = drawable->getName();
-      //       if (name.find("RoofSurface") != std::string::npos) {
-      //         if (data.numPanelsMax == 0) continue;
-      //         osg::ref_ptr<osg::Group> parent = drawable->getParent(0);
-      //         osg::ref_ptr<osg::Geode> geode = drawable->asGeode();
-      //         auto bb = geode->getBoundingBox();
-      //         // auto bbVis = createBoundingBoxVisualization(bb);
-      //         auto minBB = bb._min;
-      //         auto maxBB = bb._max;
-      //         auto width = maxBB.x() - minBB.x();
-      //         auto height = maxBB.y() - minBB.y();
-      //         auto center = bb.center();
-      //         osg::ref_ptr<osg::MatrixTransform> pvPanelsTransform =
-      //             new osg::MatrixTransform();
-      //         pvPanelsTransform->setName("PVPanels");
-
-      //         int numPanelsPerRow =
-      //         static_cast<int>(std::sqrt(data.numPanelsMax));
-
-      //         for (int i = 0; i < data.numPanelsMax; ++i) {
-      //           int row = i / numPanelsPerRow;
-      //           int col = i % numPanelsPerRow;
-
-      //           //   Calculate the starting position to align the panels within
-      //           //   bounding box
-      //           auto startX = center.x() - ((numPanelsPerRow - 1) * panelWidth /
-      //           2); auto startY = center.y() - ((data.numPanelsMax /
-      //           numPanelsPerRow - 1) *
-      //                                       panelHeight / 2);
-
-      //           // Calculate the position of the current panel
-      //           auto x = startX + (col * panelWidth);
-      //           auto y = startY + (row * panelHeight);
-      //           auto z = maxBB.z() + zOffset;
-
-      //           // Create the position vector
-      //           auto position = osg::Vec3(x, y, z);
-      //           auto solarPanelInstance =
-      //               instancing::createInstance(masterGeometryData, osg::Matrix());
-      //           osg::Matrix matrix =
-      //               rotationZ * rotationX * osg::Matrix::translate(position);
-      //           osg::ref_ptr<osg::MatrixTransform> instanceTransform =
-      //               new osg::MatrixTransform(matrix);
-      //           instanceTransform->addChild(solarPanelInstance);
-
-      //           auto solarPanel = std::make_unique<SolarPanel>(instanceTransform);
-
-      //           for (auto solarDrawable : solarPanel->getDrawables()) {
-      //             pvPanelsTransform->addChild(solarDrawable);
-      //           }
-      //           m_solarPanels.push_back(std::move(solarPanel));
-      //         }
-      //         parent->addChild(pvPanelsTransform);
-      //         // parent->addChild(bbVis);
-      //       }
-      //     }
-      //   }
     }
   }
 }
