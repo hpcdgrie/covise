@@ -26,6 +26,7 @@ class Point : public osg::MatrixTransform {
   }
 
   const auto &getRadius() const { return m_radius; }
+  const auto &getCenter() const { return m_point->getCenter(); }
   const auto &getPosition() const { return m_point->getCenter(); }
   const auto &getAdditionalData() const { return m_additionalData; }
   osg::ref_ptr<osg::Geode> getGeode() {
