@@ -13,14 +13,16 @@
 #include <osg/LineWidth>
 #include <osg/Material>
 #include <osg/Matrixd>
+#include <osg/PolygonMode>
 #include <osg/PrimitiveSet>
 #include <osg/Shape>
-#include <osg/PolygonMode>
 #include <osg/ShapeDrawable>
 #include <osg/Vec3>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
+#include <osgDB/ReadFile>
 #include <osgText/Text>
+#include <osgUtil/Optimizer>
 #include <osgUtil/SmoothingVisitor>
 
 namespace core::utils::osgUtils {
@@ -404,31 +406,98 @@ osg::ref_ptr<osg::Geode> createBoundingBoxVisualization(const osg::BoundingBox &
   return geode;
 }
 
-osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(const osg::BoundingSphere& bs) {
-    osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(
+    const osg::BoundingSphere &bs) {
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode();
 
-    // Create a wireframe sphere using osg::ShapeDrawable
-    osg::ref_ptr<osg::Sphere> sphere = new osg::Sphere(bs.center(), bs.radius());
-    osg::ref_ptr<osg::ShapeDrawable> shapeDrawable = new osg::ShapeDrawable(sphere);
+  // Create a wireframe sphere using osg::ShapeDrawable
+  osg::ref_ptr<osg::Sphere> sphere = new osg::Sphere(bs.center(), bs.radius());
+  osg::ref_ptr<osg::ShapeDrawable> shapeDrawable = new osg::ShapeDrawable(sphere);
 
-    // Set wireframe mode
-    osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode;
-    polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
-    shapeDrawable->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::ON);
+  // Set wireframe mode
+  osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode;
+  polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::LINE);
+  shapeDrawable->getOrCreateStateSet()->setAttributeAndModes(
+      polygonMode, osg::StateAttribute::ON);
 
-    // Set color (e.g., green)
-    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-    colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green
-    shapeDrawable->setColorArray(colors);
-    shapeDrawable->setColorBinding(osg::Geometry::BIND_OVERALL);
+  // Set color (e.g., green)
+  osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+  colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f));  // Green
+  shapeDrawable->setColorArray(colors);
+  shapeDrawable->setColorBinding(osg::Geometry::BIND_OVERALL);
 
-    // Make the lines thicker
-    osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(2.0f);
-    shapeDrawable->getOrCreateStateSet()->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
+  // Make the lines thicker
+  osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(2.0f);
+  shapeDrawable->getOrCreateStateSet()->setAttributeAndModes(
+      lineWidth, osg::StateAttribute::ON);
 
-    geode->addDrawable(shapeDrawable);
+  geode->addDrawable(shapeDrawable);
 
-    return geode;
+  return geode;
+}
+
+osg::ref_ptr<osg::Node> readFileViaOSGDB(const std::string &filename,
+                                         osg::ref_ptr<osgDB::Options> options,
+                                         bool optimize) {
+  osg::ref_ptr<osg::Node> node = osgDB::readNodeFile(filename, options);
+  if (!node) {
+    std::cerr << "Error: Unable to read file: " << filename << std::endl;
+    return nullptr;
   }
+
+  // Optimize the node
+  if (optimize) {
+    osgUtil::Optimizer optimizer;
+    optimizer.optimize(node);
+  }
+
+  return node;
+}
+
+namespace instancing {
+
+std::vector<GeometryData> extractAllGeometryData(osg::Node *node) {
+  std::vector<GeometryData> geometryDataList;
+  osg::ref_ptr<osg::Geode> geode = node->asGeode();
+  if (geode) {
+    for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
+      osg::ref_ptr<osg::Geometry> geometry = geode->getDrawable(i)->asGeometry();
+      if (geometry) {
+        GeometryData data;
+        data.geometry = geometry;
+        data.stateSet = geode->getStateSet();  // use state set of the geode
+        geometryDataList.push_back(data);
+      }
+    }
+  }
+  osg::ref_ptr<osg::Group> group = node->asGroup();
+  if (group) {
+    for (unsigned int i = 0; i < group->getNumChildren(); ++i) {
+      std::vector<GeometryData> childData =
+          extractAllGeometryData(group->getChild(i));
+      geometryDataList.insert(geometryDataList.end(), childData.begin(),
+                              childData.end());
+    }
+  }
+  return geometryDataList;
+}
+
+osg::ref_ptr<osg::Node> createInstance(
+    const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix) {
+  osg::ref_ptr<osg::Group> instanceRoot = new osg::Group;
+  osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform(matrix);
+  instanceRoot->addChild(mt);
+
+  for (const auto &data : masterGeometryData) {
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+    geode->addDrawable(data.geometry);
+    geode->setStateSet(data.stateSet);  // share state set
+    mt->addChild(geode);
+  }
+
+  return instanceRoot.release();
+}
+
+}  // namespace instancing
 
 }  // namespace core::utils::osgUtils

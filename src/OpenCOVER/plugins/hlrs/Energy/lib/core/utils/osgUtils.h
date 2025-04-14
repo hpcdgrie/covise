@@ -5,7 +5,9 @@
 #include <osg/BoundingBox>
 #include <osg/Geode>
 #include <osg/Geometry>
+#include <osg/StateSet>
 #include <osg/ref_ptr>
+#include <osgDB/Options>
 #include <osgText/Text>
 #include <vector>
 
@@ -53,7 +55,21 @@ osg::ref_ptr<osg::Geometry> createBackgroundQuadGeometry(const osg::Vec3 &center
                                                          const osg::Vec4 &color);
 void enableLighting(osg::ref_ptr<osg::Geode> geode, bool enable = true);
 osg::ref_ptr<osg::Geode> createBoundingBoxVisualization(const osg::BoundingBox &bb);
-osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(const osg::BoundingSphere& bs);
+osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(
+    const osg::BoundingSphere &bs);
+osg::ref_ptr<osg::Node> readFileViaOSGDB(const std::string &filename,
+                                         osg::ref_ptr<osgDB::Options> options,
+                                         bool optimize = false);
 
+namespace instancing {
+struct GeometryData {
+  osg::ref_ptr<osg::Geometry> geometry;
+  osg::ref_ptr<osg::StateSet> stateSet;
+};
+
+std::vector<GeometryData> extractAllGeometryData(osg::Node *node);
+osg::ref_ptr<osg::Node> createInstance(
+    const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix);
+}  // namespace Instancing
 }  // namespace core::utils::osgUtils
 #endif
