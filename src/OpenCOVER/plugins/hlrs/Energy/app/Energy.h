@@ -16,6 +16,7 @@
 #define _Energy_PLUGIN_H
 
 // ui
+#include "lib/core/interfaces/ISolarPanel.h"
 #include "lib/core/simulation/power.h"
 #include "ui/citygml/CityGMLDeviceSensor.h"
 #include "ui/historic/Device.h"
@@ -26,6 +27,7 @@
 
 // presentation
 #include "presentation/PrototypeBuilding.h"
+#include "presentation/SolarPanel.h"
 
 // core
 #include <cover/coTUIListener.h>
@@ -139,6 +141,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
   typedef NameMapPtr<opencover::utils::read::CSVStream> CSVStreamMap;
   typedef std::unique_ptr<CSVStreamMap> CSVStreamMapPtr;
+
+  typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
   /* #endregion */
 
   /* #region GENERAL */
@@ -210,6 +214,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   /* #region CITYGML */
   void initCityGMLUI();
+  void addSolarPanelsToCityGML(const boost::filesystem::path &dirPath);
   void enableCityGML(bool on);
   void addCityGMLObjects(osg::ref_ptr<osg::Group> citygmlGroup);
   void addCityGMLObject(const std::string &name,
@@ -389,6 +394,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   std::unique_ptr<PowerSimUI> m_powerSimUI;
   std::unique_ptr<HeatingSimUI> m_heatingSimUI;
+//   std::unique_ptr<SolarPanelList> m_solarPanels;
+  SolarPanelList m_solarPanels;
+//   std::unique_ptr<SolarPanel> m_solarPanel;
 };
 
 #endif
