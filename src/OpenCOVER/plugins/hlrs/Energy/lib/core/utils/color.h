@@ -1,7 +1,8 @@
 #ifndef _CORE_UTILS_COLOR_H
 #define _CORE_UTILS_COLOR_H
 
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
+
 
 #include <memory>
 #include <osg/Geode>

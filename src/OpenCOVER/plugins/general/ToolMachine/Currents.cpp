@@ -7,7 +7,8 @@
 #include <iostream>
 #include <osg/StateSet>
 #include <osgDB/StreamOperator>
-#include <PluginUtil/ColorMaterials.h>
+#include <PluginUtil/colors/ColorMaterials.h>
+
 
 #include <PluginUtil/coShaderUtil.h>
 #include <OpcUaClient/opcua.h>

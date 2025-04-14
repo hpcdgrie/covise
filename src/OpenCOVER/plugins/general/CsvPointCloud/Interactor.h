@@ -2,7 +2,7 @@
 #define COVISE_CSV_POINT_CLOUD_INTERACTOR_H
 
 #include <cover/coInteractor.h>
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <functional>
 namespace opencover
 {

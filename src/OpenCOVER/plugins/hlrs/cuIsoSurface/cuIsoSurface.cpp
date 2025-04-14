@@ -11,7 +11,8 @@
 #include <do/coDoUnstructuredGrid.h>
 #include <do/coDoData.h>
 
-#include <PluginUtil/ColorBar.h>
+#include <PluginUtil/colors/ColorBar.h>
+
 
 #include <cover/OpenCOVER.h>
 #include <cover/coVRPluginSupport.h>

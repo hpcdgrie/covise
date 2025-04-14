@@ -17,7 +17,7 @@
 
 #include "ColorBarPlugin.h"
 #include <OpenVRUI/osg/mathUtils.h>
-#include <PluginUtil/ColorBar.h>
+#include <PluginUtil/colors/ColorBar.h>
 #include <config/CoviseConfig.h>
 #include <cover/OpenCOVER.h>
 #include <cover/RenderObject.h>

@@ -10,8 +10,10 @@
 #include "DataTable.h"
 #include "Interactor.h"
 
-#include <PluginUtil/ColorBar.h>
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/ColorBar.h>
+
+#include <PluginUtil/colors/coColorMap.h>
+
 #include <cover/coTabletUI.h>
 #include <cover/coVRFileManager.h>
 #include <cover/coVRPlugin.h>

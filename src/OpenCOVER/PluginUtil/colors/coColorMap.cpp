@@ -8,6 +8,7 @@
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/CovconfigLink.h>
 #include <cover/ui/Slider.h>
+#include <cover/coVRPluginList.h>
 
 #include <cassert>
 #include <iomanip>

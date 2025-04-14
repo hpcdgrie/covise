@@ -20,7 +20,7 @@
 #include <cover/coVRPlugin.h>
 #include <map>
 
-#include <PluginUtil/ColorBar.h>
+#include <PluginUtil/colors/ColorBar.h>
 
 #include <cover/ui/Owner.h>
 
