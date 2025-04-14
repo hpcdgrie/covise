@@ -16,7 +16,7 @@
 
 #include <osg/MatrixTransform>
 #include <osg/Observer>
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <OpcUaClient/opcua.h>
 #include <OpcUaClient/variantAccess.h>
 

@@ -1,6 +1,6 @@
 #ifndef COVISE_COLOR_MAP_SHADER_H
 #define COVISE_COLOR_MAP_SHADER_H
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <cover/coVRShader.h>
     
 constexpr int TfTexUnit = 1;

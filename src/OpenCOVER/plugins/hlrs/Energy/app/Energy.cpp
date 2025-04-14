@@ -29,7 +29,8 @@
 #include <config/CoviseConfig.h>
 
 // COVER
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
+
 #include <PluginUtil/coShaderUtil.h>
 #include <cover/coVRAnimationManager.h>
 #include <cover/coVRFileManager.h>
@@ -1398,8 +1399,7 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
   m_powerGridSelectionPtr =
       configBoolArray("Simulation", "powerGridDataSelection", std::vector<bool>{});
   auto powerGridSelection = m_powerGridSelectionPtr->value();
-  bool initConfig = false;
-  if (powerGridSelection.size() < 1) initConfig = true;
+  auto initConfig = powerGridSelection.empty();
 
   int i = 0;
   for (auto &[name, stream] : *m_powerGridStreams) {
@@ -1563,14 +1563,14 @@ std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoi
 
     try {
       busName = busNames.at(busID);
-    } catch (const std::out_of_range &e) {
+    } catch (const std::out_of_range &) {
       busName = "Base_" + std::to_string(busID);
     }
 
     grid::Data busData;
     try {
       busData = additionalData->at(busID);
-    } catch (const std::out_of_range &e) {
+    } catch (const std::out_of_range &) {
       busData["base_point_data"] = "";
     }
 

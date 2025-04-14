@@ -40,7 +40,8 @@
 // cover
 #include <OpenConfig/array.h>
 #include <PluginUtil/coSensor.h>
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
+
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>

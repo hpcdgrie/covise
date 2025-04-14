@@ -1,6 +1,7 @@
 #include "CityGMLDeviceSensor.h"
 
-#include <PluginUtil/coColorMap.h>
+#include <PluginUtil/colors/coColorMap.h>
+
 #include <PluginUtil/coSensor.h>
 #include <PluginUtil/coShaderUtil.h>
 #include <app/presentation/CityGMLBuilding.h>

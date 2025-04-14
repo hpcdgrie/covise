@@ -1,7 +1,7 @@
 #ifndef COVER_PLUGINUTIL_SHADERUTIL_H
 #define COVER_PLUGINUTIL_SHADERUTIL_H
 #include <cover/coVRShader.h>
-#include "coColorMap.h"
+#include "colors/coColorMap.h"
 #include <string>
 #include <osg/Drawable>
 #include <util/coExport.h>
