@@ -22,6 +22,7 @@ SET(HEADERS
     app/presentation/CityGMLBuilding.h
     app/presentation/TxtInfoboard.h
     app/presentation/EnergyGrid.h
+    app/presentation/SolarPanel.h
     # app/ui/SensorManager.h
 )
 SET(SOURCES
@@ -35,6 +36,7 @@ SET(SOURCES
     app/presentation/CityGMLBuilding.cpp
     app/presentation/TxtInfoboard.cpp
     app/presentation/EnergyGrid.cpp
+    app/presentation/SolarPanel.cpp
     # app/ui/simulation/HeatingSimulationUI.cpp
 )
 

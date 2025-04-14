@@ -20,6 +20,7 @@ set(HEADERS
     interfaces/IMovable.h
     interfaces/ISeparable.h
     interfaces/ITimedependable.h
+    interfaces/ISolarPanel.h
     utils/color.h
     utils/osgUtils.h
     utils/math.h
