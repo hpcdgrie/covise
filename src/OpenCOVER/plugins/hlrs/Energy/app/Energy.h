@@ -233,8 +233,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initSimMenu();
   void updateColorMap(const covise::ColorMap &map);
   void initColorMap();
-
   void initGrid();
+  void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
 
   /* #region POWERGRID */
   void initPowerGridStreams();
@@ -302,7 +302,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #region COOLINGGRID */
   void buildCoolingGrid();
   /* #endregion */
-  void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
   /* #endregion*/
 
   // general
@@ -335,6 +334,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   // citygml UI
   opencover::ui::Menu *m_cityGMLMenu = nullptr;
   opencover::ui::Button *m_cityGMLEnable = nullptr;
+//   opencover::ui::Button *m_PVEnable = nullptr;
 
   // Simulation UI
   opencover::ui::Menu *m_simulationMenu = nullptr;
@@ -359,6 +359,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   float rad, scaleH;
   int m_selectedComp = 0;
+  std::string m_powerGridDir;
   std::vector<double> m_offset;
 
   ennovatis::BuildingsPtr m_buildings;
