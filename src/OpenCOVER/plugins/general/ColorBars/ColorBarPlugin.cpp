@@ -247,7 +247,7 @@ ColorBarPlugin::newInteractor(const RenderObject *container, coInteractor *inter
         mod.menu = new ui::Menu(menuName, &mod);
         colorSubmenu->add(mod.menu);
 
-        mod.colorbar = new ColorBar(mod.menu);
+        mod.colorbar = std::make_unique<ColorBar>(mod.menu);
     }
     ColorsModule &mod = it->second;
     ++mod.useCount;
