@@ -32,20 +32,18 @@
 # ----------------------------------------------------------------------
 
 zebu            Visual Studio 2015 Update 3, 2017 or 2019 for x86_64
-vcpkg           Visual Studio 2015 Update 3, 2017 or 2019 with 3rd party libraries from vcpkg
 
 linux32         Generic x86 Linux
 linux64         Generic x86_64 Linux
 linuxarm        Generic aarch64 Linux
-cray64          Cray x86_64 Linux software rendering
 rhel8           Red Hat Enterprise Linux/CentOS 8 with updates on x86_64 (64 bit mode)
 rhel9           Red Hat Enterprise Linux/CentOS/Rocky 9 with updates on x86_64 (64 bit mode)
 jammy           Ubuntu 22.04 Jammy Jellyfish on x86_64 (64 bit mode)
+noble		Ubuntu 24.04 Noble Numbat on x86_64 (64 bit mode)
 
 darwin          Generic macOS
 macos           macOS, x86_64 or arm64 with libc++
 
-freebsd         Generic FreeBSD
 spack*          Installation of dependencies via spack (https://spack.io), possibly based on a spack environment
 
 
@@ -65,6 +63,10 @@ yoroo           Visual Studio 2010 for ia32
 berrenda        Visual Studio 2010 for x86_64
 tamarau         Visual Studio 2012 for x86_64
 mingw           Windows XP/Vista with gcc 4.4.0 on ia32
+vcpkg           Visual Studio 2015 Update 3, 2017 or 2019 with 3rd party libraries from vcpkg
+
+freebsd         Generic FreeBSD
+cray64          Cray x86_64 Linux software rendering
 
 linux           Red Hat 7.3 (with GCC 2.96) on ia32
 gcc3            Red Hat 8 with glibc 2.3.2 on ia32
@@ -137,6 +139,7 @@ etch            Debian Linux 4.0 (Etch) with updates on x86_64
 lenny32         Debian Linux 5.0 (Lenny) with updates on ia32
 lenny           Debian Linux 5.0 (Lenny) with updates on x86_64
 squeeze         Debian Linux 6.0 (Squeeze) with updates on x86_64
+buster          Debian Linux 10 (Buster) with updates on x86_64
 
 dapper          Ubuntu 6.06 Dapper Drake on ia32
 edgy            Ubuntu 6.10 Edgy Eft on ia32

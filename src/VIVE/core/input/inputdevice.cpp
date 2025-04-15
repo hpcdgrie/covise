@@ -189,7 +189,7 @@ void InputDevice::run()
         if (!poll())
             again = false;
         else
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
 
@@ -216,7 +216,7 @@ void InputDevice::update()
         m_bodyMatricesFrame.resize(m_bodyMatrices.size());
     for (size_t i = 0; i < m_bodyMatrices.size(); ++i)
     {
-        m_bodyMatricesFrame[i] = m_bodyMatrices[i] * m_offsetMatrix;
+        m_bodyMatricesFrame[i] = m_offsetMatrix * m_bodyMatrices[i] ;
     }
 
     if (m_buttonStatesFrame.size() != m_buttonStates.size())

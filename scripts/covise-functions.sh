@@ -163,6 +163,8 @@ guess_archsuffix() {
                     export ARCHSUFFIX=rhel7
                   elif grep -i -q -s 'Red Hat Enterprise Linux.*release 7..' /etc/system-release; then
                     export ARCHSUFFIX=rhel7
+                  elif grep -i -q -s 'Rocky Linux release 8' /etc/system-release; then
+                    export ARCHSUFFIX=rhel8
                   elif grep -i -q -s 'CentOS Linux release 8..' /etc/system-release; then
                     export ARCHSUFFIX=rhel8
                   elif grep -i -q -s 'CentOS Stream release 8' /etc/system-release; then
@@ -238,6 +240,8 @@ guess_archsuffix() {
                    export ARCHSUFFIX=focal
                elif grep -i -q -s 'ubuntu.*22\.04' /etc/issue; then
                    export ARCHSUFFIX=jammy
+               elif grep -i -q -s 'ubuntu.*24\.04' /etc/issue; then
+                   export ARCHSUFFIX=noble
                elif grep -i -q -s 'Linux Mint *17\.' /etc/issue; then
                    export ARCHSUFFIX=tahr
                elif grep -i -q -s 'suse.*42.2' /etc/issue; then
@@ -252,6 +256,8 @@ guess_archsuffix() {
                    export ARCHSUFFIX=etch
                elif grep -i -q -s 'debian.*5\.0' /etc/issue; then
                    export ARCHSUFFIX=lenny
+               elif grep -i -q -s 'debian.*10 ' /etc/issue; then
+                   export ARCHSUFFIX=buster
                elif grep -i -q -s 'squeeze' /etc/issue; then
                    export ARCHSUFFIX=squeeze
                elif grep -i -q -s 'ubuntu.*7\.10' /etc/issue; then
