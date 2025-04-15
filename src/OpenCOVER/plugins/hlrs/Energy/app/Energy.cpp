@@ -475,7 +475,7 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
   std::map<std::string, PVData> pvDataMap;
   while (pvStream >> row) {
     PVData pvData;
-    ACCESS_CSV_ROW(row, "gml_id", pvData.cityGMLID);
+    ACCESS_CSV_ROW(row, "id", pvData.cityGMLID);
     if (m_cityGMLObjs.find(pvData.cityGMLID) == m_cityGMLObjs.end()) {
       std::cerr << "Error: Could not find cityGML object with ID "
                 << pvData.cityGMLID << std::endl;
