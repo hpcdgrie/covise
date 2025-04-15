@@ -7,8 +7,8 @@
   <COVER>
    <NumScreens value="0" />
    <NumWindows value="0" />
-   <StartCommand value="PATH=/usr/bin LD_LIBRARY_PATH= sudo nvidia-smi -ac 4513,1657" />
-   <ExitCommand value="PATH=/usr/bin LD_LIBRARY_PATH= sudo nvidia-smi -rac" />
+   <StartCommand value="nvidia-smi -ac 4513,1657" />
+   <ExitCommand value="nvidia-smi -rac" />
   </COVER>
  </GLOBAL>
 
@@ -25,17 +25,15 @@
      <Input>
         <MouseNav value="true" />
         <Device>
-
-           <DTrackCaveOutside driver="dtrack" port="5001" serverHost="141.58.8.78">
-              <!--Offset x="-86" y="-3080" z="-1260" /-->
-              <Offset x="0" y="-3400" z="-1327" />
-              <Orientation h="0" p="0" r="0" />
-           </DTrackCaveOutside>
-
-           <DTrackCave driver="dtrack" port="5000" serverHost="visir.hlrs.de">
+           <DTrackCave driver="dtrack" port="5000">
               <Offset x="0" y="-0" z="-1327" />
               <Orientation h="0" p="0" r="0" />
            </DTrackCave>
+
+           <DTrackCaveOutside driver="dtrack" port="5001">
+              <Offset x="0" y="-2673" z="-1327" />
+              <Orientation h="0" p="0" r="0" />
+           </DTrackCaveOutside>
 
            <CaveButtons driver="mousebuttons" device="/dev/input/presenter"/>
            <CyberstickButtons driver="mousebuttons" device="/dev/input/cyberstick"/>
@@ -48,22 +46,22 @@
               <Orientation h="0" p="0" r="0" />
            </ConstHead>
 
-           <CaveHead device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="1">
-              <Offset x="105" y="-50" z="-60" />
+           <CaveHead device="DTrackCave" bodyIndex="1">
+              <Offset x="-105" y="-40" z="-50" />
               <Orientation h="0" p="0" r="0" />
            </CaveHead>
 
-           <CaveHand device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="0">
-              <Offset x="10" y="-110" z="0" />
+           <CaveHand device="DTrackCave" bodyIndex="0">
+              <Offset x="0" y="-110" z="0" />
               <Orientation h="-2" p="-2" r="14" />
            </CaveHand>
 
-           <CaveCamera device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="2">
-              <Offset x="0" y="120" z="-100" />
+           <CaveCamera device="DTrackCave" bodyIndex="2">
+              <Offset x="0" y="120" z="-200" />
               <Orientation h="0" p="0" r="0" />
            </CaveCamera>
 
-           <CaveCameraOutside device="DTrackCaveOutside" bodyIndex="2">
+           <CaveCameraOutside device="DTrackCaveOutside" bodyIndex="0">
               <Offset x="0" y="120" z="-200" />
               <Orientation h="0" p="0" r="0" />
            </CaveCameraOutside>
@@ -110,13 +108,9 @@
            <CaveJoyX device="DTrackCave" valuatorIndex="0" />
            <CaveJoyY device="DTrackCave" valuatorIndex="1" />
         </Valuator>
-	
-	<Device>
-           <joystick driver="joystick" device="/dev/input/js"/>
-	</Device>
 
         <Persons>
-           <Person name="Tracked" default="true" head="CaveHead" hand="CaveHand" buttons="CaveMouse" />
+           <Person name="Tracked" head="CaveHead" hand="CaveHand" buttons="CaveMouse" />
            <Person name="Tracked2" head="CaveHead2" hand="CaveHand2" buttons="CaveMouse" />
            <Person name="Tripod" eyeDistance="0.0" head="TripodHead" hand="CaveHand" buttons="CaveMouse" />
            <Person name="Camera" eyeDistance="0.0" head="CaveCamera" hand="CaveHand" buttons="CaveMouse" />
@@ -201,15 +195,11 @@
     <Server port="31809" />
    </covRemote>
 
-   <VRB>
-	  <RemoteFetch value="on" path="/var/tmp/$USER/remoteFetch" hash="on"/>
-   </VRB>
   </System>
 
 
   <COVER>
 
-   <Stereo value="true" />
    <Spheres><UseVertexArrays value="on"/></Spheres>
    <OMPThreads value="off"/>
    <!--IconSize value="20"/-->
@@ -218,12 +208,8 @@
     <Multisample value="OFF" numSamples="4" numBuffers="2" mode="FASTEST" />
    <AnisotropicFiltering value="0" />
    <Plugin>
-    <Skateboard>
-        <Position x="0" y="0" />
-    </Skateboard>
     <COVERScript value="off"/>
-    <Variant value="true"/>
-    <Revit value="on" ignoreDepthOnly="true" textures="/data/revit/Textures" localTextures="/data/revit/Textures">
+    <Revit menu="on" textures="/data/revit/Textures" localTextures="/data/revit/Textures">
     </Revit>
     <TrackObjects menu="on" value="off" >
 	    <Objects>
@@ -242,9 +228,8 @@
 
      <Lights value="ON" />
      <Audio value="AServer" >
-        <Host value="192.168.0.240"/> 
+      <Host value="192.168.0.88" />
      </Audio>
-
 
     <ViewpointType value = "free"/>
 
@@ -264,12 +249,11 @@
 
    </Plugin>
 
-   <!--TabletUI host="141.58.8.221" /-->
    <TabletUI host="141.58.8.187" />
 
    <MultiPC>
     <SyncMode value="TCP" hosts="viscluster50,viscluster51,viscluster52,viscluster53,viscluster54,viscluster55,viscluster56,viscluster57,viscluster58,viscluster59,viscluster60"/>
-    <NumSlaves value="10" />
+    <NumSlaves value="2" />
     <MasterInterface value="192.168.2.150" />
 
     <Startup ARCH="x11" value="ssh ${USER}@viscluster51 ${COVISEDIR}/bin/startOpenCOVER `pwd` $ARCHSUFFIX $COVISEDIR $COVISE_PATH $COCONFIG" name="0"/>
@@ -325,7 +309,7 @@
  <LOCAL HOST="viscluster50" >
   <COVER>
    <ScreenConfig>
-    <Screen width="4320" comment="FRONT" h="0.0" originX="0" originY="1350" originZ="0" height="2700" p="0.0" r="0.0" name="0" screen="0" />
+    <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="1350" originZ="0" height="1080" p="0.0" r="0.0" name="0" screen="0" />
    </ScreenConfig>
   </COVER>
  </LOCAL>
@@ -335,8 +319,8 @@
    <SplashScreen value="/mnt/raid/media/images/splash/Front.tif" width="1176" height="1050" />
    
    <ScreenConfig>
-    <Screen width="2700" comment="FRONT" h="0.0" originX="0" originY="1350" originZ="0" height="2700" p="0.0" r="0.0" name="0" screen="0" />
-    <Screen width="2700" comment="FRONT" h="0.0" originX="0" originY="1350" originZ="0" height="2700" p="0.0" r="0.0" name="1" screen="1" />
+    <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="1350" originZ="0" height="1080" p="0.0" r="0.0" name="0" screen="0" />
+    <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="1350" originZ="0" height="1080" p="0.0" r="0.0" name="1" screen="1" />
    </ScreenConfig>
   </COVER>
  </LOCAL>
@@ -416,13 +400,26 @@
     <Viewport width="1" left="0" windowIndex="0" bottom="0" name="0" height="1" />
    </ViewportConfig>
    <WindowConfig>
-   <Window ARCH="x11" type="" width="1600" comment="MAIN" window="0" pipeIndex="0" height="1000" left="100" top="50" name="0" decoration="true" />
+   <Window ARCH="x11" type="Qt" width="1920" comment="MAIN" window="0" pipeIndex="0" height="1080" left="100" top="50" name="0" decoration="true" />
    </WindowConfig>
   </COVER>
  </LOCAL>
 
 
-<LOCAL HOST="viscluster52,viscluster54,viscluster56" >
+<LOCAL HOST="viscluster52" >
+  <COVER>
+     <TestImage value="/mnt/raid/media/images/hpcwoess/testbild/testbild_1600x1600_neuR.png" />
+   <ChannelConfig>
+    <Channel comment="MAIN" channel="0"  stereoMode="RIGHT" windowIndex="0" name="0" viewportIndex="0" />
+   </ChannelConfig>
+   <ViewportConfig>
+    <Viewport width="1920"  left="280" windowIndex="0" bottom="0" name="0" height="1080" />
+   </ViewportConfig>
+
+  </COVER>
+ </LOCAL>
+
+<LOCAL HOST="viscluster54,viscluster56" >
   <COVER>
      <TestImage value="/mnt/raid/media/images/hpcwoess/testbild/testbild_1600x1600_neuR.png" />
    <ChannelConfig>
@@ -448,7 +445,18 @@
  </LOCAL>
 
 
- <LOCAL HOST="viscluster51,viscluster53,viscluster55,visent,visent.hlrs.de" >
+ <LOCAL HOST="viscluster51" >
+  <COVER>
+     <TestImage value="/mnt/raid/media/images/hpcwoess/testbild/testbild_1600x1600_neuL.png" />
+   <ChannelConfig>
+    <Channel comment="MAIN" channel="0"  stereoMode="LEFT" windowIndex="0" name="0" viewportIndex="0" />
+   </ChannelConfig>
+   <ViewportConfig>
+    <Viewport width="1920"  left="280" windowIndex="0" bottom="0" name="0" height="1080" />
+   </ViewportConfig>
+  </COVER>
+ </LOCAL>
+ <LOCAL HOST="viscluster53,viscluster55,visent,visent.hlrs.de" >
   <COVER>
      <TestImage value="/mnt/raid/media/images/hpcwoess/testbild/testbild_1600x1600_neuL.png" />
    <ChannelConfig>
@@ -490,7 +498,7 @@
    <Near value="100" />
    <!--StereoCommand value="echo stereo > /proc/driver/genlock/state" /-->
    <!--MonoCommand value="echo mono > /proc/driver/genlock/state" /-->
-   <ViewerPosition x="0" y="-3000" z="200" />
+   <ViewerPosition x="0" y="-1000" z="200" />
    <FloorHeight value="-1250" />
    <StepSize value="400" />
 
@@ -506,7 +514,7 @@
       
 
    <SceneSize value="2500" />
-   <Freeze value="OFF" />
+   <Freeze value="ON" />
    <MultiProcess value="OFF" />
    <MultiThreaded value="OFF" />
    <ScaleAll value="OFF" />
@@ -514,7 +522,6 @@
 
    <Collaborative>
     <Sync mode="LOOSE_COUPLING" />
-    <Icon value="/data/KoLabBW/KolabBWLogo.3ds"/>
    </Collaborative>
 
    <Spotlight value="OFF" />
@@ -531,24 +538,9 @@
    <!--Module value="vranim" name="vranim" /-->
    <!--Module value="SteeringWheel" name="SteeringWheel" /-->
    <Plugin>
-   <Tacx menu="on" />
    <PointCloud>
    <PointSize value="4" />
    </PointCloud>
-   <JSBSim menu="on" >
-   <Geometry y="-800" z="200" />
-   <Glider serverPort="31319" localPort="1234" />
-   <Sound server="192.168.0.240" />
-   <!--Sound server="141.58.8.223" /-->
-
-   <!--ScriptName value="C:/src/gitbase/jsbsim/scripts/c172_cruise.xml" /-->
-   <!--Model aircraft="c172x" enginesDir="C:/src/gitbase/jsbsim/engine" systemsDir="C:/src/gitbase/jsbsim/systems" resetFile="C:/src/gitbase/jsbsim/aircraft/c172x/reset01.xml"-->
-   <!--/Model-->
-   <!--Model aircraft="paraglider" enginesDir="C:/src/gitbase/jsbsim/engine" systemsDir="C:/src/gitbase/jsbsim/systems" resetFile="C:/src/gitbase/jsbsim/aircraft/paraglider/reset00.xml">
-   </Model-->
-   <!--Model aircraft="lcaro" enginesDir="engine" systemsDir="aircraft/lcaro/Systems" resetFile="reset00.xml">
-   </Model-->
-   </JSBSim>
         <MarkerTracking value="Off">
 		   <Capture value="Off" />
 		   <Stereo value="OFF" />
@@ -558,7 +550,7 @@
 		   <Threshold value="143" />
 		   <!-- SLK -->
 		   <Marker name="ObjectMarker" >
-			   <Pattern value="56" />
+			   <Pattern value="/mnt/raid/share/hpcbrait/AR/camera/4x4_56.patt" />
 			   <Size value="50" />
 			   <Offset x="0" y="0" h="0" z="38" p="0" r="-6" />
 			   <VrmlToPf value="TRUE" />
@@ -577,10 +569,7 @@
    <Bicycle>
    <LenkMaus value="/dev/input/mouse3"/>
    <PedalMaus value="/dev/input/mouse4"/>
-   <isBike value="false"/>
-   <FlightGear value="true"/>
-   <isParaglider value="true"/>
-   <isSkateboard value="false"/>
+   <isBike value="true"/>
    </Bicycle>
    <SteeringWheel>
 
@@ -589,8 +578,7 @@
    <PorscheHupe value="/dev/input/porschehupe" />
    <FKFS value="OFF" host="192.168.0.95" origin="-1.80877" />
    <CAN value="OFF" port="1" speed="1000" nodeID="1" origin="0.0" />
-   <CarSound host="192.168.0.240" port="31804"/>
-   <!--CarSound host="192.168.0.88" port="31804"/-->
+   <CarSound host="192.168.0.88" port="31804"/>
    <!--CarSound host="141.58.8.110" port="31804"/-->
    <!--CarSound host="141.58.8.32" port="31804"/-->
    <!--InputDevice value="PORSCHE_SIM"/-->
