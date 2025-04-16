@@ -437,6 +437,17 @@ void EnergyPlugin::initCityGMLUI() {
 
 void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPath) {
   using namespace core::utils::osgUtils;
+  auto getColor = [](float val, float max) {
+    osg::Vec4 colHigh = osg::Vec4(1, 0.1, 0, 1.0);
+    osg::Vec4 colLow = osg::Vec4(0, 1, 0.5, 1.0);
+    float valN = val / max;
+    osg::Vec4 col(colHigh.r() * valN + colLow.r() * (1 - valN),
+                  colHigh.g() * valN + colLow.g() * (1 - valN),
+                  colHigh.b() * valN + colLow.b() * (1 - valN),
+                  colHigh.a() * valN + colLow.a() * (1 - valN));
+    return col;
+  };
+
   if (m_cityGMLObjs.empty()) {
     std::cerr << "Error: No cityGML objects found." << std::endl;
     return;
@@ -473,6 +484,7 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
 
   CSVStream::CSVRow row;
   std::map<std::string, PVData> pvDataMap;
+  float maxPVIntensity = 0;
   while (pvStream >> row) {
     PVData pvData;
     ACCESS_CSV_ROW(row, "id", pvData.cityGMLID);
@@ -488,8 +500,18 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
     ACCESS_CSV_ROW(row, "co2savings", pvData.co2savings);
     ACCESS_CSV_ROW(row, "n_modules_max", pvData.numPanelsMax);
 
+    if (pvData.pvAreaQm == 0) {
+      std::cerr << "Error: pvAreaQm is 0 for cityGML object with ID "
+                << pvData.cityGMLID << std::endl;
+      continue;
+    }
+
+    maxPVIntensity =
+        std::max(pvData.energyYearlyKWhMax / pvData.pvAreaQm, maxPVIntensity);
+
     pvDataMap.insert({pvData.cityGMLID, pvData});
   }
+
   // panel is 1.7m x 1.0m x 0.4m
   //   float angleZ = 45.0f;
   constexpr float panelWidth = 1.0f;
@@ -519,6 +541,9 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
       for (const auto &[id, data] : pvDataMap) {
         auto &cityGMLObj = m_cityGMLObjs[id];
         auto drawables = cityGMLObj->getDrawables();
+        // const auto &colorIntensity =
+        auto colorIntensity =
+            getColor(data.energyYearlyKWhMax / data.pvAreaQm, maxPVIntensity);
         for (auto drawable : drawables) {
           const auto &name = drawable->getName();
           if (name.find("RoofSurface") != std::string::npos) {
@@ -526,7 +551,6 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
             osg::ref_ptr<osg::Group> parent = drawable->getParent(0);
             osg::ref_ptr<osg::Geode> geode = drawable->asGeode();
             auto bb = geode->getBoundingBox();
-            // auto bbVis = createBoundingBoxVisualization(bb);
             auto minBB = bb._min;
             auto maxBB = bb._max;
             auto roofWidth = maxBB.x() - minBB.x();
@@ -534,11 +558,14 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
             auto roofCenter = bb.center();
             auto z = maxBB.z() + zOffset;
 
-            osg::ref_ptr<osg::MatrixTransform> pvPanelsTransform =
-                new osg::MatrixTransform();
+            // osg::ref_ptr<osg::MatrixTransform> pvPanelsTransform =
+            //     new osg::MatrixTransform();
+            osg::ref_ptr<osg::Group> pvPanelsTransform =
+                new osg::Group();
             pvPanelsTransform->setName("PVPanels");
 
-            int maxPanels = data.numPanelsMax;
+            int dividedBy = 10;
+            int maxPanels = data.numPanelsMax / dividedBy;
             if (maxPanels == 0) maxPanels = 1;
 
             int numPanelsPerRow = static_cast<int>(std::sqrt(maxPanels));
@@ -576,23 +603,35 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
               auto y = startY + (row * (panelHeight + spacingY));
 
               auto position = osg::Vec3(x, y, z);
-              auto solarPanelInstance =
-                  instancing::createInstance(masterGeometryData, osg::Matrix());
               osg::Matrix matrix =
                   rotationZ * rotationX * osg::Matrix::translate(position);
-              osg::ref_ptr<osg::MatrixTransform> instanceTransform =
-                  new osg::MatrixTransform(matrix);
-              instanceTransform->addChild(solarPanelInstance);
+              //   auto solarPanelInstance =
+              //       instancing::createInstance(masterGeometryData, osg::Matrix());
+              auto solarPanelInstance =
+                  instancing::createInstance(masterGeometryData, matrix);
+              solarPanelInstance->setName("SolarPanel_" + std::to_string(i));
 
-              auto solarPanel = std::make_unique<SolarPanel>(instanceTransform);
+              //   osg::Matrix matrix =
+              //       rotationZ * rotationX * osg::Matrix::translate(position);
+              //   osg::ref_ptr<osg::MatrixTransform> instanceTransform =
+              //       new osg::MatrixTransform(matrix);
+              //   instanceTransform->addChild(solarPanelInstance);
 
-              for (auto solarDrawable : solarPanel->getDrawables()) {
-                pvPanelsTransform->addChild(solarDrawable);
-              }
+              //   auto solarPanel = std::make_unique<SolarPanel>(instanceTransform);
+              auto solarPanel = std::make_unique<SolarPanel>(solarPanelInstance);
+              solarPanel->updateColor(colorIntensity);
+              pvPanelsTransform->addChild(solarPanelInstance);
+
+            //   for (auto solarDrawable : solarPanel->getDrawables()) {
+            //     // auto outlinedSolarPanel =
+            //     //     core::utils::osgUtils::createOutline(solarDrawable, 0.1f, colorIntensity);
+            //     pvPanelsTransform->addChild(solarDrawable);
+
+            //     // pvPanelsTransform->addChild(outlinedSolarPanel);
+            //   }
               m_solarPanels.push_back(std::move(solarPanel));
             }
             parent->addChild(pvPanelsTransform);
-            // parent->addChild(bbVis);
           }
         }
       }
