@@ -55,6 +55,7 @@ private:
     opencover::ui::Menu *_menu = nullptr;
     typedef std::map<std::string, opencover::coInteractor *> InteractorMap;
     InteractorMap interactorMap; // from container to interactor
+    typedef std::map<opencover::coInteractor *, ColorsModule> ColorsModuleMap;
     
     ColorsModuleMap colorsModuleMap;
     std::vector<const ColorsModule *> visibleHuds;

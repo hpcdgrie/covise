@@ -92,7 +92,16 @@ public:
     ~ColorBar();
 
     bool hudVisible() const;
-    void setHudPosition(osg::Vec3 pos, osg::Vec3 hpr, float size);
+    struct PLUGIN_UTILEXPORT HudPosition
+    {
+      HudPosition(float hudScale = 1.f);
+      void setNumHuds(int numHuds); //changes the offset so that all huds are visible
+      osg::Vec3 bottomLeft, hpr;
+      float scale;
+   private:
+      osg::Vec3 m_bottomLeft, m_offset;
+    };
+    void setHudPosition(const HudPosition &pos);
 
     /** colorbar update
        *  @param species title bar content

@@ -19,6 +19,9 @@
 #include <cover/ui/SpecialElement.h>
 
 #include <cover/VRVruiRenderInterface.h>
+#include <cover/coVRMSController.h>
+#include <cover/coVRConfig.h>
+#include <OpenVRUI/osg/mathUtils.h>
 
 static const char MINMAX[] = "MinMax";
 static const char STEPS[] = "numSteps";
@@ -228,12 +231,40 @@ bool ColorBar::hudVisible() const
     return hudbar_ && hudbar_->isVisible();
 }
 
-void ColorBar::setHudPosition(osg::Vec3 pos, osg::Vec3 hpr, float size)
+ColorBar::HudPosition::HudPosition(float hudScale)
+{
+    if (coVRMSController::instance()->isMaster() && coVRConfig::instance()->numScreens() > 0) {
+        const auto &s0 = coVRConfig::instance()->screens[0];
+        hpr = s0.hpr;
+        auto sz = osg::Vec3(s0.hsize, 0., s0.vsize);
+        osg::Matrix mat;
+        MAKE_EULER_MAT_VEC(mat, hpr);
+        m_bottomLeft = s0.xyz - sz * mat * 0.5;
+        auto minsize = std::min(s0.hsize, s0.vsize);
+        m_bottomLeft += osg::Vec3(minsize, 0., minsize) * mat * 0.02;
+        m_offset = osg::Vec3(s0.vsize/2.5, 0 , 0) * mat * hudScale;
+    }
+    for (int i=0; i<3; ++i)
+    {
+        coVRMSController::instance()->syncData(&m_bottomLeft[i], sizeof(m_bottomLeft[i]));
+        coVRMSController::instance()->syncData(&hpr[i], sizeof(hpr[i]));
+        coVRMSController::instance()->syncData(&m_offset[i], sizeof(m_offset[i]));
+    }
+    scale = m_offset[0]/480;
+    bottomLeft = m_bottomLeft;
+}
+
+void ColorBar::HudPosition::setNumHuds(int numHuds)
+{
+    bottomLeft = m_bottomLeft + m_offset * numHuds;
+}
+
+void ColorBar::setHudPosition(const HudPosition &pos)
 {
     if (!hudbar_)
         return;
 
-    auto mat = coUIElement::getMatrixFromPositionHprScale(pos[0], pos[1], pos[2], hpr[0], hpr[1], hpr[2], size);
+    auto mat = coUIElement::getMatrixFromPositionHprScale(pos.bottomLeft[0], pos.bottomLeft[1], pos.bottomLeft[2], pos.hpr[0], pos.hpr[1], pos.hpr[2], pos.scale);
     auto uie = hudbar_->getUIElement();
     auto vtr = uie->getDCS();
     vtr->setMatrix(mat);
