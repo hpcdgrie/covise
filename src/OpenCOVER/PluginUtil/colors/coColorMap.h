@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "ColorBar.h"
+#include "coColorBar.h"
 #include "config/CoviseConfig.h"
 #include "cover/VRViewer.h"
 #include "osg/ref_ptr"
@@ -88,11 +90,14 @@ class PLUGIN_UTILEXPORT ColorMapSelector {
   osg::Vec4 getColor(float val, float min = 0, float max = 1);
   const ColorMap &selectedMap() const;
   void setCallback(const std::function<void(const ColorMap &)> &f);
-
+  void showHud(bool show);
+  bool hudVisible() const;
+  void setHudPosition(const opencover::ColorBar::HudPosition &position); 
  private:
   opencover::ui::SelectionList *m_selector;
   const ColorMaps m_colors;
   ColorMaps::const_iterator m_selectedMap;
+  std::unique_ptr<opencover::coColorBar> m_hud;
   void updateSelectedMap();
   void init();
 };

@@ -214,6 +214,15 @@ EnergyPlugin::EnergyPlugin()
   initUI();
   m_offset =
       configFloatArray("General", "offset", std::vector<double>{0, 0, 0})->value();
+
+
+
+  auto testMenu = new ui::Menu("Test", this);
+  auto showColorMampBtn = new ui::Button(testMenu, "ShowColorMap");
+  m_colorMapSelector = std::make_unique<covise::ColorMapSelector>(*testMenu);
+  showColorMampBtn->setCallback([this](bool value) {
+      m_colorMapSelector->showHud(value);
+  });
 }
 
 EnergyPlugin::~EnergyPlugin() {
@@ -237,7 +246,7 @@ EnergyPlugin::~EnergyPlugin() {
 }
 
 void EnergyPlugin::initUI() {
-  m_EnergyTab = new ui::Menu("Energy_Campus", EnergyPlugin::m_plugin);
+  m_EnergyTab = new ui::Menu("Energy_Campus", m_plugin);
   m_EnergyTab->setText("Energy Campus");
 
   initOverview();
@@ -273,6 +282,14 @@ void EnergyPlugin::initOverview() {
     }
   });
   m_gridControlButton->setState(true);
+}
+
+void EnergyPlugin::preFrame(){
+  if(m_colorMapSelector->hudVisible())
+  {
+    ColorBar::HudPosition hudPos;
+    m_colorMapSelector->setHudPosition(hudPos);
+  }
 }
 
 bool EnergyPlugin::isActiv(osg::ref_ptr<osg::Switch> switchToCheck,

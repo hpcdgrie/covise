@@ -1,14 +1,18 @@
 #include "coColorMap.h"
 
-#include <config/CoviseConfig.h>
 #include <config/coConfig.h>
-#include <cover/VRViewer.h>
+#include <config/CoviseConfig.h>
 #include <cover/coVRConfig.h>
 #include <cover/coVRMSController.h>
+#include <cover/coVRPluginList.h>
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/CovconfigLink.h>
 #include <cover/ui/Slider.h>
-#include <cover/coVRPluginList.h>
+#include <cover/VRViewer.h>
+#include <cover/VRVruiRenderInterface.h>
+#include <OpenVRUI/coUIElement.h>
+#include <OpenVRUI/sginterface/vruiRendererInterface.h>
+#include <OpenVRUI/sginterface/vruiTransformNode.h>
 
 #include <cassert>
 #include <iomanip>
@@ -215,10 +219,38 @@ void covise::ColorMapSelector::setCallback(
   });
 }
 
+
+void covise::ColorMapSelector::showHud(bool show)
+{
+ m_hud->setVisible(show);
+}
+bool covise::ColorMapSelector::hudVisible() const
+{
+  return m_hud->isVisible();
+}
+void covise::ColorMapSelector::setHudPosition(const opencover::ColorBar::HudPosition &pos)
+{
+  auto mat = vrui::coUIElement::getMatrixFromPositionHprScale(pos.bottomLeft[0], pos.bottomLeft[1], pos.bottomLeft[2], pos.hpr[0], pos.hpr[1], pos.hpr[2], pos.scale);
+  auto uie = m_hud->getUIElement();
+  auto vtr = uie->getDCS();
+  vtr->setMatrix(mat);
+  vrui::vruiRendererInterface::the()->deleteMatrix(mat);
+}
+
+
 void covise::ColorMapSelector::updateSelectedMap() {
   m_selectedMap = m_colors.begin();
   std::advance(m_selectedMap, m_selector->selectedIndex());
   assert(m_selectedMap != m_colors.end());
+  
+  
+  m_hud->setName(m_selectedMap->first);
+  auto m = interpolateColorMap(m_selectedMap->second, m_selectedMap->second.steps);
+  
+  m_hud->update(m_selectedMap->second.min,
+                m_selectedMap->second.max,  m_selectedMap->second.g.size(),
+                m_selectedMap->second.r.data(), m_selectedMap->second.g.data(),
+                m_selectedMap->second.b.data(), m_selectedMap->second.a.data());
 }
 
 void covise::ColorMapSelector::init() {
@@ -227,6 +259,14 @@ void covise::ColorMapSelector::init() {
   m_selectedMap = m_colors.begin();
 
   m_selector->setCallback([this](int index) { updateSelectedMap(); });
+  m_hud = std::make_unique<opencover::coColorBar>(
+      "ColorMap", m_selectedMap->first, m_selectedMap->second.min,
+      m_selectedMap->second.max, m_selectedMap->second.r.size(),
+      m_selectedMap->second.r.data(), m_selectedMap->second.g.data(),
+      m_selectedMap->second.b.data(), m_selectedMap->second.a.data());
+    m_hud->getUIElement()->createGeometry();
+    auto vtr = m_hud->getUIElement()->getDCS();
+    opencover::VRVruiRenderInterface::the()->getAlwaysVisibleGroup()->addChild(vtr);
 }
 
 osg::ref_ptr<osg::Texture2D>

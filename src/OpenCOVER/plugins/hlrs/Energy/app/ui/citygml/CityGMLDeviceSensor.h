@@ -5,7 +5,7 @@
 #include <lib/core/interfaces/IBuilding.h>
 #include <lib/core/interfaces/IInfoboard.h>
 #include <lib/core/utils/color.h>
-
+#include <PluginUtil/colors/coColorMap.h>
 #include <memory>
 #include <osg/Group>
 

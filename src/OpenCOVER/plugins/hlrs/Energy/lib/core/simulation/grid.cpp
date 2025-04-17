@@ -6,7 +6,8 @@
 #include <osg/BoundingBox>
 #include <osg/MatrixTransform>
 #include <osg/Shape>
-
+#include <cassert>
+#include <iostream>
 namespace {
 void updateMinMax(osg::Vec3 &minExtends, osg::Vec3 &maxExtends,
                   const osg::Vec3 &point) {

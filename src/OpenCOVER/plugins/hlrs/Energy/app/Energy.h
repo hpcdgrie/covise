@@ -41,6 +41,8 @@
 #include <OpenConfig/array.h>
 #include <PluginUtil/coSensor.h>
 #include <PluginUtil/colors/coColorMap.h>
+#include <PluginUtil/colors/coColorBar.h>
+#include <PluginUtil/colors/ColorBar.h>
 
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
@@ -55,7 +57,6 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/SelectionList.h>
-
 // ennovatis
 #include <lib/ennovatis/building.h>
 #include <lib/ennovatis/rest.h>
@@ -127,6 +128,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   template <typename T>
   using NameMapVectorPtr = NameMapPtr<std::vector<T>>;
 
+  std::unique_ptr<covise::ColorMapSelector> m_colorMapSelector = nullptr;
+
   /* #endregion */
 
   /* #region typedef */
@@ -145,6 +148,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
   /* #endregion */
+
+  void preFrame() override; //update colormaps
 
   /* #region GENERAL */
   inline void checkEnergyTab() {
