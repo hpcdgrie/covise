@@ -17,6 +17,7 @@ std::unique_ptr<osg::Vec4> ColorMap::getColor(float value, float maxValue) const
 auto createMaterial(const osg::Vec4 &color, osg::Material::Face faceMask) {
   osg::ref_ptr<osg::Material> mat = new osg::Material;
   mat->setDiffuse(faceMask, color);
+  mat->setAmbient(faceMask, color);
   return mat;
 }
 
