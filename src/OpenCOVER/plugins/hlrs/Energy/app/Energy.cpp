@@ -541,7 +541,6 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
       for (const auto &[id, data] : pvDataMap) {
         auto &cityGMLObj = m_cityGMLObjs[id];
         auto drawables = cityGMLObj->getDrawables();
-        // const auto &colorIntensity =
         auto colorIntensity =
             getColor(data.energyYearlyKWhMax / data.pvAreaQm, maxPVIntensity);
         for (auto drawable : drawables) {
@@ -558,10 +557,7 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
             auto roofCenter = bb.center();
             auto z = maxBB.z() + zOffset;
 
-            // osg::ref_ptr<osg::MatrixTransform> pvPanelsTransform =
-            //     new osg::MatrixTransform();
-            osg::ref_ptr<osg::Group> pvPanelsTransform =
-                new osg::Group();
+            osg::ref_ptr<osg::Group> pvPanelsTransform = new osg::Group();
             pvPanelsTransform->setName("PVPanels");
 
             int dividedBy = 10;
@@ -605,32 +601,18 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
               auto position = osg::Vec3(x, y, z);
               osg::Matrix matrix =
                   rotationZ * rotationX * osg::Matrix::translate(position);
-              //   auto solarPanelInstance =
-              //       instancing::createInstance(masterGeometryData, osg::Matrix());
               auto solarPanelInstance =
                   instancing::createInstance(masterGeometryData, matrix);
               solarPanelInstance->setName("SolarPanel_" + std::to_string(i));
 
-              //   osg::Matrix matrix =
-              //       rotationZ * rotationX * osg::Matrix::translate(position);
-              //   osg::ref_ptr<osg::MatrixTransform> instanceTransform =
-              //       new osg::MatrixTransform(matrix);
-              //   instanceTransform->addChild(solarPanelInstance);
-
-              //   auto solarPanel = std::make_unique<SolarPanel>(instanceTransform);
               auto solarPanel = std::make_unique<SolarPanel>(solarPanelInstance);
               solarPanel->updateColor(colorIntensity);
               pvPanelsTransform->addChild(solarPanelInstance);
-
-            //   for (auto solarDrawable : solarPanel->getDrawables()) {
-            //     // auto outlinedSolarPanel =
-            //     //     core::utils::osgUtils::createOutline(solarDrawable, 0.1f, colorIntensity);
-            //     pvPanelsTransform->addChild(solarDrawable);
-
-            //     // pvPanelsTransform->addChild(outlinedSolarPanel);
-            //   }
               m_solarPanels.push_back(std::move(solarPanel));
             }
+            // osgUtil::Optimizer optimizer;
+            // optimizer.optimize(pvPanelsTransform, osgUtil::Optimizer::ALL_OPTIMIZATIONS);
+            // core::utils::osgUtils::printNodeInfo(pvPanelsTransform);
             parent->addChild(pvPanelsTransform);
           }
         }
@@ -1975,8 +1957,9 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
     row.clear();
   }
 
-  // TODO: change datastructure to lines instead => indices can be used as well but lines will represent the new simulation data more accurately
-  // indices are strangely mapped with random ids => make them contiguous
+  // TODO: change datastructure to lines instead => indices can be used as well but
+  // lines will represent the new simulation data more accurately indices are
+  // strangely mapped with random ids => make them contiguous
   for (int i = 0; i < indices.size(); ++i)
     for (int j = 0; j < indices[i].size(); ++j)
       if (auto it = idMap.find(indices[i][j]); it != idMap.end())
