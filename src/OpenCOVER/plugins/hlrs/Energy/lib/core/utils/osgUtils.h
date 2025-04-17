@@ -60,6 +60,18 @@ osg::ref_ptr<osg::Geode> createBoundingSphereVisualization(
 osg::ref_ptr<osg::Node> readFileViaOSGDB(const std::string &filename,
                                          osg::ref_ptr<osgDB::Options> options,
                                          bool optimize = false);
+void addEmissionMaterial(osg::ref_ptr<osg::Geode> geo,
+                         const osg::Vec4 &highlightColor);
+
+osg::ref_ptr<osg::Node> createOutline(osg::ref_ptr<osg::Node> originalNode,
+                                      float scaleFactor,
+                                      const osg::Vec4 &outlineColor);
+void applyOutlineShader(osg::ref_ptr<osg::Geode> geo, const osg::Vec4 &outlineColor,
+                        float lineWidth = 2.0f);
+void createOutlineFX(osg::ref_ptr<osg::Geode> geode, const osg::Vec4 &outlineColor,
+                     float lineWidth = 2.0f);
+
+void printNodeInfo(osg::Node *node, int indent = 0);
 
 namespace instancing {
 struct GeometryData {
@@ -70,6 +82,6 @@ struct GeometryData {
 std::vector<GeometryData> extractAllGeometryData(osg::Node *node);
 osg::ref_ptr<osg::Node> createInstance(
     const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix);
-}  // namespace Instancing
+}  // namespace instancing
 }  // namespace core::utils::osgUtils
 #endif

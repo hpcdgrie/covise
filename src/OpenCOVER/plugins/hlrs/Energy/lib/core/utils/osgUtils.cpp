@@ -1,12 +1,15 @@
 #include "osgUtils.h"
 
+#include <GL/gl.h>
 #include <utils/color.h>
 
+#include <iostream>
 #include <memory>
 #include <osg/Array>
 #include <osg/BlendFunc>
 #include <osg/BoundingBox>
 #include <osg/BoundingSphere>
+#include <osg/Depth>
 #include <osg/Drawable>
 #include <osg/Geode>
 #include <osg/Geometry>
@@ -15,12 +18,15 @@
 #include <osg/Matrixd>
 #include <osg/PolygonMode>
 #include <osg/PrimitiveSet>
+#include <osg/Shader>
 #include <osg/Shape>
 #include <osg/ShapeDrawable>
+#include <osg/StateAttribute>
 #include <osg/Vec3>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
 #include <osgDB/ReadFile>
+#include <osgFX/Outline>
 #include <osgText/Text>
 #include <osgUtil/Optimizer>
 #include <osgUtil/SmoothingVisitor>
@@ -452,6 +458,207 @@ osg::ref_ptr<osg::Node> readFileViaOSGDB(const std::string &filename,
   }
 
   return node;
+}
+
+void addEmissionMaterial(osg::ref_ptr<osg::Geode> geo,
+                         const osg::Vec4 &highlightColor) {
+  if (geo) {
+    for (unsigned int i = 0; i < geo->getNumDrawables(); ++i) {
+      osg::StateSet *stateset = geo->getDrawable(i)->getOrCreateStateSet();
+      osg::ref_ptr<osg::Material> material = new osg::Material;
+      material->setEmission(osg::Material::FRONT_AND_BACK, highlightColor);
+      stateset->setAttributeAndModes(material.get(), osg::StateAttribute::ON);
+    }
+  }
+}
+
+osg::ref_ptr<osg::Node> createOutline(osg::ref_ptr<osg::Node> originalNode,
+                                      float scaleFactor,
+                                      const osg::Vec4 &outlineColor) {
+  osg::ref_ptr<osg::MatrixTransform> outlineMT = new osg::MatrixTransform;
+  outlineMT->setMatrix(osg::Matrix::scale(scaleFactor, scaleFactor, scaleFactor));
+
+  osg::ref_ptr<osg::Node> outlineNode = originalNode;
+
+  osg::Geode *geode = outlineNode->asGeode();
+  if (geode) {
+    for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
+      osg::StateSet *stateset = geode->getDrawable(i)->getOrCreateStateSet();
+      osg::ref_ptr<osg::Material> material = new osg::Material;
+      material->setDiffuse(osg::Material::FRONT_AND_BACK, outlineColor);
+      material->setAmbient(osg::Material::FRONT_AND_BACK,
+                           outlineColor * 0.2f);  // Etwas dunklerer Rand
+      stateset->setAttributeAndModes(material.get(), osg::StateAttribute::ON);
+      stateset->setMode(GL_LIGHTING, osg::StateAttribute::ON);
+    }
+  }
+
+  osg::ref_ptr<osg::Group> group = new osg::Group;
+  group->addChild(outlineMT.get());
+  group->addChild(originalNode.get());
+
+  return group.get();
+}
+
+void applyOutlineShader(osg::ref_ptr<osg::Geode> geode,
+                        const osg::Vec4 &outlineColor, float outlineWidth) {
+  if (!geode.valid()) {
+    OSG_WARN << "addOutlineShaderWithTexture: Ungültige Geode übergeben."
+             << std::endl;
+    return;
+  }
+
+  osg::StateSet *stateSet = geode->getOrCreateStateSet();
+
+  // Kombinierter Vertex Shader Source
+  const char *vertexShaderSource =
+      "#version 150 core\n"
+      "\n"
+      "in vec4 osg_Vertex;\n"
+      "in vec3 osg_Normal;\n"
+      "in vec2 osg_TexCoord0;\n"
+      "uniform mat4 osg_ModelViewMatrix;\n"
+      "uniform mat4 osg_ProjectionMatrix;\n"
+      "uniform float outlineWidth;\n"
+      "\n"
+      "out vec2 fragTexCoord;\n"
+      "out float outlineFactor;\n"
+      "\n"
+      "void main()\n"
+      "{\n"
+      "    vec3 normalWorld = normalize(mat3(osg_ModelViewMatrix) * osg_Normal);\n"
+      "    vec4 offset = vec4(normalWorld * outlineWidth, 0.0);\n"
+      "    gl_Position = osg_ProjectionMatrix * (osg_ModelViewMatrix * osg_Vertex + "
+      "offset);\n"
+      "    fragTexCoord = osg_TexCoord0;\n"
+      "    // Einfacher Ansatz: Wenn der Vertex verschoben wurde, ist er Teil der "
+      "Umrandung\n"
+      "    outlineFactor = length(offset.xyz) > 0.0 ? 1.0 : 0.0;\n"
+      "}\n";
+
+  // Kombinierter Fragment Shader Source
+  const char *fragmentShaderSource =
+      "#version 150 core\n"
+      "\n"
+      "uniform vec4 outlineColor;\n"
+      "uniform sampler2D texture0;\n"
+      "uniform bool hasTexture;\n"
+      "\n"
+      "in vec2 fragTexCoord;\n"
+      "in float outlineFactor;\n"
+      "out vec4 fragColor;\n"
+      "\n"
+      "void main()\n"
+      "{\n"
+      "    vec4 baseColor = vec4(1.0);\n"
+      "    if (hasTexture)\n"
+      "    {\n"
+      "        baseColor = texture(texture0, fragTexCoord);\n"
+      "    }\n"
+      "    // Mische die Texturfarbe mit der Umrandungsfarbe basierend auf dem "
+      "outlineFactor\n"
+      "    fragColor = mix(baseColor, outlineColor, outlineFactor);\n"
+      "}\n";
+
+  // Erstelle die Shader-Objekte
+  osg::ref_ptr<osg::Shader> vertexShader = new osg::Shader(osg::Shader::VERTEX);
+  vertexShader->setShaderSource(vertexShaderSource);
+
+  osg::ref_ptr<osg::Shader> fragmentShader = new osg::Shader(osg::Shader::FRAGMENT);
+  fragmentShader->setShaderSource(fragmentShaderSource);
+
+  // Erstelle das Shader-Programm
+  osg::ref_ptr<osg::Program> program = new osg::Program();
+  program->addShader(vertexShader.get());
+  program->addShader(fragmentShader.get());
+
+  // Weise das Programm dem StateSet zu
+  stateSet->setAttributeAndModes(program.get(), osg::StateAttribute::ON);
+
+  // Erstelle und setze die Uniformen
+  osg::ref_ptr<osg::Uniform> colorUniform =
+      new osg::Uniform("outlineColor", outlineColor);
+  stateSet->addUniform(colorUniform.get());
+
+  osg::ref_ptr<osg::Uniform> widthUniform =
+      new osg::Uniform("outlineWidth", outlineWidth);
+  stateSet->addUniform(widthUniform.get());
+
+  // Überprüfe, ob die Geode eine Textur hat und setze die entsprechende Uniform
+  osg::Texture *texture = nullptr;
+  for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
+    osg::StateSet *drawableState = geode->getDrawable(i)->getStateSet();
+    if (drawableState) {
+      texture = dynamic_cast<osg::Texture *>(
+          drawableState->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
+      if (texture) break;
+    }
+  }
+
+  osg::ref_ptr<osg::Uniform> hasTextureUniform =
+      new osg::Uniform("hasTexture", texture != nullptr);
+  stateSet->addUniform(hasTextureUniform.get());
+
+  if (texture) {
+    stateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
+    osg::ref_ptr<osg::Uniform> textureUniform =
+        new osg::Uniform("texture0", (int)0);  // Textur Unit 0
+    stateSet->addUniform(textureUniform.get());
+  }
+
+  // Optional: Deaktiviere das Schreiben in den Tiefenpuffer für die Umrandung,
+  //           um Z-Fighting zu vermeiden.
+  // osg::ref_ptr<osg::Depth> depth = new osg::Depth;
+  // depth->setWriteMask(false);
+  // stateSet->setAttribute(depth.get(), osg::StateAttribute::ON);
+}
+
+void createOutlineFX(osg::ref_ptr<osg::Geode> geode, const osg::Vec4 &outlineColor,
+                     float lineWidth) {
+  osg::ref_ptr<osgFX::Outline> outline = new osgFX::Outline;
+  outline->setColor(outlineColor);
+  outline->setWidth(lineWidth);
+  outline->addChild(geode.get());
+  for (int i = 0; geode->getNumParents(); ++i) {
+    osg::ref_ptr<osg::Group> parent = geode->getParent(i)->asGroup();
+    if (parent) {
+      if (parent->containsNode(geode)) parent->replaceChild(geode, outline);
+      break;
+    }
+  }
+}
+
+void printNodeInfo(osg::Node *node, int indent) {
+  for (int i = 0; i < indent; ++i) std::cout << "  ";
+  std::cout << "(" << node->className() << ") " << node->getName() << std::endl;
+  osg::Group *group = node->asGroup();
+  if (group) {
+    for (unsigned int i = 0; i < group->getNumChildren(); ++i) {
+      printNodeInfo(group->getChild(i), indent + 1);
+    }
+  }
+  osg::Geode *geode = node->asGeode();
+  if (geode) {
+    for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
+      for (int j = 0; j <= indent; ++j) std::cout << "  ";
+      std::cout << "  Drawable[" << i << "] : " << geode->getDrawable(i)->className()
+                << std::endl;
+      if (geode->getDrawable(i)->asGeometry()) {
+        osg::StateSet *ss = geode->getDrawable(i)->getStateSet();
+        if (ss) {
+          for (int j = 0; j <= indent + 1; ++j) std::cout << "  ";
+          std::cout << "    StateSet with " << ss->getTextureAttributeList().size()
+                    << " texture units." << std::endl;
+        }
+      }
+    }
+    osg::StateSet *ss = geode->getStateSet();
+    if (ss) {
+      for (int j = 0; j <= indent; ++j) std::cout << "  ";
+      std::cout << "  Geode StateSet with " << ss->getTextureAttributeList().size()
+                << " texture units." << std::endl;
+    }
+  }
 }
 
 namespace instancing {
