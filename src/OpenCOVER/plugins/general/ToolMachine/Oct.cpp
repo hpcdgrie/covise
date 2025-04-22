@@ -84,7 +84,7 @@ void Oct::clear()
     m_sections.clear();
 }
 
-void Oct::applyShader(const covise::ColorMap& map, float min, float max)
+void Oct::applyShader(const opencover::ColorMap& map, float min, float max)
 {
     for(auto &section : m_sections)
         opencover::applyShader(section.points, map, min, max, "OctPoints");
@@ -174,7 +174,7 @@ void Oct::correctLastUpdate(const osg::Vec3 &toolHeadPos)
 
 }
 
-Oct::Section::Section(size_t vertsPerCircle, double pointSize, const covise::ColorMap& map, float min, float max, osg::MatrixTransform* parent)
+Oct::Section::Section(size_t vertsPerCircle, double pointSize, const opencover::ColorMap& map, float min, float max, osg::MatrixTransform* parent)
 : m_parent(parent)
 , points(new osg::Geometry)
 , surface(new osg::Geometry)

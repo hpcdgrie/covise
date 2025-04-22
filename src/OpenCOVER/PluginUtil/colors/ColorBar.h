@@ -9,6 +9,7 @@
 #define _COLOR_BAR_H_
 
 #include "coColorBar.h"
+
 #include <OpenVRUI/coMenu.h>
 #include <OpenVRUI/coRowMenu.h>
 #include <OpenVRUI/coSubMenuItem.h>
@@ -66,10 +67,7 @@ private:
 
     void updateTitle();
 
-    float min = 0.0;
-    float max = 1.0;
-    int numColors = 0;
-    std::vector<float> r, g, b, a;
+   ColorMap map_;
 
 public:
 
@@ -113,7 +111,7 @@ public:
        *  @param b blue colors
        *  @param a red colors
        */
-    void update(const std::string &species, float min, float max, int numColors, const float *r, const float *g, const float *b, const float *a);
+    void update(const std::string &species, const ColorMap &map);
 
     /** set name */
     void setName(const char *name);
@@ -126,17 +124,9 @@ public:
     /** parseAttrib
        * @param attrib COLORMAP attribute
        * @param species: get species (the client should delete this pointer)
-       * @param min: colormap minimum
-       * @param max: colormap maximum
-       * @param numColors: number of colors
-       * @param r: red (the client should delete this pointer)
-       * @param g: green (the client should delete this pointer)
-       * @param b: blue (the client should delete this pointer)
-       * @param a: alpha (the client should delete this pointer)
+       * @return map: colormap to be filled
        */
-    static void parseAttrib(const char *attrib, std::string &species,
-                            float &min, float &max, int &numColors,
-                            std::vector<float> &r, std::vector<float> &g, std::vector<float> &b, std::vector<float> &a);
+    static ColorMap parseAttrib(const char *attrib, std::string &species);
 
     void parseAttrib(const char *attrib);
     void setVisible(bool);

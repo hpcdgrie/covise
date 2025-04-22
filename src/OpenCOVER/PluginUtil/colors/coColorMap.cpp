@@ -43,7 +43,7 @@ constexpr int maxLabels = 10;
 constexpr int maxPrecision = 2;
 }  // namespace
 
-osg::Quat covise::createRotationMatrixQuat(double headingDegrees,
+osg::Quat opencover::createRotationMatrixQuat(double headingDegrees,
                                            double pitchDegrees, double rollDegrees,
                                            RotationType type) {
   // Convert degrees to radians
@@ -69,22 +69,21 @@ osg::Quat covise::createRotationMatrixQuat(double headingDegrees,
   return combinedQuat;
 }
 
-osg::Matrix covise::createRotationMatrix(double headingDegrees, double pitchDegrees,
+osg::Matrix opencover::createRotationMatrix(double headingDegrees, double pitchDegrees,
                                          double rollDegrees, RotationType type) {
-  return osg::Matrix(covise::createRotationMatrixQuat(headingDegrees, pitchDegrees,
+  return osg::Matrix(opencover::createRotationMatrixQuat(headingDegrees, pitchDegrees,
                                                       rollDegrees, type));
 }
 
-osg::Matrix PLUGIN_UTILEXPORT covise::createRotationMatrix(const osg::Vec3 &hpr,
+osg::Matrix PLUGIN_UTILEXPORT opencover::createRotationMatrix(const osg::Vec3 &hpr,
                                                            RotationType type) {
   return createRotationMatrix(hpr[0], hpr[1], hpr[2], type);
 }
 
-covise::ColorMaps covise::readColorMaps() {
+opencover::ColorMaps opencover::readColorMaps() {
   // read the name of all colormaps in file
 
-  covise::coCoviseConfig::ScopeEntries colorMapEntries =
-      coCoviseConfig::getScopeEntries("Colormaps");
+  auto colorMapEntries = covise::coCoviseConfig::getScopeEntries("Colormaps");
   ColorMaps colorMaps;
 #ifdef NO_COLORMAP_PARAM
   colorMapEntries["COVISE"];
@@ -95,7 +94,7 @@ covise::ColorMaps covise::readColorMaps() {
   for (const auto &map : colorMapEntries) {
     string name = "Colormaps." + map.first;
 
-    auto no = coCoviseConfig::getScopeEntries(name).size();
+    auto no = covise::coCoviseConfig::getScopeEntries(name).size();
     ColorMap &colorMap = colorMaps.emplace(map.first, ColorMap()).first->second;
     // read all sampling points
     float diff = 1.0f / (no - 1);
@@ -103,18 +102,18 @@ covise::ColorMaps covise::readColorMaps() {
     for (int j = 0; j < no; j++) {
       string tmp = name + ".Point:" + std::to_string(j);
       ColorMap cm;
-      colorMap.r.push_back(coCoviseConfig::getFloat("r", tmp, 0));
-      colorMap.g.push_back(coCoviseConfig::getFloat("g", tmp, 0));
-      colorMap.b.push_back(coCoviseConfig::getFloat("b", tmp, 0));
-      colorMap.a.push_back(coCoviseConfig::getFloat("a", tmp, 1));
-      colorMap.samplingPoints.push_back(coCoviseConfig::getFloat("x", tmp, pos));
+      colorMap.r.push_back(covise::coCoviseConfig::getFloat("r", tmp, 0));
+      colorMap.g.push_back(covise::coCoviseConfig::getFloat("g", tmp, 0));
+      colorMap.b.push_back(covise::coCoviseConfig::getFloat("b", tmp, 0));
+      colorMap.a.push_back(covise::coCoviseConfig::getFloat("a", tmp, 1));
+      colorMap.samplingPoints.push_back(covise::coCoviseConfig::getFloat("x", tmp, pos));
       pos += diff;
     }
   }
   return colorMaps;
 }
 
-osg::Vec4 covise::getColor(float val, const covise::ColorMap &colorMap, float min,
+osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap, float min,
                            float max) {
   assert(val >= min && val <= max);
   val = 1 / (max - min) * (val - min);
@@ -136,9 +135,9 @@ osg::Vec4 covise::getColor(float val, const covise::ColorMap &colorMap, float mi
   return color;
 }
 
-covise::ColorMap covise::interpolateColorMap(const covise::ColorMap &cm,
+opencover::ColorMap opencover::interpolateColorMap(const opencover::ColorMap &cm,
                                              int numSteps) {
-  covise::ColorMap interpolatedMap;
+  opencover::ColorMap interpolatedMap;
   interpolatedMap.r.resize(numSteps);
   interpolatedMap.g.resize(numSteps);
   interpolatedMap.b.resize(numSteps);
@@ -182,19 +181,20 @@ covise::ColorMap covise::interpolateColorMap(const covise::ColorMap &cm,
   return interpolatedMap;
 }
 
-covise::ColorMapSelector::ColorMapSelector(opencover::ui::Group &group)
+opencover::ColorMapSelector::ColorMapSelector(opencover::ui::Group &group)
     : m_selector(new opencover::ui::SelectionList(&group, "mapChoice")),
       m_colors(readColorMaps()) {
   init();
 }
 
-covise::ColorMapSelector::ColorMapSelector(opencover::ui::Menu &menu)
-    : m_selector(new opencover::ui::SelectionList{&menu, "mapChoice"}),
-      m_colors(readColorMaps()) {
+opencover::ColorMapSelector::ColorMapSelector(opencover::ui::Menu &menu)
+    : m_selector(new opencover::ui::SelectionList{&menu, "mapChoice"})
+    , m_colors(readColorMaps())
+    , m_colorBar(std::make_unique<opencover::ColorBar>(&menu)) {
   init();
 }
 
-bool covise::ColorMapSelector::setValue(const std::string &colorMapName) {
+bool opencover::ColorMapSelector::setValue(const std::string &colorMapName) {
   auto it = m_colors.find(colorMapName);
   if (it == m_colors.end()) return false;
 
@@ -203,15 +203,15 @@ bool covise::ColorMapSelector::setValue(const std::string &colorMapName) {
   return true;
 }
 
-osg::Vec4 covise::ColorMapSelector::getColor(float val, float min, float max) {
-  return covise::getColor(val, m_selectedMap->second, min, max);
+osg::Vec4 opencover::ColorMapSelector::getColor(float val, float min, float max) {
+  return opencover::getColor(val, m_selectedMap->second, min, max);
 }
 
-const covise::ColorMap &covise::ColorMapSelector::selectedMap() const {
+const opencover::ColorMap &opencover::ColorMapSelector::selectedMap() const {
   return m_selectedMap->second;
 }
 
-void covise::ColorMapSelector::setCallback(
+void opencover::ColorMapSelector::setCallback(
     const std::function<void(const ColorMap &)> &f) {
   m_selector->setCallback([this, f](int index) {
     updateSelectedMap();
@@ -220,57 +220,40 @@ void covise::ColorMapSelector::setCallback(
 }
 
 
-void covise::ColorMapSelector::showHud(bool show)
+void opencover::ColorMapSelector::showHud(bool show)
 {
- m_hud->setVisible(show);
+ m_colorBar->show(show);
 }
-bool covise::ColorMapSelector::hudVisible() const
+bool opencover::ColorMapSelector::hudVisible() const
 {
-  return m_hud->isVisible();
+  return m_colorBar->hudVisible();
 }
-void covise::ColorMapSelector::setHudPosition(const opencover::ColorBar::HudPosition &pos)
+void opencover::ColorMapSelector::setHudPosition(const opencover::ColorBar::HudPosition &pos)
 {
-  auto mat = vrui::coUIElement::getMatrixFromPositionHprScale(pos.bottomLeft[0], pos.bottomLeft[1], pos.bottomLeft[2], pos.hpr[0], pos.hpr[1], pos.hpr[2], pos.scale);
-  auto uie = m_hud->getUIElement();
-  auto vtr = uie->getDCS();
-  vtr->setMatrix(mat);
-  vrui::vruiRendererInterface::the()->deleteMatrix(mat);
+  m_colorBar->setHudPosition(pos);
 }
 
-
-void covise::ColorMapSelector::updateSelectedMap() {
+void opencover::ColorMapSelector::updateSelectedMap() {
   m_selectedMap = m_colors.begin();
   std::advance(m_selectedMap, m_selector->selectedIndex());
   assert(m_selectedMap != m_colors.end());
   
-  
-  m_hud->setName(m_selectedMap->first);
-  auto m = interpolateColorMap(m_selectedMap->second, m_selectedMap->second.steps);
-  
-  m_hud->update(m_selectedMap->second.min,
-                m_selectedMap->second.max,  m_selectedMap->second.g.size(),
-                m_selectedMap->second.r.data(), m_selectedMap->second.g.data(),
-                m_selectedMap->second.b.data(), m_selectedMap->second.a.data());
+  m_colorBar->update(m_selectedMap->first, m_selectedMap->second);
 }
 
-void covise::ColorMapSelector::init() {
+void opencover::ColorMapSelector::init() {
   for (auto &n : m_colors) m_selector->append(n.first);
   m_selector->select(0);
   m_selectedMap = m_colors.begin();
 
   m_selector->setCallback([this](int index) { updateSelectedMap(); });
-  m_hud = std::make_unique<opencover::coColorBar>(
-      "ColorMap", m_selectedMap->first, m_selectedMap->second.min,
-      m_selectedMap->second.max, m_selectedMap->second.r.size(),
-      m_selectedMap->second.r.data(), m_selectedMap->second.g.data(),
-      m_selectedMap->second.b.data(), m_selectedMap->second.a.data());
-    m_hud->getUIElement()->createGeometry();
-    auto vtr = m_hud->getUIElement()->getDCS();
-    opencover::VRVruiRenderInterface::the()->getAlwaysVisibleGroup()->addChild(vtr);
+  if(!m_colorBar)
+    return;
+  m_colorBar->update(m_selectedMap->first, m_selectedMap->second);
 }
 
 osg::ref_ptr<osg::Texture2D>
-covise::ColorMapRenderObject::createVerticalColorMapTexture(
+opencover::ColorMapRenderObject::createVerticalColorMapTexture(
     const ColorMap &colorMap) {
   if (colorMap.r.empty() || colorMap.g.empty() || colorMap.b.empty() ||
       colorMap.a.empty() || colorMap.samplingPoints.empty()) {
@@ -326,8 +309,8 @@ covise::ColorMapRenderObject::createVerticalColorMapTexture(
   return texture;
 }
 
-osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createColorMapPlane(
-    const covise::ColorMap &colorMap) {
+osg::ref_ptr<osg::Geode> opencover::ColorMapRenderObject::createColorMapPlane(
+    const opencover::ColorMap &colorMap) {
   osg::ref_ptr<osg::Geode> geode = new osg::Geode;
   osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
 
@@ -368,7 +351,7 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createColorMapPlane(
   return geode;
 }
 
-osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
+osg::ref_ptr<osg::Geode> opencover::ColorMapRenderObject::createTextGeode(
     const std::string &text, const osg::Vec3 &position) {
   osg::ref_ptr<osgText::Text> osgText = new osgText::Text;
   osgText->setText(text);
@@ -383,7 +366,7 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
   return textGeode;
 }
 
-void covise::ColorMapRenderObject::initShader() {
+void opencover::ColorMapRenderObject::initShader() {
   // Add a shader to apply the texture as emission.
   osg::ref_ptr<osg::Program> program = new osg::Program;
   osg::ref_ptr<osg::Shader> vertexShader = new osg::Shader(osg::Shader::VERTEX);
@@ -395,7 +378,7 @@ void covise::ColorMapRenderObject::initShader() {
   m_shader = program;
 }
 
-void covise::ColorMapRenderObject::applyEmissionShader(
+void opencover::ColorMapRenderObject::applyEmissionShader(
     osg::ref_ptr<osg::StateSet> stateSet,
     osg::ref_ptr<osg::Texture2D> colormapTexture) {
   assert(stateSet && "Cannot apply emission shader to uninitialized stateSet");
@@ -416,12 +399,12 @@ void covise::ColorMapRenderObject::applyEmissionShader(
   stateSet->setAttributeAndModes(m_shader, osg::StateAttribute::ON);
 }
 
-void covise::ColorMapRenderObject::rebuild() {
+void opencover::ColorMapRenderObject::rebuild() {
   show(false);
   show(true);
 }
 
-void covise::ColorMapRenderObject::addLabel(const float &samplePoint,
+void opencover::ColorMapRenderObject::addLabel(const float &samplePoint,
                                             osg::ref_ptr<osg::Group> colormapGroup) {
   auto colormap = m_colormap.lock();
   float value = samplePoint * (colormap->max - colormap->min) + colormap->min;
@@ -433,7 +416,7 @@ void covise::ColorMapRenderObject::addLabel(const float &samplePoint,
   colormapGroup->addChild(textGeode);
 }
 
-void covise::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGroup,
+void opencover::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGroup,
                                              const ColorMap &colorMap) {
   auto size = colorMap.samplingPoints.size();
   // Determine the step size to ensure no more than maxLabels are visible
@@ -460,7 +443,7 @@ void covise::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGr
   colormapGroup->addChild(name);
 }
 
-void covise::ColorMapRenderObject::addColorMap(
+void opencover::ColorMapRenderObject::addColorMap(
     osg::ref_ptr<osg::Group> colormapGroup, const ColorMap &colorMap) {
   auto colormapPlane = createColorMapPlane(*m_colormap.lock());
 
@@ -474,7 +457,7 @@ void covise::ColorMapRenderObject::addColorMap(
   colormapGroup->addChild(pat);
 }
 
-osg::ref_ptr<osg::Group> covise::ColorMapRenderObject::createColorMapGroup(
+osg::ref_ptr<osg::Group> opencover::ColorMapRenderObject::createColorMapGroup(
     const ColorMap &colorMap) {
   osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
   addColorMap(colormapGroup, colorMap);
@@ -483,7 +466,7 @@ osg::ref_ptr<osg::Group> covise::ColorMapRenderObject::createColorMapGroup(
   return colormapGroup;
 }
 
-void covise::ColorMapRenderObject::show(bool on) {
+void opencover::ColorMapRenderObject::show(bool on) {
   if (on) {
     auto colorMap = m_colormap.lock();
     if (!colorMap) {
@@ -507,7 +490,7 @@ void covise::ColorMapRenderObject::show(bool on) {
   }
 }
 
-void covise::ColorMapRenderObject::render() {
+void opencover::ColorMapRenderObject::render() {
   if (m_config.Update() && m_visible) {
     m_config.Update() = false;
     rebuild();
@@ -552,14 +535,14 @@ void covise::ColorMapRenderObject::render() {
   }
 }
 
-covise::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
+opencover::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
     : m_colorMapGroup(new opencover::ui::Group(&group, "ColorMap")),
       m_colorMapSettingsMenu(new opencover::ui::Menu(&group, "ColorMapSettings")),
       m_selector(std::make_unique<ColorMapSelector>(*m_colorMapGroup)) {
   init();
 }
 
-void covise::ColorMapUI::sliderCallback(opencover::ui::Slider *slider, float &toSet,
+void opencover::ColorMapUI::sliderCallback(opencover::ui::Slider *slider, float &toSet,
                                         float value, bool moving,
                                         bool predicateCheck) {
   if (!moving) return;
@@ -570,7 +553,7 @@ void covise::ColorMapUI::sliderCallback(opencover::ui::Slider *slider, float &to
   toSet = value;
 }
 
-opencover::ui::Slider *covise::ColorMapUI::createSlider(
+opencover::ui::Slider *opencover::ColorMapUI::createSlider(
     const std::string &name, const ui::Slider::ValueType &min,
     const ui::Slider::ValueType &max, const ui::Slider::Presentation &presentation,
     const ui::Slider::ValueType &initial, std::function<void(float, bool)> callback,
@@ -584,13 +567,13 @@ opencover::ui::Slider *covise::ColorMapUI::createSlider(
   return slider;
 }
 
-void covise::ColorMapUI::initSteps() {
+void opencover::ColorMapUI::initSteps() {
   m_numSteps = createSlider("steps", 1, 1024, ui::Slider::AsSlider,
                             m_colorMap->steps, [this](float value, bool moving) {
                               if (value < 1) return;
                               if (!moving) return;
                               int num = static_cast<int>(value);
-                              *m_colorMap = covise::interpolateColorMap(
+                              *m_colorMap = opencover::interpolateColorMap(
                                   m_selector->selectedMap(), num);
                               rebuildColorMap();
                             });
@@ -598,17 +581,17 @@ void covise::ColorMapUI::initSteps() {
   m_numSteps->setIntegral(true);
 }
 
-void covise::ColorMapUI::initColorMap() {
+void opencover::ColorMapUI::initColorMap() {
   assert(m_selector && "ColorMapSelector must be initialized before ColorMap");
   m_colorMap = std::make_shared<ColorMap>(m_selector->selectedMap());
 }
 
-void covise::ColorMapUI::initShow() {
+void opencover::ColorMapUI::initShow() {
   m_show = new ui::Button(m_colorMapGroup, "Show");
   m_show->setCallback([this](bool on) { show(on); });
 }
 
-void covise::ColorMapUI::initColorMapSettings() {
+void opencover::ColorMapUI::initColorMapSettings() {
   assert(m_renderObject && "RenderObject need to be initialized before calling it.");
   auto renderConfig = m_renderObject->getConfig();
   m_distance_x = createSlider(
@@ -675,7 +658,7 @@ void covise::ColorMapUI::initColorMapSettings() {
   });
 }
 
-void covise::ColorMapUI::initUI() {
+void opencover::ColorMapUI::initUI() {
   initShow();
   initColorMap();
   m_minAttribute = createSlider(
@@ -695,18 +678,18 @@ void covise::ColorMapUI::initUI() {
   initColorMapSettings();
 }
 
-void covise::ColorMapUI::initRenderObject() {
+void opencover::ColorMapUI::initRenderObject() {
   assert(m_colorMap && "ColorMap must be initialized before render object");
   m_renderObject = std::make_unique<ColorMapRenderObject>(m_colorMap);
 }
 
-void covise::ColorMapUI::init() { initUI(); }
+void opencover::ColorMapUI::init() { initUI(); }
 
-void covise::ColorMapUI::rebuildColorMap() {
+void opencover::ColorMapUI::rebuildColorMap() {
   m_renderObject->getConfig().Update() = true;
 }
 
-void covise::ColorMapUI::setCallback(
+void opencover::ColorMapUI::setCallback(
     const std::function<void(const ColorMap &)> &f) {
   m_selector->setCallback([this, f](const ColorMap &cm) {
     *m_colorMap = interpolateColorMap(cm, m_numSteps->value());
@@ -715,8 +698,8 @@ void covise::ColorMapUI::setCallback(
   });
 }
 
-osg::Vec4 covise::ColorMapUI::getColor(float val) {
-  return covise::getColor(val, *m_colorMap, m_colorMap->min, m_colorMap->max);
+osg::Vec4 opencover::ColorMapUI::getColor(float val) {
+  return opencover::getColor(val, *m_colorMap, m_colorMap->min, m_colorMap->max);
 }
 
-void covise::ColorMapUI::show(bool show) { m_renderObject->show(show); }
+void opencover::ColorMapUI::show(bool show) { m_renderObject->show(show); }

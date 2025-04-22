@@ -128,7 +128,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   template <typename T>
   using NameMapVectorPtr = NameMapPtr<std::vector<T>>;
 
-  std::unique_ptr<covise::ColorMapSelector> m_colorMapSelector = nullptr;
+  std::unique_ptr<opencover::ColorMapSelector> m_colorMapSelector = nullptr;
 
   /* #endregion */
 
@@ -237,7 +237,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initEnergyGridUI();
   void switchEnergyGrid(EnergyGrids grid);
   void initSimMenu();
-  void updateColorMap(const covise::ColorMap &map);
+  void updateColorMap(const opencover::ColorMap &map);
   void initColorMap();
   void initGrid();
   void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
@@ -318,7 +318,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_gridControlButton = nullptr;
   opencover::ui::Button *m_energySwitchControlButton = nullptr;
 
-  std::shared_ptr<covise::ColorMapUI> m_colorMapMenu = nullptr;
+  std::shared_ptr<opencover::ColorMapUI> m_colorMapMenu = nullptr;
 
   // historical
   opencover::ui::Button *ShowGraph = nullptr;

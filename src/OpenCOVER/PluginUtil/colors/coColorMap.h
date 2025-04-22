@@ -1,6 +1,6 @@
 
-#ifndef COVUSE_UTIL_COMORMAP_H
-#define COVUSE_UTIL_COMORMAP_H
+#ifndef COVISE_UTIL_COLOR_MAP_H
+#define COVISE_UTIL_COLOR_MAP_H
 
 #include <OpenVRUI/coUpdateManager.h>
 #include <cover/coVRPluginSupport.h>
@@ -30,7 +30,7 @@
 #include "osg/ref_ptr"
 #include "util/coExport.h"
 
-namespace covise {
+namespace opencover {
 namespace shader {
 constexpr const char *COLORMAP_VERTEX_EMISSION_SHADER =
     "void main() { "
@@ -43,14 +43,6 @@ constexpr const char *COLORMAP_FRAGMENT_EMISSION_SHADER =
     "   gl_FragColor = texture2D(emissionMap, gl_TexCoord[0]);"
     "}";
 }  // namespace shader
-
-struct ColorMap {
-  std::vector<float> r, g, b, a, samplingPoints;
-  float min = 0.0, max = 1.0;
-  int steps = 32;
-  std::string name = "default";
-  std::string unit = "unit";
-};
 
 struct ColorMapLabelConfig {
   std::string font = "DejaVuSans-Bold.ttf";
@@ -97,7 +89,7 @@ class PLUGIN_UTILEXPORT ColorMapSelector {
   opencover::ui::SelectionList *m_selector;
   const ColorMaps m_colors;
   ColorMaps::const_iterator m_selectedMap;
-  std::unique_ptr<opencover::coColorBar> m_hud;
+  std::unique_ptr<opencover::ColorBar> m_colorBar;
   void updateSelectedMap();
   void init();
 };
@@ -297,6 +289,6 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   //   std::map<std::string, std::shared_ptr<ColorMap>> m_colorMap;
 };
 
-}  // namespace covise
+}  // namespace opencover
 
 #endif

@@ -15,7 +15,7 @@
 using namespace opencover;
 
 
-opencover::coVRShader *applyLineShader(osg::Drawable *drawable, const covise::ColorMap &colorMap, float min, float max)
+opencover::coVRShader *applyLineShader(osg::Drawable *drawable, const opencover::ColorMap &colorMap, float min, float max)
 {
     // return applyShader(drawable, colorMap, min, max, "MapColorsAttrib");
     return applyShader(drawable, colorMap, min, max, "MapColorsAttribUnlit");
@@ -33,7 +33,7 @@ void Currents::clear()
     m_values->clear();
 }
 
-void Currents::applyShader(const covise::ColorMap& map, float min, float max)
+void Currents::applyShader(const opencover::ColorMap& map, float min, float max)
 {
     applyLineShader(m_traceLine, map, min, max);
 }

@@ -218,11 +218,8 @@ EnergyPlugin::EnergyPlugin()
 
 
   auto testMenu = new ui::Menu("Test", this);
-  auto showColorMampBtn = new ui::Button(testMenu, "ShowColorMap");
-  m_colorMapSelector = std::make_unique<covise::ColorMapSelector>(*testMenu);
-  showColorMampBtn->setCallback([this](bool value) {
-      m_colorMapSelector->showHud(value);
-  });
+  m_colorMapSelector = std::make_unique<opencover::ColorMapSelector>(*testMenu);
+
 }
 
 EnergyPlugin::~EnergyPlugin() {
@@ -1207,12 +1204,12 @@ void EnergyPlugin::initColorMap() {
     initSimMenu();
   }
 
-  m_colorMapMenu = std::make_shared<covise::ColorMapUI>(*m_simulationMenu);
+  m_colorMapMenu = std::make_shared<opencover::ColorMapUI>(*m_simulationMenu);
   m_colorMapMenu->setCallback(
-      [this](const covise::ColorMap &cm) { updateColorMap(cm); });
+      [this](const opencover::ColorMap &cm) { updateColorMap(cm); });
 }
 
-void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
+void EnergyPlugin::updateColorMap(const opencover::ColorMap &map) {
   if (isActiv(m_grid, m_heatingGroup)) {
     // heating simulation
     m_heatingSimUI->updateTimestepColors("mass_flow", m_colorMapMenu->getMin(),

@@ -8,7 +8,7 @@
 namespace opencover
 {
 constexpr int DataAttrib = 10; //use this when setting the attribute array
-PLUGIN_UTILEXPORT coVRShader *applyShader(osg::Drawable *drawable, const covise::ColorMap &colorMap, float min, float max, const std::string& shaderFile);
+PLUGIN_UTILEXPORT coVRShader *applyShader(osg::Drawable *drawable, const ColorMap &colorMap, float min, float max, const std::string& shaderFile);
 
 }
 

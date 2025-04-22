@@ -10,14 +10,13 @@
 #include <osg/Group>
 
 class CityGMLDeviceSensor : public coPickSensor {
-  typedef covise::ColorMap ColorMap;
 
  public:
   CityGMLDeviceSensor(
       osg::ref_ptr<osg::Group> group,
       std::unique_ptr<core::interface::IInfoboard<std::string>> &&infoBoard,
       std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
-      std::shared_ptr<covise::ColorMapUI> colorMap);
+      std::shared_ptr<opencover::ColorMapUI> colorMap);
 
   ~CityGMLDeviceSensor();
   CityGMLDeviceSensor(const CityGMLDeviceSensor &) = delete;
@@ -42,7 +41,7 @@ class CityGMLDeviceSensor : public coPickSensor {
  private:
   std::unique_ptr<core::interface::IBuilding> m_cityGMLBuilding;
   std::unique_ptr<core::interface::IInfoboard<std::string>> m_infoBoard;
-  std::weak_ptr<covise::ColorMapUI> m_colorMapRef;
+  std::weak_ptr<opencover::ColorMapUI> m_colorMapRef;
   std::vector<osg::Vec4> m_colors;
   bool m_active = false;
 };

@@ -28,8 +28,8 @@ Tool::Tool(ui::Group *group, config::File &file, osg::MatrixTransform *toolHeadN
     m_minAttribute->setUpdater([this](){
         applyShader(m_colorMapSelector->selectedMap(), m_minAttribute->ui()->number(), m_maxAttribute->ui()->number());
     });
-    m_colorMapSelector = new covise::ColorMapSelector(*group);
-    m_colorMapSelector->setCallback([this](const covise::ColorMap &cm)
+    m_colorMapSelector = new ColorMapSelector(*group);
+    m_colorMapSelector->setCallback([this](const ColorMap &cm)
     {
         applyShader(m_colorMapSelector->selectedMap(), m_minAttribute->ui()->number(), m_maxAttribute->ui()->number());
     });

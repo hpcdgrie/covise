@@ -1,8 +1,7 @@
 #ifndef COVISE_CSV_POINT_CLOUD_INTERACTOR_H
 #define COVISE_CSV_POINT_CLOUD_INTERACTOR_H
-
 #include <cover/coInteractor.h>
-#include <PluginUtil/colors/coColorMap.h>
+#include <PluginUtil/colors/coColorBar.h>
 #include <functional>
 namespace opencover
 {
@@ -13,8 +12,8 @@ class CsvInteractor : public opencover::coInteractor
 {
 public:
     CsvInteractor() = default;
-    void setColorMap(const covise::ColorMap &cm);
-    covise::ColorMap getColorMap() const;
+    void setColorMap(const opencover::ColorMap &cm);
+    opencover::ColorMap getColorMap() const;
     void setName(const std::string &name);
     void setMinMax(float min, float max);
     virtual ~CsvInteractor() = default;
@@ -118,7 +117,7 @@ public:
 
 private:
     std::string m_name;
-    covise::ColorMap m_colorMap;
+    opencover::ColorMap m_colorMap;
     float m_minSlider = 0, m_maxSlider = 0;
     float m_min = 0, m_max = 0;
     int m_numColorSteps = 0;

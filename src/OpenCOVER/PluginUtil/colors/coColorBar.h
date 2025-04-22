@@ -20,7 +20,6 @@
 #define _CO_COLOR_BAR_H_
 
 #define MAX_LABELS 18
-
 #include <OpenVRUI/coMenuItem.h>
 #include <util/coTypes.h>
 #include <vector>
@@ -35,7 +34,16 @@ class coColoredBackground;
 
 namespace opencover
 {
-
+struct ColorMap {
+   std::vector<float> r{0., 1.}, g{0., 1.}, b{0., 1.}, a{0., 1.}, samplingPoints;
+   float min = 0.0, max = 1.0;
+   int steps = 32;
+   std::string name = "default";
+   std::string unit = "unit";
+   size_t numColors() const {
+      return r.size();
+   };
+   };
 /** class coColorBar, derived from coMenuItem
  *  colorbar is a window containing a texture and labels
  */
@@ -66,13 +74,12 @@ private:
     float labelValues_[MAX_LABELS]; // numerical values of labels
     char format_str_[32]; // precision of float values
 
-    int numColors_ = 0;
-    float min_, max_;
+    ColorMap map_;
     std::vector<unsigned char> image_, tickImage_;
     std::string name_; // the name of the colors module for example Colors_1
     std::string species_;
 
-    void makeImage(int numColors, const float *r, const float *g, const float *b, const float *a, bool swapped);
+    void makeImage(const ColorMap &map, bool swapped);
     void makeTickImage();
     void makeLabelValues();
 
@@ -81,29 +88,15 @@ public:
        *  create texture and labels, put them nto containers
        *  @param name the name of the colorbar, identical with module name, eg, g, Colors_1
        *  @param species data species name, currently not displayed
-       *  @param min data minimum
-       *  @param max data maximum
-       *  @param numColors number of different colors in colorbar
-       *  @param r red colors
-       *  @param g green colors
-       *  @param b blue colors
-       *  @param a red colors
+       *  @param map color map to display
        */
-    coColorBar(const std::string &name, const std::string &species, float min, float max, int numColors, const float *r, const float *g, const float *b, const float *a, bool inMenu=true);
+    coColorBar(const std::string &name, const std::string &species, const ColorMap &map, bool inMenu=true);
 
     /// destructor
     ~coColorBar();
 
-    /** colorbar update
-       *  @param min data minimum
-       *  @param max data maximum
-       *  @param numColors number of different colors in colorbar
-       *  @param r red colors
-       *  @param g green colors
-       *  @param b blue colors
-       *  @param a red colors
-       */
-    void update(float min, float max, int numColors, const float *r, const float *g, const float *b, const float *a);
+      /// display a new color map
+      void update(const ColorMap &map);
 
     /** get name
        *  @return name the name of the colorbar, identical with module name, eg, g, Colors_1

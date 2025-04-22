@@ -6,7 +6,7 @@ using namespace opencover;
 constexpr int TfTexUnit = 1;
 
 
-coVRShader *opencover::applyShader(osg::Drawable *drawable, const covise::ColorMap &colorMap, float min, float max, const std::string& shaderFile)
+coVRShader *opencover::applyShader(osg::Drawable *drawable, const ColorMap &colorMap, float min, float max, const std::string& shaderFile)
 {
     std::map<std::string, std::string> parammap;
     parammap["dataAttrib"] = std::to_string(DataAttrib);

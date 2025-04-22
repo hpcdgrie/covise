@@ -26,7 +26,7 @@ class BaseSimulationUI {
 
  public:
   BaseSimulationUI(std::shared_ptr<Simulation> sim, std::shared_ptr<T> parent,
-                   std::shared_ptr<covise::ColorMapUI> colorMap)
+                   std::shared_ptr<opencover::ColorMapUI> colorMap)
       : m_simulation(sim), m_parent(parent), m_colorMapRef(colorMap) {
     if (auto simulation = m_simulation.lock()) simulation->computeParameters();
   }
@@ -61,7 +61,7 @@ class BaseSimulationUI {
 
   template <typename simulationObject>
   void computeColors(
-      std::shared_ptr<covise::ColorMapUI> color_map, const std::string &key, float min,
+      std::shared_ptr<opencover::ColorMapUI> color_map, const std::string &key, float min,
       float max, const std::map<std::string, simulationObject> &objectContainer) {
     isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
@@ -108,7 +108,7 @@ class BaseSimulationUI {
   }
 
   std::weak_ptr<T> m_parent;  // parent which manages drawable
-  std::weak_ptr<covise::ColorMapUI> m_colorMapRef;
+  std::weak_ptr<opencover::ColorMapUI> m_colorMapRef;
   std::weak_ptr<Simulation> m_simulation;
   std::map<std::string, std::vector<osg::Vec4>> m_colors;
 };

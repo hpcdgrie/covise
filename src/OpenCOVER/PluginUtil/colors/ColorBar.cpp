@@ -50,13 +50,6 @@ namespace opencover
 ColorBar::ColorBar(ui::Menu *menu)
 : ui::Owner(std::string("ColorBar"), menu)
 , species_("NoColors")
-, min(0.)
-, max(1.)
-, numColors(2)
-, r{0., 1.}
-, g{0., 1.}
-, b{0., 1.}
-, a{0., 1.}
 {
     colorsMenu_ = menu;
 
@@ -77,7 +70,7 @@ ColorBar::ColorBar(ui::Menu *menu)
                 [this](ui::SpecialElement *se, ui::View::ViewElement *ve){
                 auto vve = dynamic_cast<ui::VruiViewElement *>(ve);
                 assert(vve);
-                colorbar_ = new coColorBar(name_.c_str(), species_.c_str(), min, max, numColors, r.data(), g.data(), b.data(), a.data());
+                colorbar_ = new coColorBar(name_, species_, map_);
                 vve->m_menuItem = colorbar_;
                 },
                 [this](ui::SpecialElement *se, ui::View::ViewElement *ve){
@@ -101,11 +94,11 @@ ColorBar::ColorBar(ui::Menu *menu)
         inter_->setBooleanParam(V_AUTOSCALE, state);
     });
 
-    float diff = (max - min) / 2;
+    float diff = (map_.max - map_.min) / 2;
     minSlider_ = new ui::Slider("Min", this);
     colorsMenu_->add(minSlider_);
-    minSlider_->setBounds(min-diff, min+diff);
-    minSlider_->setValue(min);
+    minSlider_->setBounds(map_.min-diff, map_.min+diff);
+    minSlider_->setValue(map_.min);
     minSlider_->setCallback([this](double value, bool released){
         if (!inter_)
             return;
@@ -120,8 +113,8 @@ ColorBar::ColorBar(ui::Menu *menu)
 
     maxSlider_ = new ui::Slider("Max", this);
     colorsMenu_->add(maxSlider_);
-    maxSlider_->setBounds(max-diff, max+diff);
-    maxSlider_->setValue(max);
+    maxSlider_->setBounds(map_.max-diff, map_.max+diff);
+    maxSlider_->setValue(map_.max);
     maxSlider_->setCallback([this](double value, bool released){
         if (!inter_)
             return;
@@ -157,7 +150,7 @@ ColorBar::ColorBar(ui::Menu *menu)
 
     stepSlider_ = new ui::Slider("Steps", this);
     colorsMenu_->add(stepSlider_);
-    stepSlider_->setBounds(2, numColors);
+    stepSlider_->setBounds(2, map_.numColors());
     stepSlider_->setIntegral(true);
     stepSlider_->setScale(ui::Slider::Logarithmic);
     stepSlider_->setCallback([this](double value, bool released){
@@ -283,26 +276,27 @@ void ColorBar::updateTitle()
 
 
 void
-ColorBar::update(const std::string &species, float min, float max, int numColors, const float *r, const float *g, const float *b, const float *a)
+ColorBar::update(const std::string &species, const ColorMap &map)
 {
+    map_ = map;
     species_ = species;
     updateTitle();
 
     if (colorbar_)
-        colorbar_->update(min, max, numColors, r, g, b, a);
+        colorbar_->update(map);
     if (hudbar_)
-        hudbar_->update(min, max, numColors, r, g, b, a);
+        hudbar_->update(map);
 
     if (stepSlider_)
     {
         int imin=0, imax=0, ival=0;
         if (!inter_ || inter_->getIntSliderParam(V_STEPS, imin, imax, ival) == -1)
         {
-            if (numColors > stepSlider_->max())
+            if (map.numColors() > stepSlider_->max())
             {
-                stepSlider_->setBounds(2, numColors);
+                stepSlider_->setBounds(2, map.numColors());
             }
-            stepSlider_->setValue(numColors);
+            stepSlider_->setValue(map.numColors());
         }
     }
 
@@ -313,10 +307,10 @@ ColorBar::update(const std::string &species, float min, float max, int numColors
             || inter_->getFloatSliderParam(V_MIN, smin, smax, sval) == -1
             || inter_->getFloatSliderParam(V_MAX, smin, smax, sval) == -1)
         {
-            float diff = (max - min) / 2;
+            float diff = (map.max - map.min) / 2;
 
-            minSlider_->setBounds(min-diff, min+diff);
-            maxSlider_->setBounds(max-diff, max+diff);
+            minSlider_->setBounds(map.min-diff, map.min+diff);
+            maxSlider_->setBounds(map.max-diff, map.max+diff);
         }
     }
 }
@@ -461,7 +455,7 @@ void ColorBar::show(bool state)
     {
         if(!hudbar_)
         {
-            hudbar_ = new coColorBar(name_.c_str(), species_.c_str(), min, max, numColors, r.data(), g.data(), b.data(), a.data(), false);
+            hudbar_ = new coColorBar(name_, species_, map_, false);
             hudbar_->getUIElement()->createGeometry();
         }
         auto vtr = hudbar_->getUIElement()->getDCS();
@@ -494,15 +488,12 @@ ColorBar::addInter(coInteractor *inter)
     updateInteractor();
 }
 
-void
-ColorBar::parseAttrib(const char *attrib, std::string &species,
-                      float &min, float &max, int &numColors,
-                      std::vector<float> &r, std::vector<float> &g, std::vector<float> &b, std::vector<float> &a)
+ColorMap ColorBar::parseAttrib(const char *attrib, std::string &species)
 {
     // convert to a istringstream
     int bufLen = strlen(attrib) + 1;
     istringstream attribs(attrib);
-
+    ColorMap map;
     //fprintf(stderr,"colorsPlugin::addColorbar [%s]\n", name);
 
     // COLORS_1_OUT_001 pressure min max ncolors 0 r g b rgb rgb ....
@@ -514,24 +505,24 @@ ColorBar::parseAttrib(const char *attrib, std::string &species,
     delete[] s;
 
     int v = 0;
-    attribs >> min >> max >> numColors >> v;
+    int numColors = 0;
+    attribs >> map.min >> map.max >> numColors >> v;
 
-    r.resize(numColors);
-    g.resize(numColors);
-    b.resize(numColors);
-    a.resize(numColors);
-
+    map.r.resize(numColors);
+    map.g.resize(numColors);
+    map.b.resize(numColors);
+    map.a.resize(numColors);
+    map.unit = s;
     for (int i = 0; i < numColors; i++)
     {
-        attribs >> r[i] >> g[i] >> b[i] >> a[i];
-        //      a[i]=1.0f;
+        attribs >> map.r[i] >> map.g[i] >> map.b[i] >> map.a[i];
     }
+    return map;
 }
 
 void ColorBar::parseAttrib(const char *attrib)
 {
-    parseAttrib(attrib, species_, min, max, numColors, r, g, b, a);
-    update(species_, min, max, numColors, r.data(), g.data(), b.data(), a.data());
+    update(species_, parseAttrib(attrib, species_));
 }
 
 void ColorBar::setVisible(bool visible)

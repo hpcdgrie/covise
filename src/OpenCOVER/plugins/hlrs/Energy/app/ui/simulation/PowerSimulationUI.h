@@ -12,7 +12,7 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
  public:
   PowerSimulationUI(std::shared_ptr<PowerSimulation> sim,
                     //   std::shared_ptr<T> parent, std::shared_ptr<ColorMap> colorMap)
-                      std::shared_ptr<T> parent, std::shared_ptr<covise::ColorMapUI> colorMap)
+                      std::shared_ptr<T> parent, std::shared_ptr<opencover::ColorMapUI> colorMap)
       : BaseSimulationUI<T>(sim, parent, colorMap) {}
   ~PowerSimulationUI() = default;
   PowerSimulationUI(const PowerSimulationUI &) = delete;

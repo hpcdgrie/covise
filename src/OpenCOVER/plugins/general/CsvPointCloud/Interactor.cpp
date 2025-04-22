@@ -1,7 +1,8 @@
 #include "Interactor.h"
 #include <sstream>
+#include <PluginUtil/colors/coColorMap.h>
 
-std::string createColorMapString(const std::string& name, const covise::ColorMap &cm, float min, float max)
+std::string createColorMapString(const std::string& name, const opencover::ColorMap &cm, float min, float max)
 {
     int v = 0;
     std::stringstream ss;
@@ -27,15 +28,15 @@ void CsvInteractor::setVectorParam(const char *name, int numElem, float *field)
     }
 }
 
-void CsvInteractor::setColorMap(const covise::ColorMap &cm)
+void CsvInteractor::setColorMap(const opencover::ColorMap &cm)
 {
     m_colorMap = cm;
     m_numColorSteps = cm.samplingPoints.size();
 }
 
-covise::ColorMap CsvInteractor::getColorMap() const
+opencover::ColorMap CsvInteractor::getColorMap() const
 {
-    return covise::interpolateColorMap(m_colorMap, m_numColorSteps);
+    return interpolateColorMap(m_colorMap, m_numColorSteps);
 }
 
 void CsvInteractor::setName(const std::string& name)
@@ -62,7 +63,7 @@ void CsvInteractor::setScalarParam(const char *name, int val)
 const char *CsvInteractor::getString(unsigned int i) const
 {
     static std::string s;
-    s = createColorMapString(m_name, covise::interpolateColorMap(m_colorMap, m_numColorSteps), m_minSlider, m_maxSlider);
+    s = createColorMapString(m_name, interpolateColorMap(m_colorMap, m_numColorSteps), m_minSlider, m_maxSlider);
     return s.c_str();
 }
 

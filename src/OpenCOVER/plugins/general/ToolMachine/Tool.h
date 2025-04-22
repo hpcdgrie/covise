@@ -42,7 +42,7 @@ public:
 protected:
     virtual void updateGeo(bool paused, const opencover::opcua::MultiDimensionalArray<double> &data) = 0;
     virtual void clear() = 0;
-    virtual void applyShader(const covise::ColorMap& map, float min, float max) = 0;
+    virtual void applyShader(const opencover::ColorMap& map, float min, float max) = 0;
     virtual std::vector<std::string> getAttributes() = 0;
     virtual void attributeChanged(float value) = 0;
     osg::Vec3 toolHeadInTableCoords();
@@ -52,7 +52,7 @@ protected:
     osg::MatrixTransform *m_tableNode = nullptr;
     std::unique_ptr<opencover::ui::Group> m_group;
     std::unique_ptr<opencover::ui::SliderConfigValue> m_numSectionsSlider;
-    covise::ColorMapSelector *m_colorMapSelector;
+    opencover::ColorMapSelector *m_colorMapSelector;
 
     opencover::opcua::Client *m_client;
     bool m_paused = false;

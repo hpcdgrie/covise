@@ -17,7 +17,7 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
  public:
   HeatingSimulationUI(std::shared_ptr<HeatingSimulation> sim,
                     //   std::shared_ptr<T> parent, std::shared_ptr<ColorMap> colorMap)
-                      std::shared_ptr<T> parent, std::shared_ptr<covise::ColorMapUI> colorMap)
+                      std::shared_ptr<T> parent, std::shared_ptr<opencover::ColorMapUI> colorMap)
       : BaseSimulationUI<T>(sim, parent, colorMap) {}
   ~HeatingSimulationUI() = default;
   HeatingSimulationUI(const HeatingSimulationUI &) = delete;
