@@ -96,12 +96,16 @@ opencover::ColorMaps opencover::readColorMaps() {
 
     auto no = covise::coCoviseConfig::getScopeEntries(name).size();
     ColorMap &colorMap = colorMaps.emplace(map.first, ColorMap()).first->second;
+    colorMap.r.clear();
+    colorMap.g.clear();
+    colorMap.b.clear();
+    colorMap.a.clear();
+    colorMap.samplingPoints.clear();
     // read all sampling points
     float diff = 1.0f / (no - 1);
     float pos = 0;
     for (int j = 0; j < no; j++) {
       string tmp = name + ".Point:" + std::to_string(j);
-      ColorMap cm;
       colorMap.r.push_back(covise::coCoviseConfig::getFloat("r", tmp, 0));
       colorMap.g.push_back(covise::coCoviseConfig::getFloat("g", tmp, 0));
       colorMap.b.push_back(covise::coCoviseConfig::getFloat("b", tmp, 0));
@@ -133,52 +137,6 @@ osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap, fl
   color[3] = ((1 - d) * colorMap.a[idx] + d * colorMap.a[idx + 1]);
 
   return color;
-}
-
-opencover::ColorMap opencover::interpolateColorMap(const opencover::ColorMap &cm,
-                                             int numSteps) {
-  opencover::ColorMap interpolatedMap;
-  interpolatedMap.r.resize(numSteps);
-  interpolatedMap.g.resize(numSteps);
-  interpolatedMap.b.resize(numSteps);
-  interpolatedMap.a.resize(numSteps);
-  interpolatedMap.samplingPoints.resize(numSteps);
-  auto numColors = cm.samplingPoints.size();
-  double delta = 1.0 / (numSteps - 1) * (numColors - 1);
-  double x;
-  int i;
-
-  delta = 1.0 / (numSteps - 1);
-  int idx = 0;
-  for (i = 0; i < numSteps - 1; i++) {
-    x = i * delta;
-    while (cm.samplingPoints[(idx + 1)] <= x) {
-      idx++;
-      if (idx > numColors - 2) {
-        idx = numColors - 2;
-        break;
-      }
-    }
-
-    double d = (x - cm.samplingPoints[idx]) /
-               (cm.samplingPoints[idx + 1] - cm.samplingPoints[idx]);
-    interpolatedMap.r[i] = (float)((1 - d) * cm.r[idx] + d * cm.r[idx + 1]);
-    interpolatedMap.g[i] = (float)((1 - d) * cm.g[idx] + d * cm.g[idx + 1]);
-    interpolatedMap.b[i] = (float)((1 - d) * cm.b[idx] + d * cm.b[idx + 1]);
-    interpolatedMap.a[i] = (float)((1 - d) * cm.a[idx] + d * cm.a[idx + 1]);
-    interpolatedMap.samplingPoints[i] = (float)i / (numSteps - 1);
-  }
-  interpolatedMap.r[numSteps - 1] = cm.r[(numColors - 1)];
-  interpolatedMap.g[numSteps - 1] = cm.g[(numColors - 1)];
-  interpolatedMap.b[numSteps - 1] = cm.b[(numColors - 1)];
-  interpolatedMap.a[numSteps - 1] = cm.a[(numColors - 1)];
-  interpolatedMap.samplingPoints[numSteps - 1] = 1;
-
-  interpolatedMap.min = cm.min;
-  interpolatedMap.max = cm.max;
-  interpolatedMap.steps = numSteps;
-
-  return interpolatedMap;
 }
 
 opencover::ColorMapSelector::ColorMapSelector(opencover::ui::Group &group)
@@ -216,6 +174,11 @@ void opencover::ColorMapSelector::setCallback(
   m_selector->setCallback([this, f](int index) {
     updateSelectedMap();
     f(selectedMap());
+  });
+  if(!m_colorBar)
+    return;
+  m_colorBar->setCallback([this, f](const ColorMap &map) {
+    f(map);
   });
 }
 

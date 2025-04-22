@@ -24,6 +24,8 @@
 #include <util/coTypes.h>
 #include <cover/coInteractor.h>
 
+#include <functional>
+
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // class ColorBar
 //
@@ -40,6 +42,7 @@ namespace ui
 {
 class SpecialElement;
 }
+ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm, int numSteps);
 
 class PLUGIN_UTILEXPORT ColorBar: public ui::Owner
 {
@@ -66,9 +69,9 @@ private:
     opencover::coInteractor *inter_ = nullptr;
 
     void updateTitle();
-
-   ColorMap map_;
-
+    void displayColorMap(const ColorMap &map);
+   ColorMap selectedMap_, interpolatedMap_;
+   std::function<void(const ColorMap &)> m_callback;
 public:
 
     /** constructor when the colorbar is not to be opened from the pinboard
@@ -103,13 +106,7 @@ public:
 
     /** colorbar update
        *  @param species title bar content
-       *  @param min data minimum
-       *  @param max data maximum
-       *  @param numColors number of different colors in colorbar
-       *  @param r red colors
-       *  @param g green colors
-       *  @param b blue colors
-       *  @param a red colors
+       *  @param map color map to display
        */
     void update(const std::string &species, const ColorMap &map);
 
@@ -134,6 +131,7 @@ public:
 
     void addInter(opencover::coInteractor *inter);
     void updateInteractor();
+    void setCallback(const std::function<void(const ColorMap &)> &f);
 };
 }
 #endif

@@ -57,7 +57,6 @@ PLUGIN_UTILEXPORT ColorMaps readColorMaps();
 osg::Vec4 PLUGIN_UTILEXPORT getColor(float val, const ColorMap &colorMap,
                                      float min = 0, float max = 1);
 // same logic as colors module, but sets linear sampling points
-ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm, int numSteps);
 ColorMap PLUGIN_UTILEXPORT upscale(const ColorMap &baseMap, size_t numSteps);
 
 osg::Quat PLUGIN_UTILEXPORT createRotationMatrixQuat(double headingDegrees,

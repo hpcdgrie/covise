@@ -47,6 +47,53 @@ using namespace  vrui;
 namespace opencover
 {
 
+    opencover::ColorMap opencover::interpolateColorMap(const opencover::ColorMap &cm, int numSteps)
+    {
+        opencover::ColorMap interpolatedMap;
+        interpolatedMap.r.resize(numSteps);
+        interpolatedMap.g.resize(numSteps);
+        interpolatedMap.b.resize(numSteps);
+        interpolatedMap.a.resize(numSteps);
+        interpolatedMap.samplingPoints.resize(numSteps);
+
+        auto numColors = cm.samplingPoints.size();
+        double delta = 1.0 / (numSteps - 1);
+        int idx = 0;
+
+        for (int i = 0; i < numSteps - 1; i++)
+        {
+            double x = i * delta;
+            while (cm.samplingPoints[idx + 1] <= x)
+            {
+                idx++;
+                if (idx > numColors - 2)
+                {
+                    idx = numColors - 2;
+                    break;
+                }
+            }
+
+            double d = (x - cm.samplingPoints[idx]) / (cm.samplingPoints[idx + 1] - cm.samplingPoints[idx]);
+            interpolatedMap.r[i] = static_cast<float>((1 - d) * cm.r[idx] + d * cm.r[idx + 1]);
+            interpolatedMap.g[i] = static_cast<float>((1 - d) * cm.g[idx] + d * cm.g[idx + 1]);
+            interpolatedMap.b[i] = static_cast<float>((1 - d) * cm.b[idx] + d * cm.b[idx + 1]);
+            interpolatedMap.a[i] = static_cast<float>((1 - d) * cm.a[idx] + d * cm.a[idx + 1]);
+            interpolatedMap.samplingPoints[i] = static_cast<float>(i) / (numSteps - 1);
+        }
+
+        interpolatedMap.r[numSteps - 1] = cm.r[numColors - 1];
+        interpolatedMap.g[numSteps - 1] = cm.g[numColors - 1];
+        interpolatedMap.b[numSteps - 1] = cm.b[numColors - 1];
+        interpolatedMap.a[numSteps - 1] = cm.a[numColors - 1];
+        interpolatedMap.samplingPoints[numSteps - 1] = 1.0f;
+
+        interpolatedMap.min = cm.min;
+        interpolatedMap.max = cm.max;
+        interpolatedMap.steps = numSteps;
+
+        return interpolatedMap;
+    }
+
 ColorBar::ColorBar(ui::Menu *menu)
 : ui::Owner(std::string("ColorBar"), menu)
 , species_("NoColors")
@@ -70,7 +117,7 @@ ColorBar::ColorBar(ui::Menu *menu)
                 [this](ui::SpecialElement *se, ui::View::ViewElement *ve){
                 auto vve = dynamic_cast<ui::VruiViewElement *>(ve);
                 assert(vve);
-                colorbar_ = new coColorBar(name_, species_, map_);
+                colorbar_ = new coColorBar(name_, species_, selectedMap_);
                 vve->m_menuItem = colorbar_;
                 },
                 [this](ui::SpecialElement *se, ui::View::ViewElement *ve){
@@ -94,11 +141,11 @@ ColorBar::ColorBar(ui::Menu *menu)
         inter_->setBooleanParam(V_AUTOSCALE, state);
     });
 
-    float diff = (map_.max - map_.min) / 2;
+    float diff = (selectedMap_.max - selectedMap_.min) / 2;
     minSlider_ = new ui::Slider("Min", this);
     colorsMenu_->add(minSlider_);
-    minSlider_->setBounds(map_.min-diff, map_.min+diff);
-    minSlider_->setValue(map_.min);
+    minSlider_->setBounds(selectedMap_.min-diff, selectedMap_.min+diff);
+    minSlider_->setValue(selectedMap_.min);
     minSlider_->setCallback([this](double value, bool released){
         if (!inter_)
             return;
@@ -113,8 +160,8 @@ ColorBar::ColorBar(ui::Menu *menu)
 
     maxSlider_ = new ui::Slider("Max", this);
     colorsMenu_->add(maxSlider_);
-    maxSlider_->setBounds(map_.max-diff, map_.max+diff);
-    maxSlider_->setValue(map_.max);
+    maxSlider_->setBounds(selectedMap_.max-diff, selectedMap_.max+diff);
+    maxSlider_->setValue(selectedMap_.max);
     maxSlider_->setCallback([this](double value, bool released){
         if (!inter_)
             return;
@@ -150,10 +197,17 @@ ColorBar::ColorBar(ui::Menu *menu)
 
     stepSlider_ = new ui::Slider("Steps", this);
     colorsMenu_->add(stepSlider_);
-    stepSlider_->setBounds(2, map_.numColors());
+    stepSlider_->setBounds(2, selectedMap_.numColors());
     stepSlider_->setIntegral(true);
     stepSlider_->setScale(ui::Slider::Logarithmic);
     stepSlider_->setCallback([this](double value, bool released){
+        if(m_callback)
+        {
+            interpolatedMap_ = opencover::interpolateColorMap(selectedMap_, static_cast<int>(value));
+            displayColorMap(interpolatedMap_);
+            m_callback(interpolatedMap_);
+        }
+        
         if (!inter_)
             return;
         int num = static_cast<int>(value);
@@ -274,11 +328,20 @@ void ColorBar::updateTitle()
     colorsMenu_->setText(title_);
 }
 
+void ColorBar::displayColorMap(const ColorMap &map)
+{
+    if (colorbar_)
+        colorbar_->update(map);
+    if (hudbar_)
+        hudbar_->update(map);
+}
+
 
 void
 ColorBar::update(const std::string &species, const ColorMap &map)
 {
-    map_ = map;
+    selectedMap_ = map;
+    interpolatedMap_ = map;
     species_ = species;
     updateTitle();
 
@@ -438,6 +501,11 @@ void ColorBar::updateInteractor()
     }
 }
 
+void ColorBar::setCallback(const std::function<void(const ColorMap &)> &f)
+{
+  m_callback = f;
+}
+
 void
 ColorBar::setName(const char *name)
 {
@@ -455,7 +523,7 @@ void ColorBar::show(bool state)
     {
         if(!hudbar_)
         {
-            hudbar_ = new coColorBar(name_, species_, map_, false);
+            hudbar_ = new coColorBar(name_, species_, interpolatedMap_, false);
             hudbar_->getUIElement()->createGeometry();
         }
         auto vtr = hudbar_->getUIElement()->getDCS();

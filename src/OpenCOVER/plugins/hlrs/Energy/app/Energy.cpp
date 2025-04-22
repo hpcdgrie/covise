@@ -219,7 +219,10 @@ EnergyPlugin::EnergyPlugin()
 
   auto testMenu = new ui::Menu("Test", this);
   m_colorMapSelector = std::make_unique<opencover::ColorMapSelector>(*testMenu);
-
+  m_colorMapSelector->setCallback(
+      [this](const opencover::ColorMap &colorMap) {
+        std::cerr << "ColorMap changed to: " << colorMap.name << std::endl;
+      });
 }
 
 EnergyPlugin::~EnergyPlugin() {
