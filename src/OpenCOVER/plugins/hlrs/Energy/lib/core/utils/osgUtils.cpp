@@ -15,6 +15,7 @@
 #include <osg/Geometry>
 #include <osg/LineWidth>
 #include <osg/Material>
+#include <osg/MatrixTransform>
 #include <osg/Matrixd>
 #include <osg/PolygonMode>
 #include <osg/PrimitiveSet>
@@ -475,7 +476,7 @@ void addEmissionMaterial(osg::ref_ptr<osg::Geode> geo,
 osg::ref_ptr<osg::Node> createOutline(osg::ref_ptr<osg::Node> originalNode,
                                       float scaleFactor,
                                       const osg::Vec4 &outlineColor) {
-  osg::ref_ptr<osg::MatrixTransform> outlineMT = new osg::MatrixTransform;
+  osg::ref_ptr<osg::MatrixTransform> outlineMT = new osg::MatrixTransform();
   outlineMT->setMatrix(osg::Matrix::scale(scaleFactor, scaleFactor, scaleFactor));
 
   osg::ref_ptr<osg::Node> outlineNode = originalNode;

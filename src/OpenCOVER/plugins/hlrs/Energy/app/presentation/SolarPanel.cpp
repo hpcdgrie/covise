@@ -15,6 +15,7 @@
 #include <osg/Vec4>
 #include <osg/ref_ptr>
 #include <string>
+#include <iostream>
 
 using namespace core::utils::osgUtils;
 
