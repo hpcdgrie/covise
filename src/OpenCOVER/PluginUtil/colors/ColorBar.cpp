@@ -147,6 +147,12 @@ ColorBar::ColorBar(ui::Menu *menu)
     minSlider_->setBounds(selectedMap_.min-diff, selectedMap_.min+diff);
     minSlider_->setValue(selectedMap_.min);
     minSlider_->setCallback([this](double value, bool released){
+        if(m_callback)
+        {
+            interpolatedMap_.min = static_cast<float>(value);
+            displayColorMap(interpolatedMap_);
+            m_callback(interpolatedMap_);
+        }
         if (!inter_)
             return;
         float dummy = 0.;
@@ -163,6 +169,12 @@ ColorBar::ColorBar(ui::Menu *menu)
     maxSlider_->setBounds(selectedMap_.max-diff, selectedMap_.max+diff);
     maxSlider_->setValue(selectedMap_.max);
     maxSlider_->setCallback([this](double value, bool released){
+        if(m_callback)
+        {
+            interpolatedMap_.max = static_cast<float>(value);
+            displayColorMap(interpolatedMap_);
+            m_callback(interpolatedMap_);
+        }
         if (!inter_)
             return;
         float dummy = 0.;

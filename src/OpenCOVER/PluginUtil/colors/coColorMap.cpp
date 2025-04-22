@@ -117,8 +117,9 @@ opencover::ColorMaps opencover::readColorMaps() {
   return colorMaps;
 }
 
-osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap, float min,
-                           float max) {
+osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap) {
+  auto min = colorMap.min;
+  auto max = colorMap.max;
   assert(val >= min && val <= max);
   val = 1 / (max - min) * (val - min);
 
@@ -127,9 +128,12 @@ osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap, fl
          colorMap.samplingPoints[idx + 1] < val;
        idx++) {
   }
-
-  double d = (val - colorMap.samplingPoints[idx]) /
+  double d = 0;
+  if(!colorMap.concretisized())
+  {
+    d = (val - colorMap.samplingPoints[idx]) /
              (colorMap.samplingPoints[idx + 1] - colorMap.samplingPoints[idx]);
+  }
   osg::Vec4 color;
   color[0] = ((1 - d) * colorMap.r[idx] + d * colorMap.r[idx + 1]);
   color[1] = ((1 - d) * colorMap.g[idx] + d * colorMap.g[idx + 1]);
@@ -161,8 +165,8 @@ bool opencover::ColorMapSelector::setValue(const std::string &colorMapName) {
   return true;
 }
 
-osg::Vec4 opencover::ColorMapSelector::getColor(float val, float min, float max) {
-  return opencover::getColor(val, m_selectedMap->second, min, max);
+osg::Vec4 opencover::ColorMapSelector::getColor(float val) {
+  return opencover::getColor(val, m_selectedMap->second);
 }
 
 const opencover::ColorMap &opencover::ColorMapSelector::selectedMap() const {
@@ -178,6 +182,7 @@ void opencover::ColorMapSelector::setCallback(
   if(!m_colorBar)
     return;
   m_colorBar->setCallback([this, f](const ColorMap &map) {
+    m_selectedMap->second = map;
     f(map);
   });
 }
@@ -662,7 +667,7 @@ void opencover::ColorMapUI::setCallback(
 }
 
 osg::Vec4 opencover::ColorMapUI::getColor(float val) {
-  return opencover::getColor(val, *m_colorMap, m_colorMap->min, m_colorMap->max);
+  return opencover::getColor(val, *m_colorMap);
 }
 
 void opencover::ColorMapUI::show(bool show) { m_renderObject->show(show); }

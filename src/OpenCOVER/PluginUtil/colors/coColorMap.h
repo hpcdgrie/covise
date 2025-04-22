@@ -54,8 +54,7 @@ enum RotationType { HPR, PHR };
 
 typedef std::map<std::string, ColorMap> ColorMaps;
 PLUGIN_UTILEXPORT ColorMaps readColorMaps();
-osg::Vec4 PLUGIN_UTILEXPORT getColor(float val, const ColorMap &colorMap,
-                                     float min = 0, float max = 1);
+osg::Vec4 PLUGIN_UTILEXPORT getColor(float val, const ColorMap &colorMap);
 // same logic as colors module, but sets linear sampling points
 ColorMap PLUGIN_UTILEXPORT upscale(const ColorMap &baseMap, size_t numSteps);
 
@@ -78,7 +77,7 @@ class PLUGIN_UTILEXPORT ColorMapSelector {
   ColorMapSelector(opencover::ui::Group &menu);
 
   bool setValue(const std::string &colorMapName);
-  osg::Vec4 getColor(float val, float min = 0, float max = 1);
+  osg::Vec4 getColor(float val);
   const ColorMap &selectedMap() const;
   void setCallback(const std::function<void(const ColorMap &)> &f);
   void showHud(bool show);
@@ -86,8 +85,8 @@ class PLUGIN_UTILEXPORT ColorMapSelector {
   void setHudPosition(const opencover::ColorBar::HudPosition &position); 
  private:
   opencover::ui::SelectionList *m_selector;
-  const ColorMaps m_colors;
-  ColorMaps::const_iterator m_selectedMap;
+  ColorMaps m_colors;
+  ColorMaps::iterator m_selectedMap;
   std::unique_ptr<opencover::ColorBar> m_colorBar;
   void updateSelectedMap();
   void init();

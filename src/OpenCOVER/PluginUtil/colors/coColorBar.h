@@ -34,10 +34,7 @@ class coColoredBackground;
 
 namespace opencover
 {
-struct ColorMapParams {
-   float min = 0.0, max = 1.0;
-   int steps = 32;
-};
+
 struct ColorMap {
    std::vector<float> r{0., 1.}, g{0., 1.}, b{0., 1.}, a{0., 1.}, samplingPoints{0., 1.};
    float min = 0.0, max = 1.0;
@@ -47,16 +44,9 @@ struct ColorMap {
    size_t numColors() const {
       return r.size();
    };
-   
-   void setParams(const ColorMapParams &params) {
-      min = params.min;
-      max = params.max;
-      steps = params.steps;
-   }
-   ColorMapParams getParams() const {
-      return {min, max, steps};
-
-   }
+   bool concretisized() const {
+      return steps < 0;
+   };
 };
 /** class coColorBar, derived from coMenuItem
  *  colorbar is a window containing a texture and labels
