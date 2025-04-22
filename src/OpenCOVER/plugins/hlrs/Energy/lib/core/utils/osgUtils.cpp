@@ -18,6 +18,7 @@
 #include <osg/MatrixTransform>
 #include <osg/Matrixd>
 #include <osg/PolygonMode>
+#include <osg/PositionAttitudeTransform>
 #include <osg/PrimitiveSet>
 #include <osg/Shader>
 #include <osg/Shape>
@@ -499,6 +500,54 @@ osg::ref_ptr<osg::Node> createOutline(osg::ref_ptr<osg::Node> originalNode,
   group->addChild(originalNode.get());
 
   return group.get();
+}
+
+osg::ref_ptr<osg::Geometry> createNormalVisualization(
+    osg::Geometry *originalGeometry) {
+  osg::Vec3Array *vertices =
+      dynamic_cast<osg::Vec3Array *>(originalGeometry->getVertexArray());
+  osg::Vec3Array *normals =
+      dynamic_cast<osg::Vec3Array *>(originalGeometry->getNormalArray());
+
+  if (!vertices || !normals || vertices->size() != normals->size()) {
+    std::cerr << "Error: Invalid vertex or normal data." << std::endl;
+    return nullptr;
+  }
+
+  osg::ref_ptr<osg::Geometry> normalsGeometry = new osg::Geometry;
+  osg::ref_ptr<osg::Vec3Array> normalVertices = new osg::Vec3Array;
+  osg::ref_ptr<osg::Vec4Array> normalColors = new osg::Vec4Array;
+  osg::ref_ptr<osg::DrawArrays> normalPrimitives =
+      new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 0);
+
+  normalsGeometry->setVertexArray(normalVertices.get());
+  normalsGeometry->setColorArray(normalColors.get());
+  normalsGeometry->setColorBinding(osg::Geometry::BIND_OVERALL);
+  normalsGeometry->addPrimitiveSet(normalPrimitives.get());
+
+  float normalLength = 0.1f;
+  osg::Vec4 normalColor(1.0f, 0.0f, 0.0f, 1.0f);
+
+  for (size_t i = 0; i < vertices->size(); ++i) {
+    osg::Vec3 vertex = (*vertices)[i];
+    osg::Vec3 normal = (*normals)[i];
+    osg::Vec3 endPoint = vertex + normal * normalLength;
+
+    normalVertices->push_back(vertex);
+    normalVertices->push_back(endPoint);
+    normalColors->push_back(normalColor);
+  }
+
+  normalPrimitives->setCount(normalVertices->size());
+
+  osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth();
+  lineWidth->setWidth(2.0f);
+  normalsGeometry->getOrCreateStateSet()->setAttributeAndModes(
+      lineWidth.get(), osg::StateAttribute::ON);
+  normalsGeometry->getOrCreateStateSet()->setMode(GL_LIGHTING,
+                                                  osg::StateAttribute::OFF);
+
+  return normalsGeometry.get();
 }
 
 void applyOutlineShader(osg::ref_ptr<osg::Geode> geode,

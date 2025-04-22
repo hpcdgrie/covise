@@ -71,6 +71,9 @@ void applyOutlineShader(osg::ref_ptr<osg::Geode> geo, const osg::Vec4 &outlineCo
 void createOutlineFX(osg::ref_ptr<osg::Geode> geode, const osg::Vec4 &outlineColor,
                      float lineWidth = 2.0f);
 
+osg::ref_ptr<osg::Geometry> createNormalVisualization(
+    osg::Geometry *originalGeometry);
+
 void printNodeInfo(osg::Node *node, int indent = 0);
 
 namespace instancing {
