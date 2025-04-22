@@ -456,14 +456,20 @@ void EnergyPlugin::initCityGMLUI() {
 void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPath) {
   using namespace core::utils::osgUtils;
   auto getColor = [](float val, float max) {
-    osg::Vec4 colHigh = osg::Vec4(1, 0.1, 0, 1.0);
-    osg::Vec4 colLow = osg::Vec4(0, 1, 0.5, 1.0);
-    float valN = val / max;
-    osg::Vec4 col(colHigh.r() * valN + colLow.r() * (1 - valN),
-                  colHigh.g() * valN + colLow.g() * (1 - valN),
-                  colHigh.b() * valN + colLow.b() * (1 - valN),
-                  colHigh.a() * valN + colLow.a() * (1 - valN));
-    return col;
+    osg::Vec4 red = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    osg::Vec4 yellow = osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f);
+    osg::Vec4 green = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+
+    float greenThreshold = max * 0.33f;
+    float yellowThreshold = max * 0.66f;
+
+    if (val <= greenThreshold) {
+      return green;
+    } else if (val <= yellowThreshold) {
+      return yellow;
+    } else {
+      return red;
+    }
   };
 
   if (m_cityGMLObjs.empty()) {
