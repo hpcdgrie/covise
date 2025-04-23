@@ -47,7 +47,7 @@ using namespace  vrui;
 namespace opencover
 {
 
-    opencover::ColorMap opencover::interpolateColorMap(const opencover::ColorMap &cm, int numSteps)
+    opencover::ColorMap interpolateColorMap(const opencover::ColorMap &cm, int numSteps)
     {
         opencover::ColorMap interpolatedMap;
         interpolatedMap.r.resize(numSteps);
@@ -207,7 +207,7 @@ ColorBar::ColorBar(ui::Menu *menu)
             displayColorMap(interpolatedMap_);
             m_callback(interpolatedMap_);
         }
-        
+
         if (!inter_)
             return;
         int num = static_cast<int>(value);
