@@ -340,7 +340,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   // citygml UI
   opencover::ui::Menu *m_cityGMLMenu = nullptr;
   opencover::ui::Button *m_cityGMLEnable = nullptr;
-//   opencover::ui::Button *m_PVEnable = nullptr;
+  opencover::ui::Button *m_PVEnable = nullptr;
 
   // Simulation UI
   opencover::ui::Menu *m_simulationMenu = nullptr;

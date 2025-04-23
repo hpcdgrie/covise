@@ -441,16 +441,22 @@ void EnergyPlugin::initCityGMLUI() {
   m_cityGMLMenu = new ui::Menu(m_EnergyTab, "CityGML");
   m_cityGMLEnable = new ui::Button(m_cityGMLMenu, "Enable");
   m_cityGMLEnable->setCallback([this](bool on) { enableCityGML(on); });
-  //   m_PVEnable = new ui::Button(m_cityGMLMenu, "Enable");
-  //   m_PVEnable->setCallback([this](bool on) {
-  //     if (!m_cityGMLEnable->state()) std::cerr << "CityGML not enabled"
-  //                 << std::endl;
-  //     else {
-  //       m_PVEnable->setState(on);
-  //       addSolarPanelsToCityGML(configString("Simulation", "pvDir",
-  //       "default")->value());
-  //     }
-  //   });
+  m_PVEnable = new ui::Button(m_cityGMLMenu, "PV");
+  m_PVEnable->setText("PV");
+  m_PVEnable->setState(true);
+  m_PVEnable->setCallback([this](bool on) {
+    if (m_pvGroup == nullptr) {
+      std::cerr << "Error: No PV group found. Please enable GML first." << std::endl;
+      return;
+    }
+    // TODO: add a check if the group is already added and make sure its safe to remove it
+    osg::ref_ptr<osg::MatrixTransform> gmlRoot = dynamic_cast<osg::MatrixTransform*>(m_cityGML->getChild(0));
+    if (gmlRoot->containsNode(m_pvGroup)) {
+      gmlRoot->removeChild(m_pvGroup);
+    } else {
+      gmlRoot->addChild(m_pvGroup);
+    }
+  });
 }
 
 void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPath) {
@@ -543,6 +549,10 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
   auto rotationZ = osg::Matrix::rotate(osg::DegreesToRadians(90.0f), 0, 0, 1);
   auto rotationX = osg::Matrix::rotate(osg::DegreesToRadians(45.0f), 1, 0, 0);
   float zOffset = sin(osg::PI / 4) * panelHeight;
+
+  m_pvGroup = new osg::Group();
+  m_pvGroup->setName("PVPanels");
+  m_cityGML->getChild(0)->asGroup()->addChild(m_pvGroup);
 
   for (auto &file : fs::directory_iterator(dirPath)) {
     if (fs::is_regular_file(file) && file.path().extension() == ".obj") {
@@ -637,7 +647,9 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
             // osgUtil::Optimizer optimizer;
             // optimizer.optimize(pvPanelsTransform, osgUtil::Optimizer::ALL_OPTIMIZATIONS);
             // core::utils::osgUtils::printNodeInfo(pvPanelsTransform);
-            parent->addChild(pvPanelsTransform);
+            // parent->addChild(pvPanelsTransform);
+            // m_cityGML->addChild(pvPanelsTransform);
+            m_pvGroup->addChild(pvPanelsTransform);
           }
         }
       }
