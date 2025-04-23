@@ -388,6 +388,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   osg::ref_ptr<osg::Group> m_cityGML;
   osg::ref_ptr<osg::Group> m_heatingGroup;
   osg::ref_ptr<osg::Group> m_powerGroup;
+  osg::ref_ptr<osg::Group> m_pvGroup;
   std::map<std::string, Geodes> m_cityGMLDefaultStatesets;
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
