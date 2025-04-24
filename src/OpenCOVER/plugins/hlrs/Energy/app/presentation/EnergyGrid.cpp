@@ -182,7 +182,7 @@ osg::ref_ptr<grid::DirectedConnection> EnergyGrid::getConnectionByName(
   return nullptr;
 }
 
-osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(const std::string &name) {
+const osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(const std::string &name) const{
   for (auto &point : m_config.points)
     if (point->getName() == name) return point;
   return nullptr;

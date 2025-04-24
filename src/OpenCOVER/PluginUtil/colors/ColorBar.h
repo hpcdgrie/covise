@@ -42,17 +42,16 @@ namespace ui
 {
 class SpecialElement;
 }
-ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm, int numSteps);
+ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm); //creates a color map with numSteps dedicated colors
 
 class PLUGIN_UTILEXPORT ColorBar: public ui::Owner
 {
 private:
     vrui::vruiMatrix *floatingMat_ = nullptr;
     coColorBar *colorbar_ = nullptr, *hudbar_ = nullptr;
-    ui::Menu *colorsMenu_ = nullptr;
+    ui::Group *colorsMenu_ = nullptr;
     std::string title_;
     std::string name_;
-    std::string species_;
     ui::SpecialElement *uiColorBar_ = nullptr;
     ui::Slider *minSlider_ = nullptr;
     ui::Slider *maxSlider_ = nullptr;
@@ -69,27 +68,14 @@ private:
     opencover::coInteractor *inter_ = nullptr;
 
     void updateTitle();
-    void displayColorMap(const ColorMap &map);
-   ColorMap selectedMap_, interpolatedMap_;
+    void displayColorMap();
+    void init();
+   ColorMap map_;
    std::function<void(const ColorMap &)> m_callback;
 public:
 
-    /** constructor when the colorbar is not to be opened from the pinboard
-       *  create create containers, texture and labels
-       *  @param colorsButton the button that opens the colorbar
-       *  @param moduleMenu the coRowMenu used instead of the pinboard
-       *  @param species data species name, currently not displayed
-       *  @param min data minimum
-       *  @param max data maximum
-       *  @param numColors number of different colors in colorbar
-       *  @param r red colors
-       *  @param g green colors
-       *  @param b blue colors
-       *  @param a red colors
-       */
     ColorBar(ui::Menu *menu);
-
-    /// destructor
+    ColorBar(ui::Group *group);
     ~ColorBar();
 
     bool hudVisible() const;
@@ -108,10 +94,9 @@ public:
        *  @param species title bar content
        *  @param map color map to display
        */
-    void update(const std::string &species, const ColorMap &map);
+    void update(const ColorMap &map);
 
-    /** set name */
-    void setName(const char *name);
+    void setName(const std::string &name);
     void show(bool state);
     /** get name
      *  @return name the name of the colorbar, identical with module name, eg, g, Colors_1
@@ -120,18 +105,19 @@ public:
 
     /** parseAttrib
        * @param attrib COLORMAP attribute
-       * @param species: get species (the client should delete this pointer)
        * @return map: colormap to be filled
        */
-    static ColorMap parseAttrib(const char *attrib, std::string &species);
+      [[nodiscard]] static ColorMap parseAttrib(const char *attrib);
 
-    void parseAttrib(const char *attrib);
     void setVisible(bool);
     bool isVisible();
 
     void addInter(opencover::coInteractor *inter);
     void updateInteractor();
     void setCallback(const std::function<void(const ColorMap &)> &f);
+    void setMinBounds(float min, float max);
+    void setMaxBounds(float min, float max);
+    void setMaxNumSteps(int maxSteps);
 };
 }
 #endif

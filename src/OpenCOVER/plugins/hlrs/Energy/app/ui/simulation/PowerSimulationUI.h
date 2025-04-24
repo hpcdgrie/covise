@@ -10,9 +10,7 @@ using namespace core::simulation::power;
 template <typename T>
 class PowerSimulationUI : public BaseSimulationUI<T> {
  public:
-  PowerSimulationUI(std::shared_ptr<PowerSimulation> sim,
-                    //   std::shared_ptr<T> parent, std::shared_ptr<ColorMap> colorMap)
-                      std::shared_ptr<T> parent, std::shared_ptr<opencover::ColorMapUI> colorMap)
+  PowerSimulationUI(std::shared_ptr<PowerSimulation> sim, std::shared_ptr<T> parent, const opencover::ColorMap &colorMap)
       : BaseSimulationUI<T>(sim, parent, colorMap) {}
   ~PowerSimulationUI() = default;
   PowerSimulationUI(const PowerSimulationUI &) = delete;
@@ -36,36 +34,28 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
     }
   }
 
-  void updateTimestepColors(const std::string &key, float min = 0.0f,
-                            float max = 1.0f, bool resetMinMax = false) override {
-    auto color_map = this->m_colorMapRef.lock();
-    if (!color_map) {
-      std::cerr << "ColorMap is not available for update of colors." << std::endl;
-      return;
-    }
+  opencover::ColorMap updateTimestepColors(const opencover::ColorMap& map, bool resetMinMax = false) override {
 
-    color_map->setName(key);
-
-    if (min > max) min = max;
-    color_map->setMax(max);
-    color_map->setMin(min);
+    auto m = map;
+    if (m.min > m.max) m.min = m.max;
 
     if (resetMinMax) {
-      auto &[res_min, res_max] = powerSimulationPtr()->getMinMax(key);
-      color_map->setMax(res_max);
-      color_map->setMin(res_min);
+      auto &[res_min, res_max] = powerSimulationPtr()->getMinMax(m.species);
+      m.max = res_max;
+      m.min = res_min;
     }
 
     // compute colors
     auto powerSim = this->powerSimulationPtr();
-    if (!powerSim) return;
+    if (!powerSim) return m;
     auto computeColorsForContainer = [&](auto container) {
-      this->computeColors(color_map, key, min, max, container);
+      this->computeColors(m, container);
     };
 
     computeColorsForContainer(powerSim->Buses().get());
     computeColorsForContainer(powerSim->Generators().get());
     computeColorsForContainer(powerSim->Transformators().get());
+    return m;
   }
 
  private:

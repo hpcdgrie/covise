@@ -15,10 +15,8 @@ using namespace core::simulation::heating;
 template <typename T>
 class HeatingSimulationUI : public BaseSimulationUI<T> {
  public:
-  HeatingSimulationUI(std::shared_ptr<HeatingSimulation> sim,
-                    //   std::shared_ptr<T> parent, std::shared_ptr<ColorMap> colorMap)
-                      std::shared_ptr<T> parent, std::shared_ptr<opencover::ColorMapUI> colorMap)
-      : BaseSimulationUI<T>(sim, parent, colorMap) {}
+  HeatingSimulationUI(std::shared_ptr<HeatingSimulation> sim, std::shared_ptr<T> parent)
+      : BaseSimulationUI<T>(sim, parent) {}
   ~HeatingSimulationUI() = default;
   HeatingSimulationUI(const HeatingSimulationUI &) = delete;
   HeatingSimulationUI &operator=(const HeatingSimulationUI &) = delete;
@@ -40,35 +38,28 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
     }
   }
 
-  void updateTimestepColors(const std::string &key, float min = 0.0f,
-                            float max = 1.0f, bool resetMinMax = false) override {
-    auto color_map = this->m_colorMapRef.lock();
-    if (!color_map) {
-      std::cerr << "ColorMap is not available for update of colors." << std::endl;
-      return;
-    }
+  opencover::ColorMap updateTimestepColors(const opencover::ColorMap& map, bool resetMinMax = false) override {
 
-    color_map->setName(key);
+    auto m = map;
 
-    if (min > max) min = max;
-    color_map->setMax(max);
-    color_map->setMin(min);
+    if (m.min > m.max) m.min = m.max;
 
     if (resetMinMax) {
-      auto &[res_min, res_max] = heatingSimulationPtr()->getMinMax(key);
-      color_map->setMax(res_max);
-      color_map->setMin(res_min);
+      auto &[res_min, res_max] = heatingSimulationPtr()->getMinMax(map.species);
+      m.max = res_max;
+      m.min = res_min;
     }
 
     // compute colors
     auto heatingSim = this->heatingSimulationPtr();
-    if (!heatingSim) return;
+    if (!heatingSim) return m;
     auto computeColorsForContainer = [&](auto entities) {
-      this->computeColors(color_map, key, min, max, entities);
+      this->computeColors(m, entities);
     };
 
     computeColorsForContainer(heatingSim->Consumers().get());
     computeColorsForContainer(heatingSim->Producers().get());
+    return m;
   }
 
  private:

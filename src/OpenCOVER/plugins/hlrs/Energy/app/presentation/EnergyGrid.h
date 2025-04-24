@@ -117,7 +117,7 @@ class EnergyGrid : public interface::IEnergyGrid {
     if (idx < 0 || idx >= m_connections.size()) return nullptr;
     return m_connections[idx];
   }
-  osg::ref_ptr<grid::Point> getPointByName(const std::string &name);
+  const osg::ref_ptr<grid::Point> getPointByName(const std::string &name) const;
   osg::ref_ptr<grid::Point> getPointByIdx(int idx) {
     if (idx < 0 || idx >= m_config.points.size()) return nullptr;
     return m_config.points[idx];

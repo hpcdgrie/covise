@@ -25,9 +25,8 @@ class BaseSimulationUI {
                 "T must be derived from ITimeDependable");
 
  public:
-  BaseSimulationUI(std::shared_ptr<Simulation> sim, std::shared_ptr<T> parent,
-                   std::shared_ptr<opencover::ColorMapUI> colorMap)
-      : m_simulation(sim), m_parent(parent), m_colorMapRef(colorMap) {
+  BaseSimulationUI(std::shared_ptr<Simulation> sim, std::shared_ptr<T> parent)
+      : m_simulation(sim), m_parent(parent) {
     if (auto simulation = m_simulation.lock()) simulation->computeParameters();
   }
 
@@ -36,8 +35,7 @@ class BaseSimulationUI {
   BaseSimulationUI &operator=(const BaseSimulationUI &) = delete;
 
   virtual void updateTime(int timestep) = 0;
-  virtual void updateTimestepColors(const std::string &key, float min = 0.0f,
-                                    float max = 1.0f, bool resetMinMax = false) = 0;
+  virtual opencover::ColorMap updateTimestepColors(const opencover::ColorMap& map, bool resetMinMax = false) = 0;
 
  protected:
   template <typename simulationObject>
@@ -60,9 +58,9 @@ class BaseSimulationUI {
   }
 
   template <typename simulationObject>
-  void computeColors(
-      std::shared_ptr<opencover::ColorMapUI> color_map, const std::string &key, float min,
-      float max, const std::map<std::string, simulationObject> &objectContainer) {
+  void computeColors(const opencover::ColorMap &color_map, const std::map<std::string, simulationObject> &objectContainer) 
+  {
+
     isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
 
@@ -74,17 +72,17 @@ class BaseSimulationUI {
         return;
       }
 
-      auto &[min_val, max_val] = simulation->getMinMax(key);
+      auto &[min_val, max_val] = simulation->getMinMax(color_map.species);
       minKeyVal = min_val;
       maxKeyVal = max_val;
     } catch (const std::out_of_range &e) {
-      std::cerr << "Key not found in minMaxValues: " << key << std::endl;
+      std::cerr << "Key not found in minMaxValues: " << color_map.species << std::endl;
       return;
     }
 
     for (auto &[name, object] : objectContainer) {
       const auto &data = object.getData();
-      const auto &values = data.at(key);
+      const auto &values = data.at(color_map.species);
       if (auto color_it = m_colors.find(name); color_it == m_colors.end()) {
         m_colors.insert({name, std::vector<osg::Vec4>(values.size())});
       }
@@ -93,8 +91,8 @@ class BaseSimulationUI {
       // color_map
       for (auto i = 0; i < values.size(); ++i) {
         auto interpolated_value = core::utils::math::interpolate(
-            values[i], minKeyVal, maxKeyVal, min, max);
-        auto color = color_map->getColor(interpolated_value);
+            values[i], minKeyVal, maxKeyVal, color_map.min, color_map.max);
+        auto color = getColor(interpolated_value, color_map);
         colors[i] = color;
       }
     }
@@ -108,7 +106,6 @@ class BaseSimulationUI {
   }
 
   std::weak_ptr<T> m_parent;  // parent which manages drawable
-  std::weak_ptr<opencover::ColorMapUI> m_colorMapRef;
   std::weak_ptr<Simulation> m_simulation;
   std::map<std::string, std::vector<osg::Vec4>> m_colors;
 };

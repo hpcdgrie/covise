@@ -120,7 +120,6 @@ private:
     opencover::ColorMap m_colorMap;
     float m_minSlider = 0, m_maxSlider = 0;
     float m_min = 0, m_max = 0;
-    int m_numColorSteps = 0;
 };
 
 #endif // COVISE_CSV_POINT_CLOUD_INTERACTOR_H

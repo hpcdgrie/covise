@@ -129,10 +129,9 @@ static void calcFormat(float &minIO, float &maxIO, char * /*mask*/, int &iSteps)
     maxIO = (float)max;
 }
 
-coColorBar::coColorBar(const std::string &name, const std::string &species, const ColorMap &map, bool inMenu)
+coColorBar::coColorBar(const std::string &name, const ColorMap &map, bool inMenu)
     : coMenuItem(name.c_str())
     , name_(name)
-    , species_(species)
     , map_(map)
 {
 
@@ -236,8 +235,6 @@ coColorBar::coColorBar(const std::string &name, const std::string &species, cons
         everything_->setUniqueName("everything");
         everything_->setVgap(10.0);
         everything_->setHgap(10.0);
-
-        speciesLabel_->setString(species_);
         everything_->addElement(textureAndLabels_);
         everything_->addElement(speciesLabel_);
         background_->addElement(everything_);
@@ -339,6 +336,10 @@ coColorBar::update(const ColorMap &map)
     makeImage(map_, map_.min > map_.max);
     texture_->setImage((const uint *)image_.data(), (const uint *)image_.data(), (const uint *)image_.data(), 4, 2, 256, 1);
     texture_->setHeight(Height);
+    auto species = map_.species;
+    if(!map_.unit.empty())
+        species += " (" + map_.unit + ")";
+    speciesLabel_->setString(species);
 }
 
 const char *coColorBar::getName() const

@@ -31,12 +31,11 @@ void CsvInteractor::setVectorParam(const char *name, int numElem, float *field)
 void CsvInteractor::setColorMap(const opencover::ColorMap &cm)
 {
     m_colorMap = cm;
-    m_numColorSteps = cm.samplingPoints.size();
 }
 
 opencover::ColorMap CsvInteractor::getColorMap() const
 {
-    return interpolateColorMap(m_colorMap, m_numColorSteps);
+    return interpolateColorMap(m_colorMap);
 }
 
 void CsvInteractor::setName(const std::string& name)
@@ -56,14 +55,14 @@ void CsvInteractor::setScalarParam(const char *name, int val)
 {
     if(std::string(name) == "steps")
     {
-        m_numColorSteps = val;
+        m_colorMap.steps = val;
     }
 }
 
 const char *CsvInteractor::getString(unsigned int i) const
 {
     static std::string s;
-    s = createColorMapString(m_name, interpolateColorMap(m_colorMap, m_numColorSteps), m_minSlider, m_maxSlider);
+    s = createColorMapString(m_name, interpolateColorMap(m_colorMap), m_minSlider, m_maxSlider);
     return s.c_str();
 }
 
@@ -71,7 +70,7 @@ int CsvInteractor::getIntScalarParam(const std::string &paraName, int &value) co
 {
     if(paraName == "steps")
     {
-        value = m_numColorSteps;
+        value = m_colorMap.steps;
         return -1;
     }
     return 0;
@@ -98,7 +97,7 @@ int CsvInteractor::getIntSliderParam(const std::string &paraName, int &min, int 
     {
         min = 2;
         max = 256;
-        val = m_numColorSteps;
+        val = m_colorMap.steps;
     }
     return 0;
 }

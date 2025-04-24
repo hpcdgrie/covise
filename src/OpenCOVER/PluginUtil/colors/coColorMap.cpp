@@ -34,51 +34,51 @@
 
 using namespace std;
 using namespace opencover;
-namespace {
-constexpr float colormapLabelMargin = 0.15f;
-constexpr float colormapHeightMargin = 0.1f;
-constexpr float colormapHeightScale = 0.8f;
-constexpr float colormapWidthScale = 0.1f;
-constexpr int maxLabels = 10;
-constexpr int maxPrecision = 2;
-}  // namespace
+// namespace {
+// constexpr float colormapLabelMargin = 0.15f;
+// constexpr float colormapHeightMargin = 0.1f;
+// constexpr float colormapHeightScale = 0.8f;
+// constexpr float colormapWidthScale = 0.1f;
+// constexpr int maxLabels = 10;
+// constexpr int maxPrecision = 2;
+// }  // namespace
 
-osg::Quat opencover::createRotationMatrixQuat(double headingDegrees,
-                                           double pitchDegrees, double rollDegrees,
-                                           RotationType type) {
-  // Convert degrees to radians
-  double headingRadians = osg::DegreesToRadians(headingDegrees);
-  double pitchRadians = osg::DegreesToRadians(pitchDegrees);
-  double rollRadians = osg::DegreesToRadians(rollDegrees);
+// osg::Quat opencover::createRotationMatrixQuat(double headingDegrees,
+//                                            double pitchDegrees, double rollDegrees,
+//                                            RotationType type) {
+//   // Convert degrees to radians
+//   double headingRadians = osg::DegreesToRadians(headingDegrees);
+//   double pitchRadians = osg::DegreesToRadians(pitchDegrees);
+//   double rollRadians = osg::DegreesToRadians(rollDegrees);
 
-  // Create quaternions for each rotation
-  osg::Quat pitchQuat(pitchRadians, osg::Vec3(1, 0, 0));  // Pitch (around X-axis)
-  osg::Quat headingQuat(headingRadians, osg::Vec3(0, 1, 0));  // Yaw (around Y-axis)
-  osg::Quat rollQuat(rollRadians, osg::Vec3(0, 0, 1));        // Roll (around Z-axis)
+//   // Create quaternions for each rotation
+//   osg::Quat pitchQuat(pitchRadians, osg::Vec3(1, 0, 0));  // Pitch (around X-axis)
+//   osg::Quat headingQuat(headingRadians, osg::Vec3(0, 1, 0));  // Yaw (around Y-axis)
+//   osg::Quat rollQuat(rollRadians, osg::Vec3(0, 0, 1));        // Roll (around Z-axis)
 
-  // Combine the quaternions (order matters!)
-  osg::Quat combinedQuat;
-  switch (type) {
-    case HPR:
-      combinedQuat = rollQuat * pitchQuat * headingQuat;
-      break;
-    case PHR:
-      combinedQuat = pitchQuat * headingQuat * rollQuat;
-      break;
-  }
-  return combinedQuat;
-}
+//   // Combine the quaternions (order matters!)
+//   osg::Quat combinedQuat;
+//   switch (type) {
+//     case HPR:
+//       combinedQuat = rollQuat * pitchQuat * headingQuat;
+//       break;
+//     case PHR:
+//       combinedQuat = pitchQuat * headingQuat * rollQuat;
+//       break;
+//   }
+//   return combinedQuat;
+// }
 
-osg::Matrix opencover::createRotationMatrix(double headingDegrees, double pitchDegrees,
-                                         double rollDegrees, RotationType type) {
-  return osg::Matrix(opencover::createRotationMatrixQuat(headingDegrees, pitchDegrees,
-                                                      rollDegrees, type));
-}
+// osg::Matrix opencover::createRotationMatrix(double headingDegrees, double pitchDegrees,
+//                                          double rollDegrees, RotationType type) {
+//   return osg::Matrix(opencover::createRotationMatrixQuat(headingDegrees, pitchDegrees,
+//                                                       rollDegrees, type));
+// }
 
-osg::Matrix PLUGIN_UTILEXPORT opencover::createRotationMatrix(const osg::Vec3 &hpr,
-                                                           RotationType type) {
-  return createRotationMatrix(hpr[0], hpr[1], hpr[2], type);
-}
+// osg::Matrix PLUGIN_UTILEXPORT opencover::createRotationMatrix(const osg::Vec3 &hpr,
+//                                                            RotationType type) {
+//   return createRotationMatrix(hpr[0], hpr[1], hpr[2], type);
+// }
 
 opencover::ColorMaps opencover::readColorMaps() {
   // read the name of all colormaps in file
@@ -129,7 +129,7 @@ osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap) {
        idx++) {
   }
   double d = 0;
-  if(!colorMap.concretisized())
+  if(colorMap.concretisized())
   {
     d = (val - colorMap.samplingPoints[idx]) /
              (colorMap.samplingPoints[idx + 1] - colorMap.samplingPoints[idx]);
@@ -144,8 +144,9 @@ osg::Vec4 opencover::getColor(float val, const opencover::ColorMap &colorMap) {
 }
 
 opencover::ColorMapSelector::ColorMapSelector(opencover::ui::Group &group)
-    : m_selector(new opencover::ui::SelectionList(&group, "mapChoice")),
-      m_colors(readColorMaps()) {
+    : m_selector(new opencover::ui::SelectionList(&group, "mapChoice"))
+    , m_colors(readColorMaps())
+    , m_colorBar(std::make_unique<opencover::ColorBar>(&group)) {
   init();
 }
 
@@ -182,7 +183,7 @@ void opencover::ColorMapSelector::setCallback(
   if(!m_colorBar)
     return;
   m_colorBar->setCallback([this, f](const ColorMap &map) {
-    m_selectedMap->second = map;
+    // m_selectedMap->second = map;
     f(map);
   });
 }
@@ -201,12 +202,55 @@ void opencover::ColorMapSelector::setHudPosition(const opencover::ColorBar::HudP
   m_colorBar->setHudPosition(pos);
 }
 
+void opencover::ColorMapSelector::setUnit(const std::string &unit)
+{
+  m_unit = unit;
+  m_selectedMap->second.unit = m_unit;
+  m_colorBar->update(m_selectedMap->second);
+}
+
+void opencover::ColorMapSelector::setSpecies(const std::string &species)
+{
+  m_species = species;
+  m_selectedMap->second.species = m_species;
+  m_colorBar->update(m_selectedMap->second);
+
+}
+
+void opencover::ColorMapSelector::setMin(float min)
+{
+  m_selectedMap->second.min = min;
+  m_colorBar->update(m_selectedMap->second);
+
+}
+void opencover::ColorMapSelector::setMax(float max)
+{
+  m_selectedMap->second.max = max;
+  m_colorBar->update(m_selectedMap->second);
+
+}
+void opencover::ColorMapSelector::setMinBounds(float min, float max)
+{
+  m_colorBar->setMinBounds(min, max);
+
+}
+void opencover::ColorMapSelector::setMaxBounds(float min, float max)
+{
+  m_colorBar->setMaxBounds(min, max);
+}
+
+void opencover::ColorMapSelector::setName(const std::string &name)
+{
+  m_colorBar->setName(name);
+}
+
 void opencover::ColorMapSelector::updateSelectedMap() {
   m_selectedMap = m_colors.begin();
   std::advance(m_selectedMap, m_selector->selectedIndex());
   assert(m_selectedMap != m_colors.end());
-  
-  m_colorBar->update(m_selectedMap->first, m_selectedMap->second);
+  m_selectedMap->second.unit = m_unit;
+  m_selectedMap->second.species = m_species;
+  m_colorBar->update(m_selectedMap->second);
 }
 
 void opencover::ColorMapSelector::init() {
@@ -217,457 +261,458 @@ void opencover::ColorMapSelector::init() {
   m_selector->setCallback([this](int index) { updateSelectedMap(); });
   if(!m_colorBar)
     return;
-  m_colorBar->update(m_selectedMap->first, m_selectedMap->second);
+    m_colorBar->setMaxNumSteps(m_selectedMap->second.numColors() *10);
+    m_colorBar->update(m_selectedMap->second);
 }
 
-osg::ref_ptr<osg::Texture2D>
-opencover::ColorMapRenderObject::createVerticalColorMapTexture(
-    const ColorMap &colorMap) {
-  if (colorMap.r.empty() || colorMap.g.empty() || colorMap.b.empty() ||
-      colorMap.a.empty() || colorMap.samplingPoints.empty()) {
-    return nullptr;
-  }
+// osg::ref_ptr<osg::Texture2D>
+// opencover::ColorMapRenderObject::createVerticalColorMapTexture(
+//     const ColorMap &colorMap) {
+//   if (colorMap.r.empty() || colorMap.g.empty() || colorMap.b.empty() ||
+//       colorMap.a.empty() || colorMap.samplingPoints.empty()) {
+//     return nullptr;
+//   }
 
-  int width = 1;  // 1D texture, now vertical
-  int height = colorMap.steps;
+//   int width = 1;  // 1D texture, now vertical
+//   int height = colorMap.steps;
 
-  osg::ref_ptr<osg::Image> image = new osg::Image;
-  // allocate pixel block
-  image->allocateImage(width, height, 1, GL_RGBA, GL_FLOAT);
+//   osg::ref_ptr<osg::Image> image = new osg::Image;
+//   // allocate pixel block
+//   image->allocateImage(width, height, 1, GL_RGBA, GL_FLOAT);
 
-  // obtain a pointer to the image data
-  float *imageData = (float *)image->data();
-  // iterate over each row of the texture (each step in the color map)
-  for (int y = 0; y < height; ++y) {
-    // calculate for each row the sample point by normalizing the row index to the
-    // range [0, 1] because colormaps are defined in this range
-    float samplePoint = (float)y / (height - 1);
-    // iterate over the sampling points in the color map to find the appropriate
-    // interval for the current sample point and perform the interpolation.
-    for (size_t i = 1; i < colorMap.samplingPoints.size(); ++i) {
-      if (samplePoint <= colorMap.samplingPoints[i]) {
-        // interval is found => calculate the interpolation
-        // factor t and use it to interpolate the red, green, blue, and alpha
-        // components of the color.
-        float t = (samplePoint - colorMap.samplingPoints[i - 1]) /
-                  (colorMap.samplingPoints[i] - colorMap.samplingPoints[i - 1]);
+//   // obtain a pointer to the image data
+//   float *imageData = (float *)image->data();
+//   // iterate over each row of the texture (each step in the color map)
+//   for (int y = 0; y < height; ++y) {
+//     // calculate for each row the sample point by normalizing the row index to the
+//     // range [0, 1] because colormaps are defined in this range
+//     float samplePoint = (float)y / (height - 1);
+//     // iterate over the sampling points in the color map to find the appropriate
+//     // interval for the current sample point and perform the interpolation.
+//     for (size_t i = 1; i < colorMap.samplingPoints.size(); ++i) {
+//       if (samplePoint <= colorMap.samplingPoints[i]) {
+//         // interval is found => calculate the interpolation
+//         // factor t and use it to interpolate the red, green, blue, and alpha
+//         // components of the color.
+//         float t = (samplePoint - colorMap.samplingPoints[i - 1]) /
+//                   (colorMap.samplingPoints[i] - colorMap.samplingPoints[i - 1]);
 
-        float r = colorMap.r[i - 1] + t * (colorMap.r[i] - colorMap.r[i - 1]);
-        float g = colorMap.g[i - 1] + t * (colorMap.g[i] - colorMap.g[i - 1]);
-        float b = colorMap.b[i - 1] + t * (colorMap.b[i] - colorMap.b[i - 1]);
-        float a = colorMap.a[i - 1] + t * (colorMap.a[i] - colorMap.a[i - 1]);
+//         float r = colorMap.r[i - 1] + t * (colorMap.r[i] - colorMap.r[i - 1]);
+//         float g = colorMap.g[i - 1] + t * (colorMap.g[i] - colorMap.g[i - 1]);
+//         float b = colorMap.b[i - 1] + t * (colorMap.b[i] - colorMap.b[i - 1]);
+//         float a = colorMap.a[i - 1] + t * (colorMap.a[i] - colorMap.a[i - 1]);
 
-        imageData[y * 4 + 0] = r;
-        imageData[y * 4 + 1] = g;
-        imageData[y * 4 + 2] = b;
-        imageData[y * 4 + 3] = a;
+//         imageData[y * 4 + 0] = r;
+//         imageData[y * 4 + 1] = g;
+//         imageData[y * 4 + 2] = b;
+//         imageData[y * 4 + 3] = a;
 
-        break;
-      }
-    }
-  }
+//         break;
+//       }
+//     }
+//   }
 
-  osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
-  texture->setImage(image);
-  texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
-  texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-  texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-  texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+//   osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
+//   texture->setImage(image);
+//   texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+//   texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+//   texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+//   texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 
-  return texture;
-}
+//   return texture;
+// }
 
-osg::ref_ptr<osg::Geode> opencover::ColorMapRenderObject::createColorMapPlane(
-    const opencover::ColorMap &colorMap) {
-  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
-  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+// osg::ref_ptr<osg::Geode> opencover::ColorMapRenderObject::createColorMapPlane(
+//     const opencover::ColorMap &colorMap) {
+//   osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+//   osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
 
-  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-  vertices->push_back(osg::Vec3(0, 0, 0));
-  vertices->push_back(osg::Vec3(1, 0, 0));
-  vertices->push_back(osg::Vec3(1, 1, 0));
-  vertices->push_back(osg::Vec3(0, 1, 0));
+//   osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+//   vertices->push_back(osg::Vec3(0, 0, 0));
+//   vertices->push_back(osg::Vec3(1, 0, 0));
+//   vertices->push_back(osg::Vec3(1, 1, 0));
+//   vertices->push_back(osg::Vec3(0, 1, 0));
 
-  geometry->setVertexArray(vertices);
+//   geometry->setVertexArray(vertices);
 
-  osg::ref_ptr<osg::Vec2Array> texcoords = new osg::Vec2Array;
-  texcoords->push_back(osg::Vec2(0, 0));
-  texcoords->push_back(osg::Vec2(1, 0));
-  texcoords->push_back(osg::Vec2(1, 1));
-  texcoords->push_back(osg::Vec2(0, 1));
-  geometry->setTexCoordArray(0, texcoords);
+//   osg::ref_ptr<osg::Vec2Array> texcoords = new osg::Vec2Array;
+//   texcoords->push_back(osg::Vec2(0, 0));
+//   texcoords->push_back(osg::Vec2(1, 0));
+//   texcoords->push_back(osg::Vec2(1, 1));
+//   texcoords->push_back(osg::Vec2(0, 1));
+//   geometry->setTexCoordArray(0, texcoords);
 
-  osg::ref_ptr<osg::DrawElementsUInt> quad =
-      new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS, 0);
-  for (auto i = 0; i < 4; ++i) quad->push_back(i);
+//   osg::ref_ptr<osg::DrawElementsUInt> quad =
+//       new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS, 0);
+//   for (auto i = 0; i < 4; ++i) quad->push_back(i);
 
-  geometry->addPrimitiveSet(quad);
+//   geometry->addPrimitiveSet(quad);
 
-  geode->addDrawable(geometry);
+//   geode->addDrawable(geometry);
 
-  osg::ref_ptr<osg::Texture2D> texture = createVerticalColorMapTexture(colorMap);
-  osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
-  if (texture) {
-    applyEmissionShader(stateset, texture);
-  }
+//   osg::ref_ptr<osg::Texture2D> texture = createVerticalColorMapTexture(colorMap);
+//   osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
+//   if (texture) {
+//     applyEmissionShader(stateset, texture);
+//   }
 
-  if (m_config.Mutlisample()) {
-    osg::ref_ptr<osg::Multisample> multisample = new osg::Multisample;
-    stateset->setAttributeAndModes(multisample, osg::StateAttribute::ON);
-  }
+//   if (m_config.Mutlisample()) {
+//     osg::ref_ptr<osg::Multisample> multisample = new osg::Multisample;
+//     stateset->setAttributeAndModes(multisample, osg::StateAttribute::ON);
+//   }
 
-  return geode;
-}
+//   return geode;
+// }
 
-osg::ref_ptr<osg::Geode> opencover::ColorMapRenderObject::createTextGeode(
-    const std::string &text, const osg::Vec3 &position) {
-  osg::ref_ptr<osgText::Text> osgText = new osgText::Text;
-  osgText->setText(text);
-  osgText->setFont(m_config.LabelConfig().font);
-  osgText->setCharacterSize(m_config.LabelConfig().charSize);
-  osgText->setPosition(position);
-  osgText->setColor(m_config.LabelConfig().color);
-  osgText->setAlignment(osgText::Text::LEFT_CENTER);
+// osg::ref_ptr<osg::Geode> opencover::ColorMapRenderObject::createTextGeode(
+//     const std::string &text, const osg::Vec3 &position) {
+//   osg::ref_ptr<osgText::Text> osgText = new osgText::Text;
+//   osgText->setText(text);
+//   osgText->setFont(m_config.LabelConfig().font);
+//   osgText->setCharacterSize(m_config.LabelConfig().charSize);
+//   osgText->setPosition(position);
+//   osgText->setColor(m_config.LabelConfig().color);
+//   osgText->setAlignment(osgText::Text::LEFT_CENTER);
 
-  osg::ref_ptr<osg::Geode> textGeode = new osg::Geode;
-  textGeode->addDrawable(osgText);
-  return textGeode;
-}
+//   osg::ref_ptr<osg::Geode> textGeode = new osg::Geode;
+//   textGeode->addDrawable(osgText);
+//   return textGeode;
+// }
 
-void opencover::ColorMapRenderObject::initShader() {
-  // Add a shader to apply the texture as emission.
-  osg::ref_ptr<osg::Program> program = new osg::Program;
-  osg::ref_ptr<osg::Shader> vertexShader = new osg::Shader(osg::Shader::VERTEX);
-  vertexShader->setShaderSource(shader::COLORMAP_VERTEX_EMISSION_SHADER);
-  osg::ref_ptr<osg::Shader> fragmentShader = new osg::Shader(osg::Shader::FRAGMENT);
-  fragmentShader->setShaderSource(shader::COLORMAP_FRAGMENT_EMISSION_SHADER);
-  program->addShader(vertexShader);
-  program->addShader(fragmentShader);
-  m_shader = program;
-}
+// void opencover::ColorMapRenderObject::initShader() {
+//   // Add a shader to apply the texture as emission.
+//   osg::ref_ptr<osg::Program> program = new osg::Program;
+//   osg::ref_ptr<osg::Shader> vertexShader = new osg::Shader(osg::Shader::VERTEX);
+//   vertexShader->setShaderSource(shader::COLORMAP_VERTEX_EMISSION_SHADER);
+//   osg::ref_ptr<osg::Shader> fragmentShader = new osg::Shader(osg::Shader::FRAGMENT);
+//   fragmentShader->setShaderSource(shader::COLORMAP_FRAGMENT_EMISSION_SHADER);
+//   program->addShader(vertexShader);
+//   program->addShader(fragmentShader);
+//   m_shader = program;
+// }
 
-void opencover::ColorMapRenderObject::applyEmissionShader(
-    osg::ref_ptr<osg::StateSet> stateSet,
-    osg::ref_ptr<osg::Texture2D> colormapTexture) {
-  assert(stateSet && "Cannot apply emission shader to uninitialized stateSet");
-  if (colormapTexture) {
-    auto colormap = m_colormap.lock();
-    assert(colormap &&
-           "Given colormapTexture is not valid and colormap weak_ptr is locked.");
-    colormapTexture = createVerticalColorMapTexture(*colormap);
-  }
-  stateSet->setTextureAttributeAndModes(0, colormapTexture, osg::StateAttribute::ON);
-  stateSet->addUniform(
-      new osg::Uniform("emissionMap", 0));  // Assuming texture unit 0
-  stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+// void opencover::ColorMapRenderObject::applyEmissionShader(
+//     osg::ref_ptr<osg::StateSet> stateSet,
+//     osg::ref_ptr<osg::Texture2D> colormapTexture) {
+//   assert(stateSet && "Cannot apply emission shader to uninitialized stateSet");
+//   if (colormapTexture) {
+//     auto colormap = m_colormap.lock();
+//     assert(colormap &&
+//            "Given colormapTexture is not valid and colormap weak_ptr is locked.");
+//     colormapTexture = createVerticalColorMapTexture(*colormap);
+//   }
+//   stateSet->setTextureAttributeAndModes(0, colormapTexture, osg::StateAttribute::ON);
+//   stateSet->addUniform(
+//       new osg::Uniform("emissionMap", 0));  // Assuming texture unit 0
+//   stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 
-  // Add a shader to apply the texture as emission.
-  if (!m_shader) initShader();
+//   // Add a shader to apply the texture as emission.
+//   if (!m_shader) initShader();
 
-  stateSet->setAttributeAndModes(m_shader, osg::StateAttribute::ON);
-}
+//   stateSet->setAttributeAndModes(m_shader, osg::StateAttribute::ON);
+// }
 
-void opencover::ColorMapRenderObject::rebuild() {
-  show(false);
-  show(true);
-}
+// void opencover::ColorMapRenderObject::rebuild() {
+//   show(false);
+//   show(true);
+// }
 
-void opencover::ColorMapRenderObject::addLabel(const float &samplePoint,
-                                            osg::ref_ptr<osg::Group> colormapGroup) {
-  auto colormap = m_colormap.lock();
-  float value = samplePoint * (colormap->max - colormap->min) + colormap->min;
-  std::stringstream ss;
-  ss << std::fixed << std::setprecision(maxPrecision) << value;
-  osg::ref_ptr<osg::Geode> textGeode = createTextGeode(
-      ss.str(),
-      osg::Vec3(-colormapLabelMargin, samplePoint * colormapHeightScale, 0.0f));
-  colormapGroup->addChild(textGeode);
-}
+// void opencover::ColorMapRenderObject::addLabel(const float &samplePoint,
+//                                             osg::ref_ptr<osg::Group> colormapGroup) {
+//   auto colormap = m_colormap.lock();
+//   float value = samplePoint * (colormap->max - colormap->min) + colormap->min;
+//   std::stringstream ss;
+//   ss << std::fixed << std::setprecision(maxPrecision) << value;
+//   osg::ref_ptr<osg::Geode> textGeode = createTextGeode(
+//       ss.str(),
+//       osg::Vec3(-colormapLabelMargin, samplePoint * colormapHeightScale, 0.0f));
+//   colormapGroup->addChild(textGeode);
+// }
 
-void opencover::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGroup,
-                                             const ColorMap &colorMap) {
-  auto size = colorMap.samplingPoints.size();
-  // Determine the step size to ensure no more than maxLabels are visible
-  size_t step = std::max<size_t>(1, size / maxLabels);
+// void opencover::ColorMapRenderObject::addLabels(osg::ref_ptr<osg::Group> colormapGroup,
+//                                              const ColorMap &colorMap) {
+//   auto size = colorMap.samplingPoints.size();
+//   // Determine the step size to ensure no more than maxLabels are visible
+//   size_t step = std::max<size_t>(1, size / maxLabels);
 
-  // Add text labels for the sampling points
-  for (size_t i = 0; i < size; i += step) {
-    auto samplingPoint = colorMap.samplingPoints[i];
-    if (samplingPoint > 0.93) continue;
-    addLabel(samplingPoint, colormapGroup);
-  }
+//   // Add text labels for the sampling points
+//   for (size_t i = 0; i < size; i += step) {
+//     auto samplingPoint = colorMap.samplingPoints[i];
+//     if (samplingPoint > 0.93) continue;
+//     addLabel(samplingPoint, colormapGroup);
+//   }
 
-  if (step < colorMap.samplingPoints.size())
-    addLabel(colorMap.samplingPoints.back(), colormapGroup);
+//   if (step < colorMap.samplingPoints.size())
+//     addLabel(colorMap.samplingPoints.back(), colormapGroup);
 
-  // Add text labels for the unit and name of the colormap
-  osg::ref_ptr<osg::Geode> unit =
-      createTextGeode(colorMap.unit, osg::Vec3(0.0f, -colormapHeightMargin, 0.0f));
-  colormapGroup->addChild(unit);
+//   // Add text labels for the unit and name of the colormap
+//   osg::ref_ptr<osg::Geode> unit =
+//       createTextGeode(colorMap.unit, osg::Vec3(0.0f, -colormapHeightMargin, 0.0f));
+//   colormapGroup->addChild(unit);
 
-  osg::ref_ptr<osg::Geode> name = createTextGeode(
-      colorMap.name,
-      osg::Vec3(0.0f, colormapHeightScale + colormapHeightMargin, 0.0f));
-  colormapGroup->addChild(name);
-}
+//   osg::ref_ptr<osg::Geode> name = createTextGeode(
+//       colorMap.name,
+//       osg::Vec3(0.0f, colormapHeightScale + colormapHeightMargin, 0.0f));
+//   colormapGroup->addChild(name);
+// }
 
-void opencover::ColorMapRenderObject::addColorMap(
-    osg::ref_ptr<osg::Group> colormapGroup, const ColorMap &colorMap) {
-  auto colormapPlane = createColorMapPlane(*m_colormap.lock());
+// void opencover::ColorMapRenderObject::addColorMap(
+//     osg::ref_ptr<osg::Group> colormapGroup, const ColorMap &colorMap) {
+//   auto colormapPlane = createColorMapPlane(*m_colormap.lock());
 
-  // position colormap relative to the object
-  osg::ref_ptr<osg::PositionAttitudeTransform> pat =
-      new osg::PositionAttitudeTransform();
-  pat->setPosition(osg::Vec3(0.0f, 0.0f, 0.0f));
-  pat->setScale(osg::Vec3(colormapWidthScale, colormapHeightScale, 1.0f));
-  pat->addChild(colormapPlane);
+//   // position colormap relative to the object
+//   osg::ref_ptr<osg::PositionAttitudeTransform> pat =
+//       new osg::PositionAttitudeTransform();
+//   pat->setPosition(osg::Vec3(0.0f, 0.0f, 0.0f));
+//   pat->setScale(osg::Vec3(colormapWidthScale, colormapHeightScale, 1.0f));
+//   pat->addChild(colormapPlane);
 
-  colormapGroup->addChild(pat);
-}
+//   colormapGroup->addChild(pat);
+// }
 
-osg::ref_ptr<osg::Group> opencover::ColorMapRenderObject::createColorMapGroup(
-    const ColorMap &colorMap) {
-  osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
-  addColorMap(colormapGroup, colorMap);
-  addLabels(colormapGroup, colorMap);
+// osg::ref_ptr<osg::Group> opencover::ColorMapRenderObject::createColorMapGroup(
+//     const ColorMap &colorMap) {
+//   osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
+//   addColorMap(colormapGroup, colorMap);
+//   addLabels(colormapGroup, colorMap);
 
-  return colormapGroup;
-}
+//   return colormapGroup;
+// }
 
-void opencover::ColorMapRenderObject::show(bool on) {
-  if (on) {
-    auto colorMap = m_colormap.lock();
-    if (!colorMap) {
-      std::cerr << "ColorMapRenderObject: ColorMap is not set or in use."
-                << std::endl;
-      return;
-    }
+// void opencover::ColorMapRenderObject::show(bool on) {
+//   if (on) {
+//     auto colorMap = m_colormap.lock();
+//     if (!colorMap) {
+//       std::cerr << "ColorMapRenderObject: ColorMap is not set or in use."
+//                 << std::endl;
+//       return;
+//     }
 
-    auto colormapGroup = createColorMapGroup(*colorMap);
+//     auto colormapGroup = createColorMapGroup(*colorMap);
 
-    // create a transform node to move the colormap to the right position
-    m_colormapTransform = new osg::MatrixTransform();
-    m_colormapTransform->addChild(colormapGroup);
-    m_colormapTransform->setName("ColorMap");
+//     // create a transform node to move the colormap to the right position
+//     m_colormapTransform = new osg::MatrixTransform();
+//     m_colormapTransform->addChild(colormapGroup);
+//     m_colormapTransform->setName("ColorMap");
 
-    cover->getObjectsRoot()->addChild(m_colormapTransform);
-    m_visible = true;
-  } else {
-    cover->getObjectsRoot()->removeChild(m_colormapTransform);
-    m_visible = false;
-  }
-}
+//     cover->getObjectsRoot()->addChild(m_colormapTransform);
+//     m_visible = true;
+//   } else {
+//     cover->getObjectsRoot()->removeChild(m_colormapTransform);
+//     m_visible = false;
+//   }
+// }
 
-void opencover::ColorMapRenderObject::render() {
-  if (m_config.Update() && m_visible) {
-    m_config.Update() = false;
-    rebuild();
-  }
-  if (m_colormapTransform) {
-    // First, cover->getInvBaseMat() transforms world coordinates into the plugin's
-    // base coordinate system.
-    //
-    // Then, cover->getViewerMat() transforms the results of
-    // the previous operation, from the plugins base coordinate system, into the
-    // viewers coordinate system.
-    //
-    // Therefore, the combined result is a matrix that transforms coordinates from
-    // the plugin's base coordinate system directly into the viewer's coordinate
-    // system.
+// void opencover::ColorMapRenderObject::render() {
+//   if (m_config.Update() && m_visible) {
+//     m_config.Update() = false;
+//     rebuild();
+//   }
+//   if (m_colormapTransform) {
+//     // First, cover->getInvBaseMat() transforms world coordinates into the plugin's
+//     // base coordinate system.
+//     //
+//     // Then, cover->getViewerMat() transforms the results of
+//     // the previous operation, from the plugins base coordinate system, into the
+//     // viewers coordinate system.
+//     //
+//     // Therefore, the combined result is a matrix that transforms coordinates from
+//     // the plugin's base coordinate system directly into the viewer's coordinate
+//     // system.
 
-    // cover->getViewerMat() does contain head tracking information => use the main
-    // camera
-    // auto viewer = VRViewer::instance();
-    // auto mainCamera = viewer->getCamera();
-    // auto viewerStaticWorldMatrix = mainCamera->getViewMatrix();
+//     // cover->getViewerMat() does contain head tracking information => use the main
+//     // camera
+//     // auto viewer = VRViewer::instance();
+//     // auto mainCamera = viewer->getCamera();
+//     // auto viewerStaticWorldMatrix = mainCamera->getViewMatrix();
 
-    // auto transformMatrix = cover->getViewerMat() * cover->getInvBaseMat();
-    // auto transformMatrix = viewerStaticWorldMatrix * cover->getInvBaseMat();
-    auto transformMatrix = m_mainCamera->getViewMatrix() * cover->getInvBaseMat();
-    osg::Vec3d scale, translation;
-    osg::Quat rotationNoScale, scaleOrientation;
-    transformMatrix.decompose(translation, rotationNoScale, scale, scaleOrientation);
+//     // auto transformMatrix = cover->getViewerMat() * cover->getInvBaseMat();
+//     // auto transformMatrix = viewerStaticWorldMatrix * cover->getInvBaseMat();
+//     auto transformMatrix = m_mainCamera->getViewMatrix() * cover->getInvBaseMat();
+//     osg::Vec3d scale, translation;
+//     osg::Quat rotationNoScale, scaleOrientation;
+//     transformMatrix.decompose(translation, rotationNoScale, scale, scaleOrientation);
 
-    auto transformMatrixNoScale =
-        osg::Matrixd::rotate(rotationNoScale) * osg::Matrixd::translate(translation);
+//     auto transformMatrixNoScale =
+//         osg::Matrixd::rotate(rotationNoScale) * osg::Matrixd::translate(translation);
 
-    // transform to viewer coordinates
-    auto objectPositionInViewer =
-        m_config.ObjectPositionInBase() * transformMatrixNoScale;
+//     // transform to viewer coordinates
+//     auto objectPositionInViewer =
+//         m_config.ObjectPositionInBase() * transformMatrixNoScale;
 
-    // apply transformation to object
-    osg::Matrixd matrix;
-    matrix.makeRotate(m_config.ColorMapRotation() * rotationNoScale);
-    matrix.setTrans(objectPositionInViewer);
-    m_colormapTransform->setMatrix(matrix);
-  }
-}
+//     // apply transformation to object
+//     osg::Matrixd matrix;
+//     matrix.makeRotate(m_config.ColorMapRotation() * rotationNoScale);
+//     matrix.setTrans(objectPositionInViewer);
+//     m_colormapTransform->setMatrix(matrix);
+//   }
+// }
 
-opencover::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
-    : m_colorMapGroup(new opencover::ui::Group(&group, "ColorMap")),
-      m_colorMapSettingsMenu(new opencover::ui::Menu(&group, "ColorMapSettings")),
-      m_selector(std::make_unique<ColorMapSelector>(*m_colorMapGroup)) {
-  init();
-}
+// opencover::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
+//     : m_colorMapGroup(new opencover::ui::Group(&group, "ColorMap")),
+//       m_colorMapSettingsMenu(new opencover::ui::Menu(&group, "ColorMapSettings")),
+//       m_selector(std::make_unique<ColorMapSelector>(*m_colorMapGroup)) {
+//   init();
+// }
 
-void opencover::ColorMapUI::sliderCallback(opencover::ui::Slider *slider, float &toSet,
-                                        float value, bool moving,
-                                        bool predicateCheck) {
-  if (!moving) return;
-  if (predicateCheck) {
-    slider->setValue(toSet);
-    return;
-  }
-  toSet = value;
-}
+// void opencover::ColorMapUI::sliderCallback(opencover::ui::Slider *slider, float &toSet,
+//                                         float value, bool moving,
+//                                         bool predicateCheck) {
+//   if (!moving) return;
+//   if (predicateCheck) {
+//     slider->setValue(toSet);
+//     return;
+//   }
+//   toSet = value;
+// }
 
-opencover::ui::Slider *opencover::ColorMapUI::createSlider(
-    const std::string &name, const ui::Slider::ValueType &min,
-    const ui::Slider::ValueType &max, const ui::Slider::Presentation &presentation,
-    const ui::Slider::ValueType &initial, std::function<void(float, bool)> callback,
-    opencover::ui::Group *group) {
-  if (!group) group = m_colorMapGroup;
-  auto slider = new ui::Slider(group, name);
-  slider->setBounds(min, max);
-  slider->setPresentation(presentation);
-  slider->setValue(initial);
-  slider->setCallback(callback);
-  return slider;
-}
+// opencover::ui::Slider *opencover::ColorMapUI::createSlider(
+//     const std::string &name, const ui::Slider::ValueType &min,
+//     const ui::Slider::ValueType &max, const ui::Slider::Presentation &presentation,
+//     const ui::Slider::ValueType &initial, std::function<void(float, bool)> callback,
+//     opencover::ui::Group *group) {
+//   if (!group) group = m_colorMapGroup;
+//   auto slider = new ui::Slider(group, name);
+//   slider->setBounds(min, max);
+//   slider->setPresentation(presentation);
+//   slider->setValue(initial);
+//   slider->setCallback(callback);
+//   return slider;
+// }
 
-void opencover::ColorMapUI::initSteps() {
-  m_numSteps = createSlider("steps", 1, 1024, ui::Slider::AsSlider,
-                            m_colorMap->steps, [this](float value, bool moving) {
-                              if (value < 1) return;
-                              if (!moving) return;
-                              int num = static_cast<int>(value);
-                              *m_colorMap = opencover::interpolateColorMap(
-                                  m_selector->selectedMap(), num);
-                              rebuildColorMap();
-                            });
-  m_numSteps->setScale(ui::Slider::Logarithmic);
-  m_numSteps->setIntegral(true);
-}
+// void opencover::ColorMapUI::initSteps() {
+//   m_numSteps = createSlider("steps", 1, 1024, ui::Slider::AsSlider,
+//                             m_colorMap->steps, [this](float value, bool moving) {
+//                               if (value < 1) return;
+//                               if (!moving) return;
+//                               int num = static_cast<int>(value);
+//                               *m_colorMap = opencover::interpolateColorMap(
+//                                   m_selector->selectedMap(), num);
+//                               rebuildColorMap();
+//                             });
+//   m_numSteps->setScale(ui::Slider::Logarithmic);
+//   m_numSteps->setIntegral(true);
+// }
 
-void opencover::ColorMapUI::initColorMap() {
-  assert(m_selector && "ColorMapSelector must be initialized before ColorMap");
-  m_colorMap = std::make_shared<ColorMap>(m_selector->selectedMap());
-}
+// void opencover::ColorMapUI::initColorMap() {
+//   assert(m_selector && "ColorMapSelector must be initialized before ColorMap");
+//   m_colorMap = std::make_shared<ColorMap>(m_selector->selectedMap());
+// }
 
-void opencover::ColorMapUI::initShow() {
-  m_show = new ui::Button(m_colorMapGroup, "Show");
-  m_show->setCallback([this](bool on) { show(on); });
-}
+// void opencover::ColorMapUI::initShow() {
+//   m_show = new ui::Button(m_colorMapGroup, "Show");
+//   m_show->setCallback([this](bool on) { show(on); });
+// }
 
-void opencover::ColorMapUI::initColorMapSettings() {
-  assert(m_renderObject && "RenderObject need to be initialized before calling it.");
-  auto renderConfig = m_renderObject->getConfig();
-  m_distance_x = createSlider(
-      "colormap_distance_x", -5.0f, 5.0f, ui::Slider::AsDial,
-      renderConfig.DistanceX(),
-      [this](float value, bool moving) {
-        m_renderObject->getConfig().DistanceX() = value;
-      },
-      m_colorMapSettingsMenu);
-  m_distance_y = createSlider(
-      "colormap_distance_y", -5.0f, 5.0f, ui::Slider::AsDial,
-      renderConfig.DistanceY(),
-      [this](float value, bool moving) {
-        m_renderObject->getConfig().DistanceY() = value;
-      },
-      m_colorMapSettingsMenu);
-  m_distance_z = createSlider(
-      "colormap_distance_z", -5.0f, 5.0f, ui::Slider::AsDial,
-      renderConfig.DistanceZ(),
-      [this](float value, bool moving) {
-        m_renderObject->getConfig().DistanceZ() = value;
-      },
-      m_colorMapSettingsMenu);
+// void opencover::ColorMapUI::initColorMapSettings() {
+//   assert(m_renderObject && "RenderObject need to be initialized before calling it.");
+//   auto renderConfig = m_renderObject->getConfig();
+//   m_distance_x = createSlider(
+//       "colormap_distance_x", -5.0f, 5.0f, ui::Slider::AsDial,
+//       renderConfig.DistanceX(),
+//       [this](float value, bool moving) {
+//         m_renderObject->getConfig().DistanceX() = value;
+//       },
+//       m_colorMapSettingsMenu);
+//   m_distance_y = createSlider(
+//       "colormap_distance_y", -5.0f, 5.0f, ui::Slider::AsDial,
+//       renderConfig.DistanceY(),
+//       [this](float value, bool moving) {
+//         m_renderObject->getConfig().DistanceY() = value;
+//       },
+//       m_colorMapSettingsMenu);
+//   m_distance_z = createSlider(
+//       "colormap_distance_z", -5.0f, 5.0f, ui::Slider::AsDial,
+//       renderConfig.DistanceZ(),
+//       [this](float value, bool moving) {
+//         m_renderObject->getConfig().DistanceZ() = value;
+//       },
+//       m_colorMapSettingsMenu);
 
-  m_rotation_x = createSlider(
-      "colormap_rotation_x", 0.0f, 360.0f, ui::Slider::AsDial,
-      renderConfig.RotationAngleX(),
-      [this](float value, bool moving) {
-        m_renderObject->getConfig().setRotationAngleX(value);
-      },
-      m_colorMapSettingsMenu);
-  m_rotation_y = createSlider(
-      "colormap_rotation_y", 0.0f, 360.0f, ui::Slider::AsDial,
-      renderConfig.RotationAngleY(),
-      [this](float value, bool moving) {
-        m_renderObject->getConfig().setRotationAngleY(value);
-      },
-      m_colorMapSettingsMenu);
-  m_rotation_z = createSlider(
-      "colormap_rotation_z", 0.0f, 360.0f, ui::Slider::AsDial,
-      renderConfig.RotationAngleZ(),
-      [this](float value, bool moving) {
-        m_renderObject->getConfig().setRotationAngleZ(value);
-      },
-      m_colorMapSettingsMenu);
-  m_charSize = createSlider(
-      "charSize", 0.01, 0.04, ui::Slider::AsDial,
-      renderConfig.LabelConfig().charSize,
-      [this](float value, bool moving) {
-        if (!moving) return;
-        m_renderObject->getConfig().LabelConfig().charSize = value;
-        rebuildColorMap();
-      },
-      m_colorMapSettingsMenu);
+//   m_rotation_x = createSlider(
+//       "colormap_rotation_x", 0.0f, 360.0f, ui::Slider::AsDial,
+//       renderConfig.RotationAngleX(),
+//       [this](float value, bool moving) {
+//         m_renderObject->getConfig().setRotationAngleX(value);
+//       },
+//       m_colorMapSettingsMenu);
+//   m_rotation_y = createSlider(
+//       "colormap_rotation_y", 0.0f, 360.0f, ui::Slider::AsDial,
+//       renderConfig.RotationAngleY(),
+//       [this](float value, bool moving) {
+//         m_renderObject->getConfig().setRotationAngleY(value);
+//       },
+//       m_colorMapSettingsMenu);
+//   m_rotation_z = createSlider(
+//       "colormap_rotation_z", 0.0f, 360.0f, ui::Slider::AsDial,
+//       renderConfig.RotationAngleZ(),
+//       [this](float value, bool moving) {
+//         m_renderObject->getConfig().setRotationAngleZ(value);
+//       },
+//       m_colorMapSettingsMenu);
+//   m_charSize = createSlider(
+//       "charSize", 0.01, 0.04, ui::Slider::AsDial,
+//       renderConfig.LabelConfig().charSize,
+//       [this](float value, bool moving) {
+//         if (!moving) return;
+//         m_renderObject->getConfig().LabelConfig().charSize = value;
+//         rebuildColorMap();
+//       },
+//       m_colorMapSettingsMenu);
 
-  m_rotationType = new ui::SelectionList(m_colorMapSettingsMenu, "RotationType");
-  m_rotationType->append("HPR");
-  m_rotationType->append("PHR");
-  m_rotationType->select(0);
+//   m_rotationType = new ui::SelectionList(m_colorMapSettingsMenu, "RotationType");
+//   m_rotationType->append("HPR");
+//   m_rotationType->append("PHR");
+//   m_rotationType->select(0);
 
-  m_rotationType->setCallback([this](int index) {
-    m_renderObject->getConfig().RotationType() = static_cast<RotationType>(index);
-    rebuildColorMap();
-  });
-}
+//   m_rotationType->setCallback([this](int index) {
+//     m_renderObject->getConfig().RotationType() = static_cast<RotationType>(index);
+//     rebuildColorMap();
+//   });
+// }
 
-void opencover::ColorMapUI::initUI() {
-  initShow();
-  initColorMap();
-  m_minAttribute = createSlider(
-      "min", 0, 1, ui::Slider::AsDial, 0, [this](float value, bool moving) {
-        sliderCallback(m_minAttribute, m_colorMap->min, value, moving,
-                       value > m_maxAttribute->value());
-        rebuildColorMap();
-      });
-  m_maxAttribute = createSlider(
-      "max", 0, 1, ui::Slider::AsDial, 1, [this](float value, bool moving) {
-        sliderCallback(m_maxAttribute, m_colorMap->max, value, moving,
-                       value < m_minAttribute->value());
-        rebuildColorMap();
-      });
-  initSteps();
-  initRenderObject();
-  initColorMapSettings();
-}
+// void opencover::ColorMapUI::initUI() {
+//   initShow();
+//   initColorMap();
+//   m_minAttribute = createSlider(
+//       "min", 0, 1, ui::Slider::AsDial, 0, [this](float value, bool moving) {
+//         sliderCallback(m_minAttribute, m_colorMap->min, value, moving,
+//                        value > m_maxAttribute->value());
+//         rebuildColorMap();
+//       });
+//   m_maxAttribute = createSlider(
+//       "max", 0, 1, ui::Slider::AsDial, 1, [this](float value, bool moving) {
+//         sliderCallback(m_maxAttribute, m_colorMap->max, value, moving,
+//                        value < m_minAttribute->value());
+//         rebuildColorMap();
+//       });
+//   initSteps();
+//   initRenderObject();
+//   initColorMapSettings();
+// }
 
-void opencover::ColorMapUI::initRenderObject() {
-  assert(m_colorMap && "ColorMap must be initialized before render object");
-  m_renderObject = std::make_unique<ColorMapRenderObject>(m_colorMap);
-}
+// void opencover::ColorMapUI::initRenderObject() {
+//   assert(m_colorMap && "ColorMap must be initialized before render object");
+//   m_renderObject = std::make_unique<ColorMapRenderObject>(m_colorMap);
+// }
 
-void opencover::ColorMapUI::init() { initUI(); }
+// void opencover::ColorMapUI::init() { initUI(); }
 
-void opencover::ColorMapUI::rebuildColorMap() {
-  m_renderObject->getConfig().Update() = true;
-}
+// void opencover::ColorMapUI::rebuildColorMap() {
+//   m_renderObject->getConfig().Update() = true;
+// }
 
-void opencover::ColorMapUI::setCallback(
-    const std::function<void(const ColorMap &)> &f) {
-  m_selector->setCallback([this, f](const ColorMap &cm) {
-    *m_colorMap = interpolateColorMap(cm, m_numSteps->value());
-    f(*m_colorMap);
-    rebuildColorMap();
-  });
-}
+// void opencover::ColorMapUI::setCallback(
+//     const std::function<void(const ColorMap &)> &f) {
+//   m_selector->setCallback([this, f](const ColorMap &cm) {
+//     *m_colorMap = interpolateColorMap(cm, m_numSteps->value());
+//     f(*m_colorMap);
+//     rebuildColorMap();
+//   });
+// }
 
-osg::Vec4 opencover::ColorMapUI::getColor(float val) {
-  return opencover::getColor(val, *m_colorMap);
-}
+// osg::Vec4 opencover::ColorMapUI::getColor(float val) {
+//   return opencover::getColor(val, *m_colorMap);
+// }
 
-void opencover::ColorMapUI::show(bool show) { m_renderObject->show(show); }
+// void opencover::ColorMapUI::show(bool show) { m_renderObject->show(show); }

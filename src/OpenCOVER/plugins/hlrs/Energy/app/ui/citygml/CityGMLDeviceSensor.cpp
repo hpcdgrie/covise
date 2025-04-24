@@ -12,12 +12,11 @@
 CityGMLDeviceSensor::CityGMLDeviceSensor(
     osg::ref_ptr<osg::Group> parent,
     std::unique_ptr<core::interface::IInfoboard<std::string>> &&infoBoard,
-    std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
-    std::shared_ptr<opencover::ColorMapUI> colorMap)
+    std::unique_ptr<core::interface::IBuilding> &&drawableBuilding)
     : coPickSensor(parent),
       m_cityGMLBuilding(std::move(drawableBuilding)),
-      m_infoBoard(std::move(infoBoard)),
-      m_colorMapRef(colorMap) {
+      m_infoBoard(std::move(infoBoard))
+{
   m_cityGMLBuilding->initDrawables();
 
   // infoboard
@@ -50,16 +49,11 @@ void CityGMLDeviceSensor::disactivate() {
   m_infoBoard->hideInfo();
 }
 
-void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values) {
-  auto colormap = m_colorMapRef.lock();
+void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values, const opencover::ColorMap &map) {
   m_colors.clear();
   m_colors.resize(values.size());
-  const auto &max = m_colorMapRef;
-  for (auto i = 0; i < m_colors.size(); ++i) {
-    auto value = values[i];
-    auto color = colormap->getColor(value);
-    m_colors[i] = color;
-  }
+  for (auto i = 0; i < m_colors.size(); ++i)
+    m_colors[i] = getColor(values[i], map);
 }
 
 void CityGMLDeviceSensor::updateTime(int timestep) {

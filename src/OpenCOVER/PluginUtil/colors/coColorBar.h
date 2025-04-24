@@ -39,13 +39,16 @@ struct ColorMap {
    std::vector<float> r{0., 1.}, g{0., 1.}, b{0., 1.}, a{0., 1.}, samplingPoints{0., 1.};
    float min = 0.0, max = 1.0;
    int steps = 32;
-   std::string name = "default";
-   std::string unit = "unit";
+   std::string species = "default";
+   std::string unit = "NoUnit";
    size_t numColors() const {
       return r.size();
    };
    bool concretisized() const {
       return steps < 0;
+   };
+   void setConcretisized() {
+      steps = -1;
    };
 };
 /** class coColorBar, derived from coMenuItem
@@ -81,7 +84,6 @@ private:
     ColorMap map_;
     std::vector<unsigned char> image_, tickImage_;
     std::string name_; // the name of the colors module for example Colors_1
-    std::string species_;
 
     void makeImage(const ColorMap &map, bool swapped);
     void makeTickImage();
@@ -91,10 +93,9 @@ public:
     /** constructor
        *  create texture and labels, put them nto containers
        *  @param name the name of the colorbar, identical with module name, eg, g, Colors_1
-       *  @param species data species name, currently not displayed
        *  @param map color map to display
        */
-    coColorBar(const std::string &name, const std::string &species, const ColorMap &map, bool inMenu=true);
+    coColorBar(const std::string &name, const ColorMap &map, bool inMenu=true);
 
     /// destructor
     ~coColorBar();

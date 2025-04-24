@@ -240,7 +240,7 @@ ColorBarPlugin::newInteractor(const RenderObject *container, coInteractor *inter
         mod.colorbar->addInter(inter);
         mod.colorbar->setName(menuName.c_str());
         if (colormapString)
-            mod.colorbar->parseAttrib(colormapString);
+            mod.colorbar->update(mod.colorbar->parseAttrib(colormapString));
     }
 }
 

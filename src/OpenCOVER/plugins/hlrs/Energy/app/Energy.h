@@ -87,6 +87,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <array>
 
 using namespace core::simulation;
 namespace COVERUtils = opencover::utils;
@@ -95,8 +96,10 @@ namespace CoreUtils = core::utils;
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
-  enum Components { Strom, Waerme, Kaelte };
-  enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid };
+  enum Components { Strom, Waerme }; //keep in sync with EnergyGrids
+  enum EnergyGrids { PowerGrid, HeatingGrid, NUM_ENERGY_GRIDS };
+  // enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid, NUM_ENERGY_GRIDS };
+
   struct ProjTrans {
     std::string projFrom;
     std::string projTo;
@@ -131,12 +134,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
   template <typename T>
   using NameMapVectorPtr = NameMapPtr<std::vector<T>>;
 
-  std::unique_ptr<opencover::ColorMapSelector> m_colorMapSelector = nullptr;
-
   /* #endregion */
 
   /* #region typedef */
   typedef std::unordered_map<int, std::string> IDLookupTable;
+  typedef BaseSimulationUI<core::interface::IEnergyGrid> BaseSimUI;
   typedef HeatingSimulationUI<core::interface::IEnergyGrid> HeatingSimUI;
   typedef PowerSimulationUI<core::interface::IEnergyGrid> PowerSimUI;
   typedef const ennovatis::Building *building_const_ptr;
@@ -150,9 +152,25 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef std::unique_ptr<CSVStreamMap> CSVStreamMapPtr;
 
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
+  typedef ::EnergyGrid EnergyGridOsg;
   /* #endregion */
-
-  void preFrame() override;  // update colormaps
+  struct EnergyGrid{
+    const std::string name;
+    const std::string species;
+    const std::string unit;
+    const EnergyGrids type;
+    const Components componentType;
+    opencover::ui::Button *historicalBtn = nullptr;
+    opencover::ui::Button *simulationUIBtn = nullptr;
+    opencover::ui::Menu *menu = nullptr;
+    osg::ref_ptr<osg::Group> group = nullptr;
+    std::shared_ptr<core::interface::IEnergyGrid> grid;
+    std::shared_ptr<HeatingSimulation> sim;
+    std::unique_ptr<BaseSimUI> simUI;
+    ui::Menu *colorMapSelectorMenu = nullptr;
+    std::unique_ptr<opencover::ColorMapSelector> colorMapSelector;
+  };
+  void preFrame() override; // update colormaps
 
   /* #region GENERAL */
   inline void checkEnergyTab() {
@@ -176,11 +194,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void helper_initTimestepsAndMinYear(size_t &maxTimesteps, int &minYear,
                                       const std::vector<std::string> &header);
   void helper_projTransformation(bool mapdrape, PJ *P, PJ_COORD &coord,
-                                 energy::DeviceInfo::ptr deviceInfoPtr,
+                                 energy::DeviceInfo &deviceInfoPtr,
                                  const double &lat, const double &lon);
   void helper_handleEnergyInfo(size_t maxTimesteps, int minYear,
                                const CSVStream::CSVRow &row,
-                               energy::DeviceInfo::ptr deviceInfoPtr);
+                               energy::DeviceInfo &deviceInfoPtr);
   bool loadDBFile(const std::string &fileName, const ProjTrans &projTrans);
   bool loadDB(const std::string &path, const ProjTrans &projTrans);
   void reinitDevices(int comp);
@@ -240,7 +258,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initEnergyGridUI();
   void switchEnergyGrid(EnergyGrids grid);
   void initSimMenu();
-  void updateColorMap(const opencover::ColorMap &map);
+  void updateColorMap(const opencover::ColorMap &map, EnergyGrids grid);
   void initColorMap();
   void initGrid();
   void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
@@ -356,15 +374,15 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_gridControlButton = nullptr;
   opencover::ui::Button *m_energySwitchControlButton = nullptr;
 
-  std::shared_ptr<opencover::ColorMapUI> m_colorMapMenu = nullptr;
-
+  std::array<EnergyGrid, NUM_ENERGY_GRIDS> m_energyGrids;
+  std::unique_ptr<opencover::ColorMapSelector> m_cityGmlColorMap;
   // historical
   opencover::ui::Button *ShowGraph = nullptr;
   opencover::ui::ButtonGroup *componentGroup = nullptr;
   opencover::ui::Menu *componentList = nullptr;
-  opencover::ui::Button *StromBt = nullptr;
-  opencover::ui::Button *WaermeBt = nullptr;
-  opencover::ui::Button *KaelteBt = nullptr;
+  // opencover::ui::Button *StromBt = nullptr;
+  // opencover::ui::Button *WaermeBt = nullptr;
+  // opencover::ui::Button *KaelteBt = nullptr;
 
   // ennovatis UI
   opencover::ui::SelectionList *m_ennovatisSelectionsList = nullptr;
@@ -384,9 +402,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Menu *m_simulationMenu = nullptr;
   opencover::ui::Group *m_energygridGroup = nullptr;
   opencover::ui::ButtonGroup *m_energygridBtnGroup = nullptr;
-  opencover::ui::Button *m_powerGridBtn = nullptr;
-  opencover::ui::Button *m_heatingGridBtn = nullptr;
-  opencover::ui::Button *m_coolingGridBtn = nullptr;
+  // opencover::ui::Button *m_powerGridBtn = nullptr;
+  // opencover::ui::Button *m_heatingGridBtn = nullptr;
+  // opencover::ui::Button *m_coolingGridBtn = nullptr;
 
   // Powergrid UI
   opencover::ui::Menu *m_powerGridMenu = nullptr;
@@ -395,11 +413,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
       m_powerGridCheckboxes;
   std::unique_ptr<config::Array<bool>> m_powerGridSelectionPtr = nullptr;
 
-  // Heatgrid UI
-  opencover::ui::Menu *m_heatGridMenu = nullptr;
+  // // Heatgrid UI
+  // opencover::ui::Menu *m_heatGridMenu = nullptr;
 
-  // Coolinggrid UI
-  opencover::ui::Menu *m_coolingGridMenu = nullptr;
+  // // Coolinggrid UI
+  // opencover::ui::Menu *m_coolingGridMenu = nullptr;
 
   float rad, scaleH;
   int m_selectedComp = 0;
@@ -424,8 +442,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   osg::ref_ptr<osg::Sequence> m_sequenceList;
   osg::ref_ptr<osg::MatrixTransform> m_Energy;
   osg::ref_ptr<osg::Group> m_cityGML;
-  osg::ref_ptr<osg::Group> m_heatingGroup;
-  osg::ref_ptr<osg::Group> m_powerGroup;
   osg::ref_ptr<osg::Group> m_pvGroup;
   std::map<std::string, Geodes> m_cityGMLDefaultStatesets;
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
@@ -433,13 +449,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   CSVStreamMap m_powerGridStreams;
   CSVStreamMap m_heatingGridStreams;
 
-  std::shared_ptr<core::interface::IEnergyGrid> m_powerGrid;
-  std::shared_ptr<core::interface::IEnergyGrid> m_heatingGrid;
-  std::shared_ptr<HeatingSimulation> m_heatingSim;
-  std::shared_ptr<PowerSimulation> m_powerSim;
 
-  std::unique_ptr<PowerSimUI> m_powerSimUI;
-  std::unique_ptr<HeatingSimUI> m_heatingSimUI;
+  // std::array<std::unique_ptr<BaseSimUI>, NUM_ENERGY_GRIDS> m_simUIs;
 //   std::unique_ptr<SolarPanelList> m_solarPanels;
   SolarPanelList m_solarPanels;
 //   std::unique_ptr<SolarPanel> m_solarPanel;
