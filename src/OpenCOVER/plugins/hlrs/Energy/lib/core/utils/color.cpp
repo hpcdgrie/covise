@@ -14,6 +14,23 @@ std::unique_ptr<osg::Vec4> ColorMap::getColor(float value, float maxValue) const
   return col;
 }
 
+osg::Vec4 getTrafficLightColor(float val, float max) {
+  osg::Vec4 red = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+  osg::Vec4 yellow = osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f);
+  osg::Vec4 green = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+
+  float greenThreshold = max * 0.33f;
+  float yellowThreshold = max * 0.66f;
+
+  if (val <= greenThreshold) {
+    return green;
+  } else if (val <= yellowThreshold) {
+    return yellow;
+  } else {
+    return red;
+  }
+};
+
 auto createMaterial(const osg::Vec4 &color, osg::Material::Face faceMask) {
   osg::ref_ptr<osg::Material> mat = new osg::Material;
   mat->setDiffuse(faceMask, color);

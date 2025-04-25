@@ -287,6 +287,47 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initPowerGrid();
   void initPowerGridUI(const std::vector<std::string> &tablesToSkip = {});
   void buildPowerGrid();
+  /* #region PV*/
+  std::pair<std::map<std::string, PVData>, float> loadPVData(CSVStream &pvStream);
+  void processPVRow(const CSVStream::CSVRow &row,
+                    std::map<std::string, PVData> &pvDataMap, float &maxPVIntensity);
+  osg::ref_ptr<osg::Node> readPVModel(const boost::filesystem::path &modelDir,
+                                      const std::string &nameInModelDir);
+  void initPV(osg::ref_ptr<osg::Node> masterPanel,
+              const std::map<std::string, PVData> &pvDataMap, float maxPVIntensity);
+  void processPVDataMap(
+      const std::vector<CoreUtils::osgUtils::instancing::GeometryData>
+          &masterGeometryData,
+      const std::map<std::string, PVData> &pvDataMap, float maxPVIntensity);
+  void processSolarPanelDrawable();
+  SolarPanel createSolarPanel(
+      const std::string &name, osg::ref_ptr<osg::Group> parent,
+      const std::vector<CoreUtils::osgUtils::instancing::GeometryData>
+          &masterGeometryData,
+      const osg::Matrix &matrix, const osg::Vec4 &colorIntensity);
+
+  struct SolarPanelConfig {
+    std::string name;
+    float zOffset;
+    float numMaxPanels;
+    float panelWidth;
+    float panelHeight;
+    osg::Vec4 colorIntensity;
+    osg::Matrixd rotation;
+    osg::ref_ptr<osg::Group> parent;
+    osg::ref_ptr<osg::Geode> geode;
+    std::vector<CoreUtils::osgUtils::instancing::GeometryData> masterGeometryData;
+    bool valid() const {
+      return parent && geode && !masterGeometryData.empty();
+    }
+  };
+
+  void processSolarPanelDrawable(SolarPanelList &solarPanels,
+                                 const SolarPanelConfig &config);
+  void processSolarPanelDrawables(
+      const PVData &data, const std::vector<osg::ref_ptr<osg::Node>> drawables,
+      SolarPanelList &solarPanels, SolarPanelConfig &config);
+  /* #endregion*/
   /* #endregion*/
 
   /* #region HEATINGGRID */
