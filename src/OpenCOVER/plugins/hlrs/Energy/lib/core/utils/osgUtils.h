@@ -12,7 +12,32 @@
 #include <vector>
 
 namespace core::utils::osgUtils {
+namespace visitors {
+class NodeNameToggler : public osg::NodeVisitor {
+ public:
+  NodeNameToggler(const std::string &targetName)
+      : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
+        _targetName(targetName) {}
 
+  virtual void apply(osg::Node &node);
+
+ private:
+  std::string _targetName;
+};
+}  // namespace visitors
+   //
+namespace instancing {
+struct GeometryData {
+  osg::ref_ptr<osg::Geometry> geometry;
+  osg::ref_ptr<osg::StateSet> stateSet;
+};
+
+std::vector<GeometryData> extractAllGeometryData(osg::Node *node);
+std::vector<GeometryData> extractTexturedGeometryData(osg::Node *node);
+osg::ref_ptr<osg::Node> createInstance(
+    const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix);
+}  // namespace instancing
+   //
 typedef std::vector<osg::ref_ptr<osg::Geode>> Geodes;
 
 std::unique_ptr<Geodes> getGeodes(osg::Group *grp);
@@ -76,15 +101,5 @@ osg::ref_ptr<osg::Geometry> createNormalVisualization(
 
 void printNodeInfo(osg::Node *node, int indent = 0);
 
-namespace instancing {
-struct GeometryData {
-  osg::ref_ptr<osg::Geometry> geometry;
-  osg::ref_ptr<osg::StateSet> stateSet;
-};
-
-std::vector<GeometryData> extractAllGeometryData(osg::Node *node);
-osg::ref_ptr<osg::Node> createInstance(
-    const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix);
-}  // namespace instancing
 }  // namespace core::utils::osgUtils
 #endif

@@ -34,7 +34,100 @@
 #include <osgUtil/SmoothingVisitor>
 
 namespace core::utils::osgUtils {
+namespace visitors {
+void NodeNameToggler::apply(osg::Node &node) {
+  if (node.getName() == _targetName) {
+    if (node.getNodeMask() == 0x0) {
+      std::cout << "Knoten '" << _targetName << "' aktiviert." << std::endl;
+      node.setNodeMask(0xffffffff);
+    } else {
+      std::cout << "Knoten '" << _targetName << "' deaktiviert." << std::endl;
+      node.setNodeMask(0x0);
+    }
+  }
+  traverse(node);
+}
+}  // namespace visitors
+namespace instancing {
+std::vector<GeometryData> extractAllGeometryData(osg::Node *node) {
+  std::vector<GeometryData> geometryDataList;
+  osg::ref_ptr<osg::Geode> geode = node->asGeode();
+  if (geode) {
+    for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
+      osg::ref_ptr<osg::Geometry> geometry = geode->getDrawable(i)->asGeometry();
+      if (geometry) {
+        GeometryData data;
+        data.geometry = geometry;
+        data.stateSet = geode->getStateSet();  // use state set of the geode
+        geometryDataList.push_back(data);
+      }
+    }
+  }
 
+  osg::ref_ptr<osg::Group> group = node->asGroup();
+  if (group) {
+    for (unsigned int i = 0; i < group->getNumChildren(); ++i) {
+      std::vector<GeometryData> childData =
+          extractAllGeometryData(group->getChild(i));
+      geometryDataList.insert(geometryDataList.end(), childData.begin(),
+                              childData.end());
+    }
+  }
+  return geometryDataList;
+}
+
+std::vector<GeometryData> extractTexturedGeometryData(osg::Node *node) {
+  auto geometryDataList = extractAllGeometryData(node);
+  std::vector<GeometryData> texturedGeometryDataList;
+  if (geometryDataList.empty()) return texturedGeometryDataList;
+
+  // get only the textured geometry data
+  for (int i = 0; i < geometryDataList.size(); ++i) {
+    const auto &geometryData = geometryDataList[i];
+    auto geom = geometryData.geometry;
+    auto geomStateset = geom->getOrCreateStateSet();
+    if (!geomStateset) continue;
+    auto textureList = geomStateset->getTextureAttributeList();
+    bool hasTexture = false;
+    for (const auto &attributeMap : textureList) {
+      if (hasTexture) break;
+      for (const auto &pair : attributeMap) {
+        const osg::StateAttribute::TypeMemberPair &typeMemberPair = pair.first;
+        const osg::StateSet::RefAttributePair &refAttributePair = pair.second;
+        osg::StateAttribute *attribute = refAttributePair.first.get();
+        if (attribute && typeMemberPair.first == osg::StateAttribute::TEXTURE) {
+          unsigned int textureUnit = typeMemberPair.second;
+          osg::Texture *texture = dynamic_cast<osg::Texture *>(attribute);
+          if (texture) {
+            texturedGeometryDataList.emplace_back(
+                instancing::GeometryData{geom, geomStateset});
+            hasTexture = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+  return texturedGeometryDataList;
+}
+
+osg::ref_ptr<osg::Node> createInstance(
+    const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix) {
+  osg::ref_ptr<osg::Group> instanceRoot = new osg::Group;
+  osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform(matrix);
+  instanceRoot->addChild(mt);
+
+  for (const auto &data : masterGeometryData) {
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+    geode->addDrawable(data.geometry);
+    geode->setStateSet(data.stateSet);  // share state set
+    mt->addChild(geode);
+  }
+
+  return instanceRoot.release();
+}
+
+}  // namespace instancing
 osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
                                           const osg::Vec3 &position, int charSize,
                                           const char *fontFile,
@@ -710,51 +803,5 @@ void printNodeInfo(osg::Node *node, int indent) {
     }
   }
 }
-
-namespace instancing {
-
-std::vector<GeometryData> extractAllGeometryData(osg::Node *node) {
-  std::vector<GeometryData> geometryDataList;
-  osg::ref_ptr<osg::Geode> geode = node->asGeode();
-  if (geode) {
-    for (unsigned int i = 0; i < geode->getNumDrawables(); ++i) {
-      osg::ref_ptr<osg::Geometry> geometry = geode->getDrawable(i)->asGeometry();
-      if (geometry) {
-        GeometryData data;
-        data.geometry = geometry;
-        data.stateSet = geode->getStateSet();  // use state set of the geode
-        geometryDataList.push_back(data);
-      }
-    }
-  }
-  osg::ref_ptr<osg::Group> group = node->asGroup();
-  if (group) {
-    for (unsigned int i = 0; i < group->getNumChildren(); ++i) {
-      std::vector<GeometryData> childData =
-          extractAllGeometryData(group->getChild(i));
-      geometryDataList.insert(geometryDataList.end(), childData.begin(),
-                              childData.end());
-    }
-  }
-  return geometryDataList;
-}
-
-osg::ref_ptr<osg::Node> createInstance(
-    const std::vector<GeometryData> &masterGeometryData, const osg::Matrix &matrix) {
-  osg::ref_ptr<osg::Group> instanceRoot = new osg::Group;
-  osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform(matrix);
-  instanceRoot->addChild(mt);
-
-  for (const auto &data : masterGeometryData) {
-    osg::ref_ptr<osg::Geode> geode = new osg::Geode;
-    geode->addDrawable(data.geometry);
-    geode->setStateSet(data.stateSet);  // share state set
-    mt->addChild(geode);
-  }
-
-  return instanceRoot.release();
-}
-
-}  // namespace instancing
 
 }  // namespace core::utils::osgUtils
