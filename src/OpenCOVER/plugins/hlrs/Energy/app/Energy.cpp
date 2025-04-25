@@ -410,15 +410,14 @@ bool EnergyPlugin::init() {
   return true;
 }
 
-EnergyPlugin::CSVStreamMapPtr EnergyPlugin::getCSVStreams(
+EnergyPlugin::CSVStreamMap EnergyPlugin::getCSVStreams(
     const boost::filesystem::path &dirPath) {
-  auto csv_files = std::make_unique<CSVStreamMap>();
+  auto csv_files = CSVStreamMap();
   for (auto &entry : fs::directory_iterator(dirPath)) {
     if (fs::is_regular_file(entry)) {
       if (entry.path().extension() == ".csv") {
         auto path = entry.path();
-        csv_files->insert(
-            {path.stem().string(), std::make_unique<CSVStream>(path.string())});
+        csv_files.emplace(path.stem().string(), path.string());
       }
     }
   }
@@ -661,7 +660,7 @@ void EnergyPlugin::enableCityGML(bool on) {
           }
         }
       }
-      core::utils::osgUtils::deleteChildrenFromOtherGroup(root, m_cityGML);
+      CoreUtils::osgUtils::deleteChildrenFromOtherGroup(root, m_cityGML);
     }
     switchTo(m_cityGML, m_switch);
 
@@ -1290,7 +1289,7 @@ void EnergyPlugin::initPowerGridStreams() {
   fs::path dir_path(powerGridDir);
   if (!fs::exists(dir_path)) return;
   m_powerGridStreams = getCSVStreams(dir_path);
-  if (!m_powerGridStreams) {
+  if (m_powerGridStreams.empty()) {
     std::cout << "No csv files found in " << powerGridDir << std::endl;
     return;
   }
@@ -1409,7 +1408,7 @@ void EnergyPlugin::updatePowerGridSelection(bool on) {
 }
 
 void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip) {
-  if (!m_powerGridStreams) initPowerGridStreams();
+  if (m_powerGridStreams.empty()) initPowerGridStreams();
   m_powerGridMenu = new opencover::ui::Menu("PowerGridData", m_EnergyTab);
 
   m_updatePowerGridSelection = new opencover::ui::Button(m_powerGridMenu, "Update");
@@ -1425,7 +1424,7 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
   auto initConfig = powerGridSelection.empty();
 
   int i = 0;
-  for (auto &[name, stream] : *m_powerGridStreams) {
+  for (auto &[name, stream] : m_powerGridStreams) {
     if (std::any_of(tablesToSkip.begin(), tablesToSkip.end(),
                     [n = name](const std::string &table) { return table == n; }))
       continue;
@@ -1433,7 +1432,7 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
     auto menu = new opencover::ui::Menu(m_powerGridMenu, name);
     menu->allowRelayout(true);
 
-    auto header = stream->getHeader();
+    auto header = stream.getHeader();
     std::vector<opencover::ui::Button *> checkBoxMap;
     for (auto &col : header) {
       if (col.find("Unnamed") == 0) continue;
@@ -1475,7 +1474,7 @@ void EnergyPlugin::initPowerGrid() {
                    "dtypes", "bus_geodata", "fuse_std_types", "line_std_types"});
   buildPowerGrid();
   applySimulationDataToPowerGrid();
-  m_powerGridStreams->clear();
+  m_powerGridStreams.clear();
 }
 
 void EnergyPlugin::initGrid() {
@@ -1525,8 +1524,8 @@ std::unique_ptr<grid::PointDataList> EnergyPlugin::getAdditionalPowerGridPointDa
   // additional bus data
   PDL additionalData;
 
-  for (auto &[tableName, tableStream] : *m_powerGridStreams) {
-    auto header = tableStream->getHeader();
+  for (auto &[tableName, tableStream] : m_powerGridStreams) {
+    auto header = tableStream.getHeader();
     if (auto it = std::find(header.begin(), header.end(), "bus"); it == header.end())
       continue;
     auto it = std::find(header.begin(), header.end(), "bus");
@@ -1535,7 +1534,7 @@ std::unique_ptr<grid::PointDataList> EnergyPlugin::getAdditionalPowerGridPointDa
     std::map<std::string, uint> duplicate{};
     CSVStream::CSVRow row;
     // row
-    while (*tableStream >> row) {
+    while (tableStream >> row) {
       grid::Data data;
       // column
       for (auto &colName : header) {
@@ -1760,37 +1759,37 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(COVERUtils::read::CSVStream &st
 
 void EnergyPlugin::buildPowerGrid() {
   using grid::Point;
-  if (!m_powerGridStreams) return;
+  if (m_powerGridStreams.empty()) return;
 
   const float connectionsRadius(0.5f);
   const float sphereRadius(1.0f);
   size_t numPoints(0);
 
   // fetch bus names
-  auto busData = m_powerGridStreams->find("bus");
+  auto busData = m_powerGridStreams.find("bus");
   std::unique_ptr<IDLookupTable> busNames(nullptr);
-  if (busData != m_powerGridStreams->end()) {
+  if (busData != m_powerGridStreams.end()) {
     auto &[name, busStream] = *busData;
-    busNames = retrieveBusNameIdMapping(*busStream);
+    busNames = retrieveBusNameIdMapping(busStream);
   }
 
   if (!busNames) return;
 
   // create points
-  auto pointsData = m_powerGridStreams->find("bus_geodata");
+  auto pointsData = m_powerGridStreams.find("bus_geodata");
   std::unique_ptr<grid::Points> points(nullptr);
-  if (pointsData != m_powerGridStreams->end()) {
+  if (pointsData != m_powerGridStreams.end()) {
     auto &[name, pointStream] = *pointsData;
-    points = createPowerGridPoints(*pointStream, numPoints, sphereRadius, *busNames);
+    points = createPowerGridPoints(pointStream, numPoints, sphereRadius, *busNames);
   }
 
   // create line
-  auto lineData = m_powerGridStreams->find("line");
+  auto lineData = m_powerGridStreams.find("line");
   std::unique_ptr<grid::Lines> lines = nullptr;
   std::unique_ptr<grid::ConnectionDataList> optData = nullptr;
-  if (lineData != m_powerGridStreams->end()) {
+  if (lineData != m_powerGridStreams.end()) {
     auto &[name, lineStream] = *lineData;
-    std::tie(lines, optData) = getPowerGridLines(*lineStream, *points);
+    std::tie(lines, optData) = getPowerGridLines(lineStream, *points);
   }
 
   // create grid
@@ -1825,7 +1824,7 @@ void EnergyPlugin::initHeatingGridStreams() {
   fs::path dir_path(heatingGridDir);
   if (!fs::exists(dir_path)) return;
   m_heatingGridStreams = getCSVStreams(dir_path);
-  if (!m_heatingGridStreams) {
+  if (m_heatingGridStreams.empty()) {
     std::cout << "No csv files found in " << heatingGridDir << std::endl;
     return;
   }
@@ -1835,7 +1834,7 @@ void EnergyPlugin::initHeatingGrid() {
   initHeatingGridStreams();
   buildHeatingGrid();
   applySimulationDataToHeatingGrid();
-  m_heatingGridStreams->clear();
+  m_heatingGridStreams.clear();
 }
 
 std::vector<int> EnergyPlugin::createHeatingGridIndices(
@@ -1901,12 +1900,12 @@ void EnergyPlugin::readSimulationDataStream(
 }
 
 void EnergyPlugin::applySimulationDataToHeatingGrid() {
-  if (!m_heatingGridStreams) return;
-  auto simulationData = m_heatingGridStreams->find("results");
-  if (simulationData == m_heatingGridStreams->end()) return;
+  if (m_heatingGridStreams.empty()) return;
+  auto simulationData = m_heatingGridStreams.find("results");
+  if (simulationData == m_heatingGridStreams.end()) return;
 
   auto &[_, stream] = *simulationData;
-  readSimulationDataStream(*stream);
+  readSimulationDataStream(stream);
 }
 
 void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
@@ -1997,14 +1996,14 @@ void EnergyPlugin::addEnergyGridToGridSwitch(
 }
 
 void EnergyPlugin::buildHeatingGrid() {
-  if (!m_heatingGridStreams) return;
+  if (m_heatingGridStreams.empty()) return;
 
   // find correct csv
-  auto heatingIt = m_heatingGridStreams->find("heating_network_2");
-  if (heatingIt == m_heatingGridStreams->end()) return;
+  auto heatingIt = m_heatingGridStreams.find("heating_network_2");
+  if (heatingIt == m_heatingGridStreams.end()) return;
 
   auto &[_, heatingStream] = *heatingIt;
-  readHeatingGridStream(*heatingStream);
+  readHeatingGridStream(heatingStream);
 }
 
 void EnergyPlugin::buildCoolingGrid() {

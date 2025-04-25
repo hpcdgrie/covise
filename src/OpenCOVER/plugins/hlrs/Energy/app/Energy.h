@@ -146,7 +146,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   typedef NameMapVector<float> FloatMap;
   typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
-  typedef NameMapPtr<CSVStream> CSVStreamMap;
+  typedef NameMap<CSVStream> CSVStreamMap;
   typedef std::unique_ptr<CSVStreamMap> CSVStreamMapPtr;
 
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
@@ -164,7 +164,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
                 osg::ref_ptr<osg::Switch> parent);
   std::pair<PJ *, PJ_COORD> initProj();
   void projTransLatLon(float &lat, float &lon);
-  CSVStreamMapPtr getCSVStreams(const boost::filesystem::path &dirPath);
+  CSVStreamMap getCSVStreams(const boost::filesystem::path &dirPath);
   void setAnimationTimesteps(size_t maxTimesteps, const void *who);
   void initOverview();
   void initUI();
@@ -389,8 +389,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::map<std::string, Geodes> m_cityGMLDefaultStatesets;
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
-  CSVStreamMapPtr m_powerGridStreams;
-  CSVStreamMapPtr m_heatingGridStreams;
+  CSVStreamMap m_powerGridStreams;
+  CSVStreamMap m_heatingGridStreams;
 
   std::shared_ptr<core::interface::IEnergyGrid> m_powerGrid;
   std::shared_ptr<core::interface::IEnergyGrid> m_heatingGrid;
