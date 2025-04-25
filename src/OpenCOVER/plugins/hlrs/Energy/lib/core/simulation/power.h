@@ -5,6 +5,15 @@
 
 namespace core::simulation::power {
 
+struct PVData {
+  std::string cityGMLID;
+  float energyYearlyKWhMax{0};
+  float pvAreaQm{0};
+  float co2savings{0};
+  float area{0};
+  int numPanelsMax{0};
+};
+
 class Bus : public Object {
  public:
   Bus(const std::string &name, const Data &data = {}) : Object(name, data) {}

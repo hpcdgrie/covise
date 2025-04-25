@@ -501,15 +501,6 @@ void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPat
     return;
   }
 
-  struct PVData {
-    std::string cityGMLID;
-    float energyYearlyKWhMax{0};
-    float pvAreaQm{0};
-    float co2savings{0};
-    float area{0};
-    int numPanelsMax{0};
-  };
-
   CSVStream::CSVRow row;
   std::map<std::string, PVData> pvDataMap;
   float maxPVIntensity = 0;
