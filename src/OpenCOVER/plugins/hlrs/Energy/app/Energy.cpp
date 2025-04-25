@@ -458,7 +458,7 @@ void EnergyPlugin::initCityGMLUI() {
 }
 
 void EnergyPlugin::addSolarPanelsToCityGML(const boost::filesystem::path &dirPath) {
-  using namespace core::utils::osgUtils;
+  using namespace CoreUtils::osgUtils;
   auto getColor = [](float val, float max) {
     osg::Vec4 red = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
     osg::Vec4 yellow = osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f);
