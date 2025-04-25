@@ -89,6 +89,8 @@
 #include <vector>
 
 using namespace core::simulation;
+namespace COVERUtils = opencover::utils;
+namespace CoreUtils = core::utils;
 
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
@@ -117,7 +119,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
  private:
   /* #region using */
-  using Geodes = core::utils::osgUtils::Geodes;
+  using Geodes = CoreUtils::osgUtils::Geodes;
+  using CSVStream = COVERUtils::read::CSVStream;
 
   template <typename T>
   using NameMap = std::map<std::string, T>;
@@ -143,13 +146,13 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   typedef NameMapVector<float> FloatMap;
   typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
-  typedef NameMapPtr<opencover::utils::read::CSVStream> CSVStreamMap;
+  typedef NameMapPtr<CSVStream> CSVStreamMap;
   typedef std::unique_ptr<CSVStreamMap> CSVStreamMapPtr;
 
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
   /* #endregion */
 
-  void preFrame() override; //update colormaps
+  void preFrame() override;  // update colormaps
 
   /* #region GENERAL */
   inline void checkEnergyTab() {
@@ -176,7 +179,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
                                  energy::DeviceInfo::ptr deviceInfoPtr,
                                  const double &lat, const double &lon);
   void helper_handleEnergyInfo(size_t maxTimesteps, int minYear,
-                               const opencover::utils::read::CSVStream::CSVRow &row,
+                               const CSVStream::CSVRow &row,
                                energy::DeviceInfo::ptr deviceInfoPtr);
   bool loadDBFile(const std::string &fileName, const ProjTrans &projTrans);
   bool loadDB(const std::string &path, const ProjTrans &projTrans);
@@ -244,43 +247,37 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   /* #region POWERGRID */
   void initPowerGridStreams();
-  std::unique_ptr<FloatMap> getInlfuxDataFromCSV(
-      opencover::utils::read::CSVStream &stream, float &max, float &min, float &sum,
-      int &timesteps);
-  std::unique_ptr<core::simulation::grid::Points> createPowerGridPoints(
-      opencover::utils::read::CSVStream &stream, size_t &numPoints,
-      const float &sphereRadius, const IDLookupTable &busNames);
-  osg::ref_ptr<core::simulation::grid::Line> createLine(
-      const std::string &name, int &from, const std::string &geoBuses,
-      core::simulation::grid::Data &data,
-      const core::simulation::grid::Points &points);
+  std::unique_ptr<FloatMap> getInlfuxDataFromCSV(CSVStream &stream, float &max,
+                                                 float &min, float &sum,
+                                                 int &timesteps);
+  std::unique_ptr<grid::Points> createPowerGridPoints(CSVStream &stream,
+                                                      size_t &numPoints,
+                                                      const float &sphereRadius,
+                                                      const IDLookupTable &busNames);
+  osg::ref_ptr<grid::Line> createLine(const std::string &name, int &from,
+                                      const std::string &geoBuses, grid::Data &data,
+                                      const grid::Points &points);
   void processGeoBuses(grid::Indices &indices, int &from,
                        const std::string &geoBuses,
-                       core::simulation::grid::ConnectionDataList &additionalData,
-                       core::simulation::grid::Data &data);
+                       grid::ConnectionDataList &additionalData, grid::Data &data);
 
-  std::pair<std::unique_ptr<core::simulation::grid::Indices>,
-            std::unique_ptr<core::simulation::grid::ConnectionDataList>>
-  getPowerGridIndicesAndOptionalData(opencover::utils::read::CSVStream &stream,
-                                     const size_t &numPoints);
+  std::pair<std::unique_ptr<grid::Indices>,
+            std::unique_ptr<grid::ConnectionDataList>>
+  getPowerGridIndicesAndOptionalData(CSVStream &stream, const size_t &numPoints);
 
-  std::pair<std::unique_ptr<core::simulation::grid::Lines>,
-            std::unique_ptr<core::simulation::grid::ConnectionDataList>>
-  getPowerGridLines(opencover::utils::read::CSVStream &stream,
-                    const core::simulation::grid::Points &points);
+  std::pair<std::unique_ptr<grid::Lines>, std::unique_ptr<grid::ConnectionDataList>>
+  getPowerGridLines(CSVStream &stream, const grid::Points &points);
 
-  std::unique_ptr<IDLookupTable> retrieveBusNameIdMapping(
-      opencover::utils::read::CSVStream &stream);
+  std::unique_ptr<IDLookupTable> retrieveBusNameIdMapping(CSVStream &stream);
 
   bool checkBoxSelection_powergrid(const std::string &tableName,
                                    const std::string &paramName);
   void helper_getAdditionalPowerGridPointData_addData(
-      int busId, core::simulation::grid::PointDataList &additionalData,
-      const core::simulation::grid::Data &data);
+      int busId, grid::PointDataList &additionalData, const grid::Data &data);
   void helper_getAdditionalPowerGridPointData_handleDuplicate(
       std::string &name, std::map<std::string, uint> &duplicateMap);
-  std::unique_ptr<core::simulation::grid::PointDataList>
-  getAdditionalPowerGridPointData(const std::size_t &numOfBus);
+  std::unique_ptr<grid::PointDataList> getAdditionalPowerGridPointData(
+      const std::size_t &numOfBus);
   void applyStaticInfluxToCityGML(const std::string &filePath);
   void applySimulationDataToPowerGrid();
   void updatePowerGridSelection(bool on);
@@ -296,13 +293,13 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initHeatingGridStreams();
   void initHeatingGrid();
   void buildHeatingGrid();
-  void readSimulationDataStream(opencover::utils::read::CSVStream &heatingSimStream);
+  void readSimulationDataStream(CSVStream &heatingSimStream);
   void applySimulationDataToHeatingGrid();
-  void readHeatingGridStream(opencover::utils::read::CSVStream &heatingStream);
+  void readHeatingGridStream(CSVStream &heatingStream);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
-      core::simulation::grid::ConnectionDataList &additionalData);
+      grid::ConnectionDataList &additionalData);
   /* #endregion */
 
   /* #region COOLINGGRID */
