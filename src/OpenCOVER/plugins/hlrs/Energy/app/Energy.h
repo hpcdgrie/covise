@@ -106,9 +106,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   EnergyPlugin(const EnergyPlugin &) = delete;
   void operator=(const EnergyPlugin &) = delete;
 
-  bool init();
-  bool update();
-  void setTimestep(int t);
+  bool init() override;
+  bool update() override;
+  void setTimestep(int t) override;
   void setComponent(Components c);
   static EnergyPlugin *instance() {
     if (!m_plugin) m_plugin = new EnergyPlugin;
