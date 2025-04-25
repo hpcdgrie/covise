@@ -45,6 +45,8 @@ public:
 
     CSVStream(const CSVStream &) = delete;
     CSVStream &operator=(const CSVStream &) = delete;
+    CSVStream(CSVStream &&) = delete;
+    CSVStream &operator=(CSVStream &&) = delete;
     CSVStream &operator>>(CSVRow &row)
     {
         readLine(row);
