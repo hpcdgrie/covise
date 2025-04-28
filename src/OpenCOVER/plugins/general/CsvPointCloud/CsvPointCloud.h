@@ -108,7 +108,6 @@ private:
   std::array<float, 3> m_currentMachineSpeeds{0, 0, 0};
   std::vector<std::unique_ptr<std::thread>> m_threads;
   const int m_numThreads;
-  float m_minColor = 0, m_maxColor = 0;
   size_t m_numPointsPerCycle = 200;
   bool m_updateColor = false;
 

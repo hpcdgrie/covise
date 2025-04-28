@@ -42,7 +42,7 @@ public:
 protected:
     virtual void updateGeo(bool paused, const opencover::opcua::MultiDimensionalArray<double> &data) = 0;
     virtual void clear() = 0;
-    virtual void applyShader(const opencover::ColorMap& map, float min, float max) = 0;
+    virtual void applyShader(const opencover::ColorMap& map) = 0;
     virtual std::vector<std::string> getAttributes() = 0;
     virtual void attributeChanged(float value) = 0;
     osg::Vec3 toolHeadInTableCoords();
@@ -63,6 +63,8 @@ private:
     MathExpressionObserver m_mathExpressionObserver;
     std::vector<UpdateValues> m_updateValues;
     std::unique_ptr<opencover::ui::SelectionListConfigValue> m_attributeName;
+    // min and max attribute only needed to store values
+    // but creating redundant sliders
     std::unique_ptr<opencover::ui::EditFieldConfigValue> m_minAttribute, m_maxAttribute, m_customAttribute;
     struct CustomAttributeVariable{
         float value = 0;

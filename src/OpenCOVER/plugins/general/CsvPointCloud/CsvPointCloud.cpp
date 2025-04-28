@@ -372,9 +372,9 @@ void CsvPointCloudPlugin::updateColorMap()
 {
     auto cm = m_colorInteractor->getColorMap();
     if (m_points)
-        applyPointShader(m_points, cm, m_minColor, m_maxColor);
+        applyPointShader(m_points, cm);
     if (m_surface)
-        applySurfaceShader(m_surface, cm, m_minColor, m_maxColor);
+        applySurfaceShader(m_surface, cm);
 
     opencover::coVRPluginList::instance()->removeObject("CsvPointCloud4", false);
     opencover::coVRPluginList::instance()->newInteractor(&renderObject, m_colorInteractor);
@@ -430,8 +430,8 @@ CsvPointCloudPlugin::ScalarData CsvPointCloudPlugin::getScalarData(DataTable &sy
     }
 
     m_colorInteractor->setMinMax(data.min, data.max);
-    m_minColor = data.min;
-    m_maxColor = data.max;
+    m_colorMapSelector.setMin(data.min);
+    m_colorMapSelector.setMax(data.max);
 
     return data;
 }
@@ -742,10 +742,10 @@ bool CsvPointCloudPlugin::update()
     m_colorInteractor->getFloatScalarParam("min", min);
     m_colorInteractor->getFloatScalarParam("max", max);
     m_colorInteractor->getIntScalarParam("steps", steps);
-    if (min != m_minColor || max != m_maxColor || steps != m_numColorSteps)
+    if (min != m_colorMapSelector.selectedMap().min || max != m_colorMapSelector.selectedMap().max || steps != m_numColorSteps)
     {
-        m_minColor = min;
-        m_maxColor = max;
+        m_colorMapSelector.setMin(min);
+        m_colorMapSelector.setMax(max);
         m_numColorSteps = steps;
         updateColorMap();
         return true;
