@@ -182,10 +182,8 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_energyGrids({
-          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGrids::PowerGrid,
-                     Components::Strom},
-          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGrids::HeatingGrid,
-                     Components::Waerme}
+          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGrids::PowerGrid},
+          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGrids::HeatingGrid}
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -1123,11 +1121,9 @@ void EnergyPlugin::initHistoricUI() {
   componentGroup->setDefaultValue(Strom);
   componentList = new ui::Menu(m_EnergyTab, "Component");
   componentList->setText("Messwerte (jährlich)");
-  int id = 0;
-  for (auto &energyGrid : m_energyGrids) {
-    energyGrid.historicalBtn =
-        new ui::Button(componentList, energyGrid.name, componentGroup, id++);
-  }
+  StromBt = new ui::Button(componentList, "Strom", componentGroup, Strom);
+  WaermeBt = new ui::Button(componentList, "Waerme", componentGroup, Waerme);
+  KaelteBt = new ui::Button(componentList, "Kaelte", componentGroup, Kaelte);
 
   componentGroup->setCallback(
       [this](int value) { setComponent(Components(value)); });
@@ -1145,7 +1141,20 @@ void EnergyPlugin::reinitDevices(int comp) {
 
 void EnergyPlugin::setComponent(Components c) {
   switchTo(m_sequenceList, m_switch);
-  m_energyGrids[c].historicalBtn->setState(true, false);
+  switch (c) {
+    case Strom:
+      StromBt->setState(true, false);
+      break;
+    case Waerme:
+      WaermeBt->setState(true, false);
+      break;
+    case Kaelte:
+      KaelteBt->setState(true, false);
+      break;
+    default:
+      break;
+  }
+
   m_selectedComp = c;
   reinitDevices(c);
 }

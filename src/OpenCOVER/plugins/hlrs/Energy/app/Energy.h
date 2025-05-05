@@ -96,7 +96,7 @@ namespace CoreUtils = core::utils;
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
-  enum Components { Strom, Waerme }; //keep in sync with EnergyGrids
+  enum Components { Strom, Waerme, Kaelte };
   enum EnergyGrids { PowerGrid, HeatingGrid, NUM_ENERGY_GRIDS };
   // enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid, NUM_ENERGY_GRIDS };
 
@@ -159,15 +159,13 @@ class EnergyPlugin : public opencover::coVRPlugin,
     const std::string species;
     const std::string unit;
     const EnergyGrids type;
-    const Components componentType;
-    opencover::ui::Button *historicalBtn = nullptr;
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
+    opencover::ui::Menu *colorMapSelectorMenu = nullptr;
     osg::ref_ptr<osg::Group> group = nullptr;
     std::shared_ptr<core::interface::IEnergyGrid> grid;
     std::shared_ptr<HeatingSimulation> sim;
     std::unique_ptr<BaseSimUI> simUI;
-    ui::Menu *colorMapSelectorMenu = nullptr;
     std::unique_ptr<opencover::ColorMapSelector> colorMapSelector;
   };
   void preFrame() override; // update colormaps
@@ -380,9 +378,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *ShowGraph = nullptr;
   opencover::ui::ButtonGroup *componentGroup = nullptr;
   opencover::ui::Menu *componentList = nullptr;
-  // opencover::ui::Button *StromBt = nullptr;
-  // opencover::ui::Button *WaermeBt = nullptr;
-  // opencover::ui::Button *KaelteBt = nullptr;
+  opencover::ui::Button *StromBt = nullptr;
+  opencover::ui::Button *WaermeBt = nullptr;
+  opencover::ui::Button *KaelteBt = nullptr;
 
   // ennovatis UI
   opencover::ui::SelectionList *m_ennovatisSelectionsList = nullptr;
