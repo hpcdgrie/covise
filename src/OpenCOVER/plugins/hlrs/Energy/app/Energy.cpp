@@ -189,7 +189,7 @@ EnergyPlugin::EnergyPlugin()
 {
   // need to save the config on exit => will only be saved when COVER is closed
   // correctly via q or closing the window
-  
+
   config()->setSaveOnExit(true);
   fprintf(stderr, "Starting Energy Plugin\n");
   m_plugin = this;
@@ -1322,7 +1322,6 @@ void EnergyPlugin::initColorMap() {
   m_cityGmlColorMap->setUnit("kWh");
   m_cityGmlColorMap->setCallback(
       [this](const opencover::ColorMap &cm) {   if (isActiv(m_switch, m_cityGML)) {
-        std::cout << "Active child at index " << m_cityGML->getName() << std::endl;
         enableCityGML(false);
         enableCityGML(true);
       }});
@@ -1335,9 +1334,7 @@ void EnergyPlugin::updateColorMap(const opencover::ColorMap &map, EnergyGrids ty
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
     // heating simulation
     m = grid.simUI->updateTimestepColors(m);
-    std::cout << "Active child at index " << grid.group->getName() << std::endl;
-
-  } 
+  }
 }
 
 void EnergyPlugin::initSimMenu() {
@@ -1356,7 +1353,7 @@ void EnergyPlugin::switchEnergyGrid(EnergyGrids grid) {
 
   bool showHud = false;
   for (auto &energyGrid : m_energyGrids) {
-    if (energyGrid.type != grid) 
+    if (energyGrid.type != grid)
     {
       showHud |= energyGrid.colorMapSelector->hudVisible();
       energyGrid.colorMapSelector->showHud(false);
@@ -1378,8 +1375,8 @@ void EnergyPlugin::initEnergyGridUI() {
   m_energygridBtnGroup = new ui::ButtonGroup(m_energygridGroup, "EnergyGrid");
   m_energygridBtnGroup->setCallback(
     [this](int value) { switchEnergyGrid(EnergyGrids(value)); });
-    
-    
+
+
     for(auto &energyGrid : m_energyGrids)
     {
       energyGrid.simulationUIBtn =
@@ -1448,9 +1445,9 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
   int timesteps = 0;
   auto values = getInlfuxDataFromCSV(csvStream, max, min, sum, timesteps);
 
-  
+
   auto distributionCenter = sum / (timesteps * values->size());
-  
+
   m_cityGmlColorMap->setMax(max);
   m_cityGmlColorMap->setMin(min);
   m_cityGmlColorMap->setMinBounds(0, distributionCenter);
@@ -1917,15 +1914,15 @@ void EnergyPlugin::buildPowerGrid() {
                            powerGroup, connectionsRadius, *optData,
                            infoboardAttributes, EnergyGridConnectionType::Line,
                            *lines);
-  
+
     auto powerGrid = std::make_unique<EnergyGridOsg>(econfig);
     powerGrid->initDrawables();
     powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
     addEnergyGridToGridSwitch(powerGroup);
     m_energyGrids[PowerGrid].group = powerGroup;
-    m_energyGrids[PowerGrid].grid = std::move(powerGrid);  
-                      
+    m_energyGrids[PowerGrid].grid = std::move(powerGrid);
+
   // TODO:
   //  [ ] set trafo as 3d model or block
 
@@ -1973,7 +1970,7 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
 
 void EnergyPlugin::readSimulationDataStream(
   COVERUtils::read::CSVStream &heatingSimStream) {
-  
+
       if (m_energyGrids[HeatingGrid].grid == nullptr) return;
   std::regex consumer_value_split_regex("Consumer_(\\d+)_(.+)");
   std::regex producer_value_split_regex("Producer_(\\d+)_(.+)");
