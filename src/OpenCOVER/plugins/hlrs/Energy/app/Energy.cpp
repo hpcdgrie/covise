@@ -182,11 +182,13 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_energyGrids({
-          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGrids::PowerGrid, Components::Strom},
-          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGrids::HeatingGrid, Components::Waerme}
-          // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid, Components::Kaelte},
-      })
-{
+          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGrids::PowerGrid,
+                     Components::Strom},
+          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGrids::HeatingGrid,
+                     Components::Waerme}
+          // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
+          // Components::Kaelte},
+      }) {
   // need to save the config on exit => will only be saved when COVER is closed
   // correctly via q or closing the window
 
@@ -220,7 +222,6 @@ EnergyPlugin::EnergyPlugin()
   initUI();
   m_offset =
       configFloatArray("General", "offset", std::vector<double>{0, 0, 0})->value();
-
 }
 
 EnergyPlugin::~EnergyPlugin() {
@@ -282,15 +283,12 @@ void EnergyPlugin::initOverview() {
   m_gridControlButton->setState(true);
 }
 
-void EnergyPlugin::preFrame(){
-
+void EnergyPlugin::preFrame() {
   ColorBar::HudPosition hudPos;
   auto numHuds = 0;
-  for(auto &energyGrid : m_energyGrids)
-  {
-    auto & colorMapMenu = energyGrid.colorMapSelector;
-    if(colorMapMenu && colorMapMenu->hudVisible())
-    {
+  for (auto &energyGrid : m_energyGrids) {
+    auto &colorMapMenu = energyGrid.colorMapSelector;
+    if (colorMapMenu && colorMapMenu->hudVisible()) {
       hudPos.setNumHuds(numHuds++);
       colorMapMenu->setHudPosition(hudPos);
     }
@@ -355,8 +353,7 @@ bool EnergyPlugin::update() {
 
   for (auto &[name, sensor] : m_cityGMLObjs) sensor->update();
 
-  for(auto &energyGrid : m_energyGrids)
-  {
+  for (auto &energyGrid : m_energyGrids) {
     energyGrid.grid->update();
   }
 
@@ -1127,9 +1124,9 @@ void EnergyPlugin::initHistoricUI() {
   componentList = new ui::Menu(m_EnergyTab, "Component");
   componentList->setText("Messwerte (jährlich)");
   int id = 0;
-  for (auto &energyGrid : m_energyGrids)
-  {
-    energyGrid.historicalBtn = new ui::Button(componentList, energyGrid.name, componentGroup, id++);
+  for (auto &energyGrid : m_energyGrids) {
+    energyGrid.historicalBtn =
+        new ui::Button(componentList, energyGrid.name, componentGroup, id++);
   }
 
   componentGroup->setCallback(
@@ -1233,7 +1230,8 @@ void EnergyPlugin::helper_handleEnergyInfo(size_t maxTimesteps, int minYear,
     auto device = std::make_shared<energy::Device>(
         deviceInfoTimestep, m_sequenceList->getChild(timestep)->asGroup(), font);
 
-    m_SDlist[deviceInfo.ID].push_back( std::make_shared<energy::DeviceSensor>(device, device->getGroup()));
+    m_SDlist[deviceInfo.ID].push_back(
+        std::make_shared<energy::DeviceSensor>(device, device->getGroup()));
   }
 }
 
@@ -1302,11 +1300,12 @@ void EnergyPlugin::initColorMap() {
     initSimMenu();
   }
   // auto colorMapMenu = new ui::Menu(m_simulationMenu);
-  for(auto &energyGrid : m_energyGrids)
-  {
-    energyGrid.colorMapSelectorMenu = new ui::Menu(m_simulationMenu, energyGrid.name + "_grid");
+  for (auto &energyGrid : m_energyGrids) {
+    energyGrid.colorMapSelectorMenu =
+        new ui::Menu(m_simulationMenu, energyGrid.name + "_grid");
     auto &cms = energyGrid.colorMapSelector;
-    cms = std::make_unique<opencover::ColorMapSelector>(*energyGrid.colorMapSelectorMenu);
+    cms = std::make_unique<opencover::ColorMapSelector>(
+        *energyGrid.colorMapSelectorMenu);
     cms->setSpecies(energyGrid.species);
     cms->setUnit(energyGrid.unit);
     auto type = energyGrid.type;
@@ -1314,17 +1313,17 @@ void EnergyPlugin::initColorMap() {
         [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
     cms->setName(energyGrid.name);
   }
-  auto menu = new ui::Menu(m_simulationMenu,"CityGml_grid");
+  auto menu = new ui::Menu(m_simulationMenu, "CityGml_grid");
 
-  m_cityGmlColorMap =
-      std::make_unique<opencover::ColorMapSelector>(*menu);
+  m_cityGmlColorMap = std::make_unique<opencover::ColorMapSelector>(*menu);
   m_cityGmlColorMap->setSpecies("Leistung");
   m_cityGmlColorMap->setUnit("kWh");
-  m_cityGmlColorMap->setCallback(
-      [this](const opencover::ColorMap &cm) {   if (isActiv(m_switch, m_cityGML)) {
-        enableCityGML(false);
-        enableCityGML(true);
-      }});
+  m_cityGmlColorMap->setCallback([this](const opencover::ColorMap &cm) {
+    if (isActiv(m_switch, m_cityGML)) {
+      enableCityGML(false);
+      enableCityGML(true);
+    }
+  });
   m_cityGmlColorMap->setName("CityGML");
 }
 
@@ -1346,19 +1345,18 @@ void EnergyPlugin::initSimMenu() {
 
 void EnergyPlugin::switchEnergyGrid(EnergyGrids grid) {
   osg::ref_ptr<osg::Group> switch_to = m_energyGrids[grid].group;
-  if(!switch_to) {
+  if (!switch_to) {
     std::cerr << "Cooling grid not implemented yet" << std::endl;
     return;
   }
 
   bool showHud = false;
   for (auto &energyGrid : m_energyGrids) {
-    if (energyGrid.type != grid)
-    {
+    if (energyGrid.type != grid) {
       showHud |= energyGrid.colorMapSelector->hudVisible();
       energyGrid.colorMapSelector->showHud(false);
       energyGrid.colorMapSelectorMenu->setVisible(false);
-    } else{
+    } else {
       energyGrid.colorMapSelectorMenu->setVisible(true);
     }
   }
@@ -1374,16 +1372,13 @@ void EnergyPlugin::initEnergyGridUI() {
 
   m_energygridBtnGroup = new ui::ButtonGroup(m_energygridGroup, "EnergyGrid");
   m_energygridBtnGroup->setCallback(
-    [this](int value) { switchEnergyGrid(EnergyGrids(value)); });
+      [this](int value) { switchEnergyGrid(EnergyGrids(value)); });
 
-
-    for(auto &energyGrid : m_energyGrids)
-    {
-      energyGrid.simulationUIBtn =
-      new ui::Button(m_simulationMenu, energyGrid.name, m_energygridBtnGroup,
-        energyGrid.type);
-    }
-    m_energygridBtnGroup->setActiveButton(m_energyGrids[HeatingGrid].simulationUIBtn);
+  for (auto &energyGrid : m_energyGrids) {
+    energyGrid.simulationUIBtn = new ui::Button(
+        m_simulationMenu, energyGrid.name, m_energygridBtnGroup, energyGrid.type);
+  }
+  m_energygridBtnGroup->setActiveButton(m_energyGrids[HeatingGrid].simulationUIBtn);
 }
 
 void EnergyPlugin::initSimUI() {
@@ -1445,7 +1440,6 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
   int timesteps = 0;
   auto values = getInlfuxDataFromCSV(csvStream, max, min, sum, timesteps);
 
-
   auto distributionCenter = sum / (timesteps * values->size());
 
   m_cityGmlColorMap->setMax(max);
@@ -1456,7 +1450,8 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
   for (auto &[name, values] : *values) {
     auto sensorIt = m_cityGMLObjs.find(name);
     if (sensorIt != m_cityGMLObjs.end()) {
-      sensorIt->second->updateTimestepColors(values, m_cityGmlColorMap->selectedMap());
+      sensorIt->second->updateTimestepColors(values,
+                                             m_cityGmlColorMap->selectedMap());
     }
   }
   setAnimationTimesteps(timesteps, m_cityGML);
@@ -1910,18 +1905,17 @@ void EnergyPlugin::buildPowerGrid() {
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   powerGroup->setName("PowerGrid");
 
-  EnergyGridConfig econfig("POWER", *points, grid::Indices(),
-                           powerGroup, connectionsRadius, *optData,
-                           infoboardAttributes, EnergyGridConnectionType::Line,
-                           *lines);
+  EnergyGridConfig econfig("POWER", *points, grid::Indices(), powerGroup,
+                           connectionsRadius, *optData, infoboardAttributes,
+                           EnergyGridConnectionType::Line, *lines);
 
-    auto powerGrid = std::make_unique<EnergyGridOsg>(econfig);
-    powerGrid->initDrawables();
-    powerGrid->updateColor(
+  auto powerGrid = std::make_unique<EnergyGridOsg>(econfig);
+  powerGrid->initDrawables();
+  powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
-    addEnergyGridToGridSwitch(powerGroup);
-    m_energyGrids[PowerGrid].group = powerGroup;
-    m_energyGrids[PowerGrid].grid = std::move(powerGrid);
+  addEnergyGridToGridSwitch(powerGroup);
+  m_energyGrids[PowerGrid].group = powerGroup;
+  m_energyGrids[PowerGrid].grid = std::move(powerGrid);
 
   // TODO:
   //  [ ] set trafo as 3d model or block
@@ -1969,9 +1963,8 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
 }
 
 void EnergyPlugin::readSimulationDataStream(
-  COVERUtils::read::CSVStream &heatingSimStream) {
-
-      if (m_energyGrids[HeatingGrid].grid == nullptr) return;
+    COVERUtils::read::CSVStream &heatingSimStream) {
+  if (m_energyGrids[HeatingGrid].grid == nullptr) return;
   std::regex consumer_value_split_regex("Consumer_(\\d+)_(.+)");
   std::regex producer_value_split_regex("Producer_(\\d+)_(.+)");
   std::smatch match;
@@ -2005,7 +1998,8 @@ void EnergyPlugin::readSimulationDataStream(
   auto &heatingGrid = m_energyGrids[HeatingGrid];
   heatingGrid.sim = std::move(sim);
 
-  m_energyGrids[HeatingGrid].simUI = std::make_unique<HeatingSimUI>(heatingGrid.sim, heatingGrid.grid);
+  m_energyGrids[HeatingGrid].simUI =
+      std::make_unique<HeatingSimUI>(heatingGrid.sim, heatingGrid.grid);
 
   auto m = heatingGrid.colorMapSelector->selectedMap();
   m = heatingGrid.simUI->updateTimestepColors(m, true);
@@ -2099,8 +2093,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   auto &heatingGrid = m_energyGrids[HeatingGrid];
   heatingGrid.group->setName(heatingGrid.name);
   heatingGrid.grid = std::make_unique<EnergyGridOsg>(
-  EnergyGridConfig{"HEATING", points, indices, heatingGrid.group, 0.5f,
-                    additionalConnectionData, infoboardAttributes});
+      EnergyGridConfig{"HEATING", points, indices, heatingGrid.group, 0.5f,
+                       additionalConnectionData, infoboardAttributes});
   heatingGrid.grid->initDrawables();
   heatingGrid.grid->updateColor(
       osg::Vec4(168.0f / 255.0f, 50.0f / 255.0f, 50.0f / 255.0f, 1.0f));
