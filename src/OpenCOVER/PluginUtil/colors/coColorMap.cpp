@@ -219,13 +219,17 @@ void opencover::ColorMapSelector::setSpecies(const std::string &species)
 
 void opencover::ColorMapSelector::setMin(float min)
 {
-  m_selectedMap->second.min = min;
+  for (auto &[_,cMap] : m_colors) {
+    cMap.min = min;
+  }
   m_colorBar->update(m_selectedMap->second);
 
 }
 void opencover::ColorMapSelector::setMax(float max)
 {
-  m_selectedMap->second.max = max;
+  for (auto &[_, cMap] : m_colors) {
+    cMap.max = max;
+  }
   m_colorBar->update(m_selectedMap->second);
 
 }
