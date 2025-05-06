@@ -18,6 +18,7 @@
 // ui
 #include "lib/core/interfaces/ISolarPanel.h"
 #include "lib/core/simulation/power.h"
+#include "lib/core/simulation/simulation.h"
 #include "ui/citygml/CityGMLDeviceSensor.h"
 #include "ui/historic/Device.h"
 #include "ui/historic/DeviceSensor.h"
@@ -164,7 +165,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
     opencover::ui::Menu *colorMapSelectorMenu = nullptr;
     osg::ref_ptr<osg::Group> group = nullptr;
     std::shared_ptr<core::interface::IEnergyGrid> grid;
-    std::shared_ptr<HeatingSimulation> sim;
+    std::shared_ptr<Simulation> sim;
     std::unique_ptr<BaseSimUI> simUI;
     std::unique_ptr<opencover::ColorMapSelector> colorMapSelector;
   };

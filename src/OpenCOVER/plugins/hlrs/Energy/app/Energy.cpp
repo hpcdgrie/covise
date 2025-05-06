@@ -1336,7 +1336,8 @@ void EnergyPlugin::initColorMap() {
   m_cityGmlColorMap->setName("CityGML");
 }
 
-void EnergyPlugin::updateColorMap(const opencover::ColorMap &map, EnergyGridType type) {
+void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
+                                  EnergyGridType type) {
   auto m = map;
   auto &grid = m_energyGrids[type];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
@@ -1976,7 +1977,7 @@ void EnergyPlugin::readSimulationDataStream(
   std::smatch match;
 
   CSVStream::CSVRow row;
-  auto sim = std::make_unique<heating::HeatingSimulation>();
+  auto sim = std::make_shared<heating::HeatingSimulation>();
   const auto &header = heatingSimStream.getHeader();
   auto &consumers = sim->Consumers();
   auto &producers = sim->Producers();
@@ -2002,10 +2003,9 @@ void EnergyPlugin::readSimulationDataStream(
     }
   }
   auto &heatingGrid = m_energyGrids[HeatingGrid];
-  heatingGrid.sim = std::move(sim);
 
-  m_energyGrids[HeatingGrid].simUI =
-      std::make_unique<HeatingSimUI>(heatingGrid.sim, heatingGrid.grid);
+  heatingGrid.simUI = std::make_unique<HeatingSimUI>(sim, heatingGrid.grid);
+  heatingGrid.sim = std::move(sim);
 
   auto m = heatingGrid.colorMapSelector->selectedMap();
   m = heatingGrid.simUI->updateTimestepColors(m, true);
