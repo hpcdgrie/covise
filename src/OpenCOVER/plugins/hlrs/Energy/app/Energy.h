@@ -97,7 +97,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
   enum Components { Strom, Waerme, Kaelte };
-  enum EnergyGrids { PowerGrid, HeatingGrid, NUM_ENERGY_GRIDS };
+  enum EnergyGridType { PowerGrid, HeatingGrid, NUM_ENERGY_TYPES };
   // enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid, NUM_ENERGY_GRIDS };
 
   struct ProjTrans {
@@ -158,7 +158,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
     const std::string name;
     const std::string species;
     const std::string unit;
-    const EnergyGrids type;
+    const EnergyGridType type;
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
     opencover::ui::Menu *colorMapSelectorMenu = nullptr;
@@ -254,9 +254,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #region SIMULATION */
   void initSimUI();
   void initEnergyGridUI();
-  void switchEnergyGrid(EnergyGrids grid);
+  void switchEnergyGrid(EnergyGridType grid);
   void initSimMenu();
-  void updateColorMap(const opencover::ColorMap &map, EnergyGrids grid);
+  void updateColorMap(const opencover::ColorMap &map, EnergyGridType grid);
   void initColorMap();
   void initGrid();
   void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
@@ -372,7 +372,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_gridControlButton = nullptr;
   opencover::ui::Button *m_energySwitchControlButton = nullptr;
 
-  std::array<EnergyGrid, NUM_ENERGY_GRIDS> m_energyGrids;
+  std::array<EnergyGrid, NUM_ENERGY_TYPES> m_energyGrids;
   std::unique_ptr<opencover::ColorMapSelector> m_cityGmlColorMap;
   // historical
   opencover::ui::Button *ShowGraph = nullptr;

@@ -182,8 +182,8 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_energyGrids({
-          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGrids::PowerGrid},
-          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGrids::HeatingGrid}
+          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGridType::PowerGrid},
+          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGridType::HeatingGrid}
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -1336,7 +1336,7 @@ void EnergyPlugin::initColorMap() {
   m_cityGmlColorMap->setName("CityGML");
 }
 
-void EnergyPlugin::updateColorMap(const opencover::ColorMap &map, EnergyGrids type) {
+void EnergyPlugin::updateColorMap(const opencover::ColorMap &map, EnergyGridType type) {
   auto m = map;
   auto &grid = m_energyGrids[type];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
@@ -1352,7 +1352,7 @@ void EnergyPlugin::initSimMenu() {
   m_simulationMenu->setText("Simulation");
 }
 
-void EnergyPlugin::switchEnergyGrid(EnergyGrids grid) {
+void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
   osg::ref_ptr<osg::Group> switch_to = m_energyGrids[grid].group;
   if (!switch_to) {
     std::cerr << "Cooling grid not implemented yet" << std::endl;
@@ -1381,7 +1381,7 @@ void EnergyPlugin::initEnergyGridUI() {
 
   m_energygridBtnGroup = new ui::ButtonGroup(m_energygridGroup, "EnergyGrid");
   m_energygridBtnGroup->setCallback(
-      [this](int value) { switchEnergyGrid(EnergyGrids(value)); });
+      [this](int value) { switchEnergyGrid(EnergyGridType(value)); });
 
   for (auto &energyGrid : m_energyGrids) {
     energyGrid.simulationUIBtn = new ui::Button(
