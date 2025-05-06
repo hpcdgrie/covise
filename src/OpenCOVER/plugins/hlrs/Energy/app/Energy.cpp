@@ -1407,9 +1407,6 @@ void EnergyPlugin::initPowerGridStreams() {
   }
 }
 
-// TODO:
-// [ ] - add a button to enable/disable the simulation data
-// [ ] - plan uniform grid structure file => csv file in specific format
 std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
     COVERUtils::read::CSVStream &stream, float &max, float &min, float &sum,
     int &timesteps) {
