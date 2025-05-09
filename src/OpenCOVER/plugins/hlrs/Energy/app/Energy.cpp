@@ -363,7 +363,8 @@ void EnergyPlugin::setTimestep(int t) {
   for (auto &sensor : m_ennovatisDevicesSensors) sensor->setTimestep(t);
 
   for (auto &[_, sensor] : m_cityGMLObjs) sensor->updateTime(t);
-  m_energyGrids[HeatingGrid].simUI->updateTime(t);
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  m_energyGrids[idx].simUI->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
@@ -1339,7 +1340,8 @@ void EnergyPlugin::initColorMap() {
 void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
                                   EnergyGridType type) {
   auto m = map;
-  auto &grid = m_energyGrids[type];
+  auto gridTypeIndex = getEnergyGridTypeIndex(type);
+  auto &grid = m_energyGrids[gridTypeIndex];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
     // heating simulation
     m = grid.simUI->updateTimestepColors(m);
@@ -1354,7 +1356,8 @@ void EnergyPlugin::initSimMenu() {
 }
 
 void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
-  osg::ref_ptr<osg::Group> switch_to = m_energyGrids[grid].group;
+  auto gridTypeIndex = getEnergyGridTypeIndex(grid);
+  osg::ref_ptr<osg::Group> switch_to = m_energyGrids[gridTypeIndex].group;
   if (!switch_to) {
     std::cerr << "Cooling grid not implemented yet" << std::endl;
     return;
@@ -1370,7 +1373,7 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
       energyGrid.colorMapSelectorMenu->setVisible(true);
     }
   }
-  m_energyGrids[grid].colorMapSelector->showHud(showHud);
+  m_energyGrids[gridTypeIndex].colorMapSelector->showHud(showHud);
   switchTo(switch_to, m_grid);
 }
 
@@ -1385,10 +1388,12 @@ void EnergyPlugin::initEnergyGridUI() {
       [this](int value) { switchEnergyGrid(EnergyGridType(value)); });
 
   for (auto &energyGrid : m_energyGrids) {
-    energyGrid.simulationUIBtn = new ui::Button(
-        m_simulationMenu, energyGrid.name, m_energygridBtnGroup, energyGrid.type);
+    auto idx = getEnergyGridTypeIndex(energyGrid.type);
+    energyGrid.simulationUIBtn =
+        new ui::Button(m_simulationMenu, energyGrid.name, m_energygridBtnGroup, idx);
   }
-  m_energygridBtnGroup->setActiveButton(m_energyGrids[HeatingGrid].simulationUIBtn);
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  m_energygridBtnGroup->setActiveButton(m_energyGrids[idx].simulationUIBtn);
 }
 
 void EnergyPlugin::initSimUI() {
@@ -1489,7 +1494,8 @@ bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
 }
 
 void EnergyPlugin::rebuildPowerGrid() {
-  m_grid->removeChild(m_energyGrids[PowerGrid].group);
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+  m_grid->removeChild(m_energyGrids[idx].group);
   initPowerGridStreams();
   buildPowerGrid();
 }
@@ -1526,7 +1532,8 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
   m_updatePowerGridSelection->setState(false);
   m_updatePowerGridSelection->setCallback([this](bool enable) {
     updatePowerGridSelection(enable);
-    switchTo(m_energyGrids[PowerGrid].group, m_grid);
+    auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+    switchTo(m_energyGrids[idx].group, m_grid);
   });
 
   m_powerGridSelectionPtr =
@@ -1921,8 +1928,9 @@ void EnergyPlugin::buildPowerGrid() {
   powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   addEnergyGridToGridSwitch(powerGroup);
-  m_energyGrids[PowerGrid].group = powerGroup;
-  m_energyGrids[PowerGrid].grid = std::move(powerGrid);
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+  m_energyGrids[idx].group = powerGroup;
+  m_energyGrids[idx].grid = std::move(powerGrid);
 
   // TODO:
   //  [ ] set trafo as 3d model or block
@@ -1971,7 +1979,8 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
 
 void EnergyPlugin::readSimulationDataStream(
     COVERUtils::read::CSVStream &heatingSimStream) {
-  if (m_energyGrids[HeatingGrid].grid == nullptr) return;
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  if (m_energyGrids[idx].grid == nullptr) return;
   std::regex consumer_value_split_regex("Consumer_(\\d+)_(.+)");
   std::regex producer_value_split_regex("Producer_(\\d+)_(.+)");
   std::smatch match;
@@ -2002,7 +2011,7 @@ void EnergyPlugin::readSimulationDataStream(
       }
     }
   }
-  auto &heatingGrid = m_energyGrids[HeatingGrid];
+  auto &heatingGrid = m_energyGrids[idx];
 
   heatingGrid.simUI = std::make_unique<HeatingSimUI>(sim, heatingGrid.grid);
   heatingGrid.sim = std::move(sim);
@@ -2035,7 +2044,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   grid::ConnectionDataList additionalConnectionData{};
   grid::Data pointData{};
   std::map<int, int> idMap{};
-  m_energyGrids[HeatingGrid].group = new osg::Group();
+  auto egridIdx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  m_energyGrids[egridIdx].group = new osg::Group();
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
@@ -2096,7 +2106,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
       if (auto it = idMap.find(indices[i][j]); it != idMap.end())
         indices[i][j] = it->second;
 
-  auto &heatingGrid = m_energyGrids[HeatingGrid];
+  auto &heatingGrid = m_energyGrids[egridIdx];
   heatingGrid.group->setName(heatingGrid.name);
   heatingGrid.grid = std::make_unique<EnergyGridOsg>(
       EnergyGridConfig{"HEATING", points, indices, heatingGrid.group, 0.5f,
@@ -2105,7 +2115,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   heatingGrid.grid->updateColor(
       osg::Vec4(168.0f / 255.0f, 50.0f / 255.0f, 50.0f / 255.0f, 1.0f));
   addEnergyGridToGridSwitch(heatingGrid.group);
-  switchEnergyGrid(HeatingGrid);
+  switchEnergyGrid(EnergyGridType::HeatingGrid);
 }
 
 void EnergyPlugin::addEnergyGridToGridSwitch(

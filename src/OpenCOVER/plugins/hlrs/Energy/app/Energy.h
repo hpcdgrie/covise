@@ -72,6 +72,7 @@
 #include <boost/filesystem.hpp>
 
 // osg
+#include <cstddef>
 #include <osg/Geode>
 #include <osg/Group>
 #include <osg/Material>
@@ -98,7 +99,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
   enum Components { Strom, Waerme, Kaelte };
-  enum EnergyGridType { PowerGrid, HeatingGrid, NUM_ENERGY_TYPES };
+  enum class EnergyGridType { PowerGrid, HeatingGrid, NUM_ENERGY_TYPES };
   // enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid, NUM_ENERGY_GRIDS };
 
   struct ProjTrans {
@@ -155,7 +156,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
   typedef ::EnergyGrid EnergyGridOsg;
   /* #endregion */
-  struct EnergyGrid{
+  struct EnergyGrid {
     const std::string name;
     const std::string species;
     const std::string unit;
@@ -163,13 +164,17 @@ class EnergyPlugin : public opencover::coVRPlugin,
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
     opencover::ui::Menu *colorMapSelectorMenu = nullptr;
+    // opencover::ui::SelectionList *scalarSelector = nullptr;
     osg::ref_ptr<osg::Group> group = nullptr;
     std::shared_ptr<core::interface::IEnergyGrid> grid;
     std::shared_ptr<Simulation> sim;
     std::unique_ptr<BaseSimUI> simUI;
     std::unique_ptr<opencover::ColorMapSelector> colorMapSelector;
   };
-  void preFrame() override; // update colormaps
+
+  auto getEnergyGridTypeIndex(EnergyGridType type) { return static_cast<int>(type); }
+
+  void preFrame() override;  // update colormaps
 
   /* #region GENERAL */
   inline void checkEnergyTab() {
@@ -334,9 +339,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
     osg::ref_ptr<osg::Group> parent;
     osg::ref_ptr<osg::Geode> geode;
     std::vector<CoreUtils::osgUtils::instancing::GeometryData> masterGeometryData;
-    bool valid() const {
-      return parent && geode && !masterGeometryData.empty();
-    }
+    bool valid() const { return parent && geode && !masterGeometryData.empty(); }
   };
 
   void processSolarPanelDrawable(SolarPanelList &solarPanels,
@@ -373,7 +376,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_gridControlButton = nullptr;
   opencover::ui::Button *m_energySwitchControlButton = nullptr;
 
-  std::array<EnergyGrid, NUM_ENERGY_TYPES> m_energyGrids;
+  std::array<EnergyGrid, static_cast<std::size_t>(EnergyGridType::NUM_ENERGY_TYPES)>
+      m_energyGrids;
   std::unique_ptr<opencover::ColorMapSelector> m_cityGmlColorMap;
   // historical
   opencover::ui::Button *ShowGraph = nullptr;
@@ -448,11 +452,10 @@ class EnergyPlugin : public opencover::coVRPlugin,
   CSVStreamMap m_powerGridStreams;
   CSVStreamMap m_heatingGridStreams;
 
-
   // std::array<std::unique_ptr<BaseSimUI>, NUM_ENERGY_GRIDS> m_simUIs;
-//   std::unique_ptr<SolarPanelList> m_solarPanels;
+  //   std::unique_ptr<SolarPanelList> m_solarPanels;
   SolarPanelList m_solarPanels;
-//   std::unique_ptr<SolarPanel> m_solarPanel;
+  //   std::unique_ptr<SolarPanel> m_solarPanel;
 };
 
 #endif
