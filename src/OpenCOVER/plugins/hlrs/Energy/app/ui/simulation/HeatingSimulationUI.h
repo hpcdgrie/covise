@@ -45,9 +45,8 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
     if (m.min > m.max) m.min = m.max;
 
     if (resetMinMax) {
-      auto &[res_min, res_max] = heatingSimulationPtr()->getMinMax(map.species);
-      m.max = res_max;
-      m.min = res_min;
+      m.min = heatingSimulationPtr()->getMin(map.species);
+      m.max = heatingSimulationPtr()->getMax(map.species);
     }
 
     // compute colors

@@ -245,6 +245,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   /* #region CITYGML */
   void initCityGMLUI();
+  void initCityGMLColorMap();
   void addSolarPanelsToCityGML(const boost::filesystem::path &dirPath);
   void enableCityGML(bool on);
   void addCityGMLObjects(osg::ref_ptr<osg::Group> citygmlGroup);
@@ -260,6 +261,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #region SIMULATION */
   void initSimUI();
   void initEnergyGridUI();
+  void initEnergyGridColorMaps();
   void switchEnergyGrid(EnergyGridType grid);
   void initSimMenu();
   void updateColorMap(const opencover::ColorMap &map, EnergyGridType grid);

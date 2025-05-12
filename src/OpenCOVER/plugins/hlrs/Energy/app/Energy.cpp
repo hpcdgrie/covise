@@ -463,6 +463,21 @@ void EnergyPlugin::initCityGMLUI() {
   });
 }
 
+void EnergyPlugin::initCityGMLColorMap() {
+  auto menu = new ui::Menu(m_simulationMenu, "CityGml_grid");
+
+  m_cityGmlColorMap = std::make_unique<opencover::ColorMapSelector>(*menu);
+  m_cityGmlColorMap->setSpecies("Leistung");
+  m_cityGmlColorMap->setUnit("kWh");
+  m_cityGmlColorMap->setCallback([this](const opencover::ColorMap &cm) {
+    if (isActiv(m_switch, m_cityGML)) {
+      enableCityGML(false);
+      enableCityGML(true);
+    }
+  });
+  m_cityGmlColorMap->setName("CityGML");
+}
+
 void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
                                 std::map<std::string, PVData> &pvDataMap,
                                 float &maxPVIntensity) {
@@ -687,8 +702,6 @@ void EnergyPlugin::initPV(osg::ref_ptr<osg::Node> masterPanel,
   using namespace CoreUtils::osgUtils;
 
   // for only textured geometry data
-  //   auto masterGeometryData =
-  //   instancing::extractTexturedGeometryData(masterPanel);
   auto masterGeometryData = instancing::extractAllGeometryData(masterPanel);
   if (masterGeometryData.empty()) {
     std::cerr << "Error: No geometry data found in the solar panel model."
@@ -753,6 +766,7 @@ void EnergyPlugin::enableCityGML(bool on) {
       }
       CoreUtils::osgUtils::deleteChildrenFromOtherGroup(root, m_cityGML);
     }
+    if (!m_cityGmlColorMap) initCityGMLColorMap();
     switchTo(m_cityGML, m_switch);
 
     // TODO: add a check if the group is already added and make sure its safe to
@@ -767,6 +781,7 @@ void EnergyPlugin::enableCityGML(bool on) {
 
       addSolarPanelsToCityGML(solarPanelsDir);
     }
+
   } else {
     switchTo(m_sequenceList, m_switch);
   }
@@ -1305,38 +1320,6 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
 /* #region SIMULATION_DATA */
 
-void EnergyPlugin::initColorMap() {
-  if (m_simulationMenu == nullptr) {
-    initSimMenu();
-  }
-  // auto colorMapMenu = new ui::Menu(m_simulationMenu);
-  for (auto &energyGrid : m_energyGrids) {
-    energyGrid.colorMapSelectorMenu =
-        new ui::Menu(m_simulationMenu, energyGrid.name + "_grid");
-    auto &cms = energyGrid.colorMapSelector;
-    cms = std::make_unique<opencover::ColorMapSelector>(
-        *energyGrid.colorMapSelectorMenu);
-    cms->setSpecies(energyGrid.species);
-    cms->setUnit(energyGrid.unit);
-    auto type = energyGrid.type;
-    cms->setCallback(
-        [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
-    cms->setName(energyGrid.name);
-  }
-  auto menu = new ui::Menu(m_simulationMenu, "CityGml_grid");
-
-  m_cityGmlColorMap = std::make_unique<opencover::ColorMapSelector>(*menu);
-  m_cityGmlColorMap->setSpecies("Leistung");
-  m_cityGmlColorMap->setUnit("kWh");
-  m_cityGmlColorMap->setCallback([this](const opencover::ColorMap &cm) {
-    if (isActiv(m_switch, m_cityGML)) {
-      enableCityGML(false);
-      enableCityGML(true);
-    }
-  });
-  m_cityGmlColorMap->setName("CityGML");
-}
-
 void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
                                   EnergyGridType type) {
   auto m = map;
@@ -1363,8 +1346,11 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
     return;
   }
 
+  if (!m_energyGrids[gridTypeIndex].colorMapSelector) return;
   bool showHud = false;
   for (auto &energyGrid : m_energyGrids) {
+    if (!energyGrid.sim || energyGrid.simUI)
+        continue;
     if (energyGrid.type != grid) {
       showHud |= energyGrid.colorMapSelector->hudVisible();
       energyGrid.colorMapSelector->showHud(false);
@@ -1381,6 +1367,7 @@ void EnergyPlugin::initEnergyGridUI() {
   if (m_simulationMenu == nullptr) {
     initSimMenu();
   }
+
   m_energygridGroup = new ui::Group(m_simulationMenu, "EnergyGrid");
 
   m_energygridBtnGroup = new ui::ButtonGroup(m_energygridGroup, "EnergyGrid");
@@ -1399,7 +1386,7 @@ void EnergyPlugin::initEnergyGridUI() {
 void EnergyPlugin::initSimUI() {
   initSimMenu();
   initEnergyGridUI();
-  initColorMap();
+  //   initColorMap();
 }
 
 void EnergyPlugin::initPowerGridStreams() {
@@ -1588,17 +1575,68 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
 
 void EnergyPlugin::initPowerGrid() {
   initPowerGridStreams();
-  initPowerGridUI({"trafo3w_std_types", "trafo_std_types", "trafo", "parameters",
+  initPowerGridUI({"trafo3w_stdtypes", "trafo_std_types", "trafo", "parameters",
                    "dtypes", "bus_geodata", "fuse_std_types", "line_std_types"});
   buildPowerGrid();
   applySimulationDataToPowerGrid();
   m_powerGridStreams.clear();
 }
 
+void EnergyPlugin::initEnergyGridColorMaps() {
+  if (m_simulationMenu == nullptr) {
+    initSimMenu();
+  }
+
+  for (auto &energyGrid : m_energyGrids) {
+    if (!energyGrid.sim) {
+    std:
+      cerr << "Simulation for energygrid " << energyGrid.name
+           << " not initialized before calling function initEnergyGridColorMaps"
+           << std::endl;
+      continue;
+    }
+    // assert(energyGrid.sim != nullptr &&
+    //        "Simulation not initialized before calling this function");
+    energyGrid.colorMapSelectorMenu =
+        new ui::Menu(m_simulationMenu, energyGrid.name + "_grid");
+
+    // energyGrid.scalarSelector = new ui::SelectionList(
+    //     energyGrid.colorMapSelectorMenu, energyGrid.name + "_scalarSelector");
+    // auto scSel = energyGrid.scalarSelector;
+    // const auto &data = energyGrid.sim->getData();
+
+    // auto &cms = energyGrid.colorMapSelector;
+
+    const auto &scalarProperties = energyGrid.sim->getScalarProperties();
+    auto scalarPropertyIt = scalarProperties.find("mass_flow");
+    if (scalarPropertyIt == scalarProperties.end()) continue;
+
+    auto scalarProperty = scalarPropertyIt->second;
+    auto cms = std::make_unique<opencover::ColorMapSelector>(
+        *energyGrid.colorMapSelectorMenu);
+    cms->setSpecies(scalarProperty.species);
+    cms->setUnit(scalarProperty.unit);
+    auto type = energyGrid.type;
+    cms->setCallback(
+        [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
+    cms->setName(energyGrid.name);
+
+    auto cmap = cms->selectedMap();
+    cmap = energyGrid.simUI->updateTimestepColors(cmap, true);
+
+    cms->setMin(cmap.min);
+    cms->setMax(cmap.max);
+
+    // energyGrid.colorMapSelector.emplace(scalarProperty.species, std::move(cms));
+    energyGrid.colorMapSelector = std::move(cms);
+  }
+}
+
 void EnergyPlugin::initGrid() {
   initPowerGrid();
   initHeatingGrid();
   buildCoolingGrid();
+  initEnergyGridColorMaps();
 }
 
 std::unique_ptr<EnergyPlugin::IDLookupTable> EnergyPlugin::retrieveBusNameIdMapping(
@@ -2016,14 +2054,16 @@ void EnergyPlugin::readSimulationDataStream(
   heatingGrid.simUI = std::make_unique<HeatingSimUI>(sim, heatingGrid.grid);
   heatingGrid.sim = std::move(sim);
 
-  auto m = heatingGrid.colorMapSelector->selectedMap();
-  m = heatingGrid.simUI->updateTimestepColors(m, true);
-  heatingGrid.colorMapSelector->setMin(m.min);
-  heatingGrid.colorMapSelector->setMax(m.max);
+  // TODO: cannot be called here => colorMapSelector will be initialized afterwards
+  // in initGrid()
+  //   auto m = heatingGrid.colorMapSelector->selectedMap();
+  //   m = heatingGrid.simUI->updateTimestepColors(m, true);
+  //   heatingGrid.colorMapSelector->setMin(m.min);
+  //   heatingGrid.colorMapSelector->setMax(m.max);
 
-  auto timesteps = heatingGrid.sim->getTimesteps(m.species);
-  std::cout << "Number of timesteps: " << timesteps << std::endl;
-  setAnimationTimesteps(timesteps, heatingGrid.group);
+  //   auto timesteps = heatingGrid.sim->getTimesteps(m.species);
+  //   std::cout << "Number of timesteps: " << timesteps << std::endl;
+  //   setAnimationTimesteps(timesteps, heatingGrid.group);
 }
 
 void EnergyPlugin::applySimulationDataToHeatingGrid() {
