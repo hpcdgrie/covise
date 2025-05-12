@@ -1,5 +1,6 @@
 #pragma once
 
+#include <PluginUtil/colors/coColorBar.h>
 #include <lib/core/interfaces/IColorable.h>
 #include <lib/core/interfaces/IDrawables.h>
 #include <lib/core/interfaces/ITimedependable.h>
@@ -58,7 +59,7 @@ class BaseSimulationUI {
   }
 
   template <typename simulationObject>
-  void computeColors(const opencover::ColorMap &color_map, const std::map<std::string, simulationObject> &objectContainer) 
+  void computeColors(const opencover::ColorMap &color_map, const std::map<std::string, simulationObject> &objectContainer)
   {
 
     isDerivedFromObject<simulationObject>();
@@ -72,9 +73,11 @@ class BaseSimulationUI {
         return;
       }
 
-      auto &[min_val, max_val] = simulation->getMinMax(color_map.species);
-      minKeyVal = min_val;
-      maxKeyVal = max_val;
+    //   auto &[min_val, max_val] = simulation->getMinMax(color_map.species);
+    //   minKeyVal = min_val;
+    //   maxKeyVal = max_val;
+      minKeyVal = simulation->getMin(color_map.species);
+      maxKeyVal = simulation->getMax(color_map.species);
     } catch (const std::out_of_range &e) {
       std::cerr << "Key not found in minMaxValues: " << color_map.species << std::endl;
       return;
