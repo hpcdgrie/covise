@@ -8,17 +8,30 @@ void Simulation::computeMinMax(const std::string &key,
                                const std::vector<double> &values) {
   const auto &[min_elem, max_elem] =
       std::minmax_element(values.begin(), values.end());
-  if (auto it = m_minMax.find(key); it == m_minMax.end()) {
-    m_minMax.insert({key, {*min_elem, *max_elem}});
+  if (auto it = m_scalarProperties.find(key); it == m_scalarProperties.end()) {
+    auto &property = m_scalarProperties[key];
+    property.min = *min_elem;
+    property.max = *max_elem;
   } else {
-    const auto &[min, max] = it->second;
-    if (*min_elem < min) it->second.first = *min_elem;
-    if (*max_elem > max) it->second.second = *max_elem;
+    auto &property = it->second;
+    if (*min_elem < property.min) property.min = *min_elem;
+    if (*max_elem > property.max) property.max = *max_elem;
   }
 }
 
 void Simulation::computeMaxTimestep(const std::string &key,
                                     const std::vector<double> &values) {
-  m_timesteps[key] = values.size();
+  m_scalarProperties[key].timesteps = values.size();
+}
+
+void Simulation::setUnit(const std::string &key) {
+  for (auto &[names, unit] : UNIT_MAP) {
+    auto it = std::find(names.begin(), names.end(), key);
+    if (it != names.end()) {
+      m_scalarProperties[key].unit = unit;
+      return;
+    }
+  }
+  m_scalarProperties[key].unit = "unknown";
 }
 }  // namespace core::simulation
