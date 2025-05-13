@@ -1654,17 +1654,13 @@ void EnergyPlugin::initEnergyGridColorMaps() {
     scalarSelector->setList(scalarPropertyNames);
     scalarSelector->setCallback([this, &energyGrid](int selected) {
       auto scalarSelection = energyGrid.scalarSelector->selectedItem();
-    //   auto it = energyGrid.colorMapRegistry.begin();
-    //   std::advance(it, selected);
-    //   auto &colorMapMenu = it->second;
-    //   auto &colorMapMenu = energyGrid.colorMapRegistry.at(selected);
-      // NOTE: colormap registry and scalar selector are in sync => if not make sure to adjust this
+      // NOTE: colormap registry and scalar selector are in sync => if not make sure
+      // to adjust this
       auto &colorMapMenu = energyGrid.colorMapRegistry[scalarSelection];
       colorMapMenu.menu->setVisible(true);
       for (auto &[name, menu] : energyGrid.colorMapRegistry) {
-        // if (name != it->first) {
         if (name != scalarSelection) {
-            menu.menu->setVisible(false);
+          menu.menu->setVisible(false);
         }
       }
       updateColorMap(colorMapMenu.selector->selectedMap(), energyGrid.type);
