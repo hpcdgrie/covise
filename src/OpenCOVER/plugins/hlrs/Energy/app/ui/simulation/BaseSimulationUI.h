@@ -73,9 +73,6 @@ class BaseSimulationUI {
         return;
       }
 
-    //   auto &[min_val, max_val] = simulation->getMinMax(color_map.species);
-    //   minKeyVal = min_val;
-    //   maxKeyVal = max_val;
       minKeyVal = simulation->getMin(color_map.species);
       maxKeyVal = simulation->getMax(color_map.species);
     } catch (const std::out_of_range &e) {
@@ -85,6 +82,11 @@ class BaseSimulationUI {
 
     for (auto &[name, object] : objectContainer) {
       const auto &data = object.getData();
+      auto it = data.find(color_map.species);
+      if (it == data.end()) {
+        std::cerr << "Key not found in data: " << color_map.species << std::endl;
+        continue;
+      }
       const auto &values = data.at(color_map.species);
       if (auto color_it = m_colors.find(name); color_it == m_colors.end()) {
         m_colors.insert({name, std::vector<osg::Vec4>(values.size())});
