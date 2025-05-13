@@ -285,11 +285,18 @@ void EnergyPlugin::preFrame() {
   ColorBar::HudPosition hudPos;
   auto numHuds = 0;
   for (auto &energyGrid : m_energyGrids) {
-    auto &colorMapMenu = energyGrid.colorMapSelector;
-    if (colorMapMenu && colorMapMenu->hudVisible()) {
+    if (!energyGrid.scalarSelector) continue;
+    const auto &selectedScalar = energyGrid.scalarSelector->selectedItem();
+    auto &colorMapMenu = energyGrid.colorMapRegistry[selectedScalar];
+    if (colorMapMenu.selector && colorMapMenu.selector->hudVisible()) {
       hudPos.setNumHuds(numHuds++);
-      colorMapMenu->setHudPosition(hudPos);
+      colorMapMenu.selector->setHudPosition(hudPos);
     }
+    // auto &colorMapSelector = energyGrid.colorMapRegistry[selectedScalar];
+    // if (colorMapSelector && colorMapSelector->hudVisible()) {
+    //   hudPos.setNumHuds(numHuds++);
+    //   colorMapSelector->setHudPosition(hudPos);
+    // }
   }
 }
 
@@ -1346,20 +1353,37 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
     return;
   }
 
-  if (!m_energyGrids[gridTypeIndex].colorMapSelector) return;
+  if (m_energyGrids[gridTypeIndex].colorMapRegistry.empty()) return;
   bool showHud = false;
   for (auto &energyGrid : m_energyGrids) {
-    if (!energyGrid.sim || energyGrid.simUI)
-        continue;
+    if (!energyGrid.sim || !energyGrid.simUI ||
+        energyGrid.colorMapRegistry.empty() || !energyGrid.scalarSelector)
+      continue;
+    const auto &selected = energyGrid.scalarSelector->selectedItem();
+    // if (energyGrid.type != grid) {
+    //   showHud |= energyGrid.colorMapRegistry[selected]->hudVisible();
+    //   energyGrid.colorMapRegistry[selected]->showHud(false);
+    //   energyGrid.colorMapSelectorMenu->setVisible(false);
+    // } else {
+    //   energyGrid.colorMapSelectorMenu->setVisible(true);
+    // }
+    auto &colorMapMenu = energyGrid.colorMapRegistry[selected];
     if (energyGrid.type != grid) {
-      showHud |= energyGrid.colorMapSelector->hudVisible();
-      energyGrid.colorMapSelector->showHud(false);
-      energyGrid.colorMapSelectorMenu->setVisible(false);
+      auto &selector = colorMapMenu.selector;
+      auto &menu = colorMapMenu.menu;
+      showHud |= selector->hudVisible();
+      selector->showHud(false);
+      menu->setVisible(false);
     } else {
-      energyGrid.colorMapSelectorMenu->setVisible(true);
+      auto menu = colorMapMenu.menu;
+      menu->setVisible(true);
+      //   energyGrid.colorMapSelectorMenu->setVisible(true);
     }
   }
-  m_energyGrids[gridTypeIndex].colorMapSelector->showHud(showHud);
+  auto &defaultGrid = m_energyGrids[gridTypeIndex];
+  const auto &selected = defaultGrid.scalarSelector->selectedItem();
+  auto &colorMapMenu = defaultGrid.colorMapRegistry[selected];
+  colorMapMenu.selector->showHud(showHud);
   switchTo(switch_to, m_grid);
 }
 
@@ -1589,46 +1613,64 @@ void EnergyPlugin::initEnergyGridColorMaps() {
 
   for (auto &energyGrid : m_energyGrids) {
     if (!energyGrid.sim) {
-    std:
-      cerr << "Simulation for energygrid " << energyGrid.name
-           << " not initialized before calling function initEnergyGridColorMaps"
-           << std::endl;
+      std::cerr << "Simulation for energygrid " << energyGrid.name
+                << " not initialized before calling function initEnergyGridColorMaps"
+                << std::endl;
       continue;
     }
-    // assert(energyGrid.sim != nullptr &&
-    //        "Simulation not initialized before calling this function");
-    energyGrid.colorMapSelectorMenu =
-        new ui::Menu(m_simulationMenu, energyGrid.name + "_grid");
-
-    // energyGrid.scalarSelector = new ui::SelectionList(
-    //     energyGrid.colorMapSelectorMenu, energyGrid.name + "_scalarSelector");
-    // auto scSel = energyGrid.scalarSelector;
-    // const auto &data = energyGrid.sim->getData();
-
-    // auto &cms = energyGrid.colorMapSelector;
 
     const auto &scalarProperties = energyGrid.sim->getScalarProperties();
-    auto scalarPropertyIt = scalarProperties.find("mass_flow");
-    if (scalarPropertyIt == scalarProperties.end()) continue;
+    std::vector<std::string> scalarPropertyNames;
+    int idx{0};
+    for (const auto &[name, scalarProperty] : scalarProperties) {
+      if (std::find(scalarPropertyNames.begin(), scalarPropertyNames.end(), name) ==
+          scalarPropertyNames.end())
+        scalarPropertyNames.push_back(name);
 
-    auto scalarProperty = scalarPropertyIt->second;
-    auto cms = std::make_unique<opencover::ColorMapSelector>(
-        *energyGrid.colorMapSelectorMenu);
-    cms->setSpecies(scalarProperty.species);
-    cms->setUnit(scalarProperty.unit);
-    auto type = energyGrid.type;
-    cms->setCallback(
-        [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
-    cms->setName(energyGrid.name);
+      auto menu =
+          new ui::Menu(m_simulationMenu, energyGrid.name + "_" + energyGrid.species +
+                                             " " + std::to_string(idx++));
 
-    auto cmap = cms->selectedMap();
-    cmap = energyGrid.simUI->updateTimestepColors(cmap, true);
+      auto cms = std::make_unique<opencover::ColorMapSelector>(*menu);
+      cms->setSpecies(scalarProperty.species);
+      cms->setUnit(scalarProperty.unit);
+      auto type = energyGrid.type;
+      cms->setCallback(
+          [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
+      cms->setName(energyGrid.name);
 
-    cms->setMin(cmap.min);
-    cms->setMax(cmap.max);
+      auto cmap = cms->selectedMap();
+      cmap = energyGrid.simUI->updateTimestepColors(cmap, true);
 
-    // energyGrid.colorMapSelector.emplace(scalarProperty.species, std::move(cms));
-    energyGrid.colorMapSelector = std::move(cms);
+      cms->setMin(cmap.min);
+      cms->setMax(cmap.max);
+
+      energyGrid.colorMapRegistry.emplace(scalarProperty.species,
+                                          ColorMapMenu{menu, std::move(cms)});
+    }
+
+    auto scalarSelector =
+        new ui::SelectionList(m_simulationMenu, energyGrid.name + "_scalarSelector");
+    scalarSelector->setList(scalarPropertyNames);
+    scalarSelector->setCallback([this, &energyGrid](int selected) {
+      auto scalarSelection = energyGrid.scalarSelector->selectedItem();
+    //   auto it = energyGrid.colorMapRegistry.begin();
+    //   std::advance(it, selected);
+    //   auto &colorMapMenu = it->second;
+    //   auto &colorMapMenu = energyGrid.colorMapRegistry.at(selected);
+      // NOTE: colormap registry and scalar selector are in sync => if not make sure to adjust this
+      auto &colorMapMenu = energyGrid.colorMapRegistry[scalarSelection];
+      colorMapMenu.menu->setVisible(true);
+      for (auto &[name, menu] : energyGrid.colorMapRegistry) {
+        // if (name != it->first) {
+        if (name != scalarSelection) {
+            menu.menu->setVisible(false);
+        }
+      }
+      updateColorMap(colorMapMenu.selector->selectedMap(), energyGrid.type);
+    });
+    energyGrid.scalarSelector = scalarSelector;
+    energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
   }
 }
 

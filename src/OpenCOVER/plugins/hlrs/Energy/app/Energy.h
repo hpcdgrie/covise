@@ -156,6 +156,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
   typedef ::EnergyGrid EnergyGridOsg;
   /* #endregion */
+
+  struct ColorMapMenu {
+    opencover::ui::Menu *menu;
+    std::unique_ptr<opencover::ColorMapSelector> selector;
+  };
+
   struct EnergyGrid {
     const std::string name;
     const std::string species;
@@ -163,13 +169,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
     const EnergyGridType type;
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
-    opencover::ui::Menu *colorMapSelectorMenu = nullptr;
-    // opencover::ui::SelectionList *scalarSelector = nullptr;
+    opencover::ui::SelectionList *scalarSelector = nullptr;
     osg::ref_ptr<osg::Group> group = nullptr;
     std::shared_ptr<core::interface::IEnergyGrid> grid;
     std::shared_ptr<Simulation> sim;
     std::unique_ptr<BaseSimUI> simUI;
-    std::unique_ptr<opencover::ColorMapSelector> colorMapSelector;
+    std::map<std::string, ColorMapMenu> colorMapRegistry;
   };
 
   auto getEnergyGridTypeIndex(EnergyGridType type) { return static_cast<int>(type); }
@@ -418,7 +423,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
       m_powerGridCheckboxes;
   std::unique_ptr<config::Array<bool>> m_powerGridSelectionPtr = nullptr;
 
-  // // Heatgrid UI
+  // Heatgrid UI
   // opencover::ui::Menu *m_heatGridMenu = nullptr;
 
   // // Coolinggrid UI
