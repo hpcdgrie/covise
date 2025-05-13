@@ -1353,20 +1353,12 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
     return;
   }
 
-  if (m_energyGrids[gridTypeIndex].colorMapRegistry.empty()) return;
   bool showHud = false;
   for (auto &energyGrid : m_energyGrids) {
     if (!energyGrid.sim || !energyGrid.simUI ||
         energyGrid.colorMapRegistry.empty() || !energyGrid.scalarSelector)
       continue;
     const auto &selected = energyGrid.scalarSelector->selectedItem();
-    // if (energyGrid.type != grid) {
-    //   showHud |= energyGrid.colorMapRegistry[selected]->hudVisible();
-    //   energyGrid.colorMapRegistry[selected]->showHud(false);
-    //   energyGrid.colorMapSelectorMenu->setVisible(false);
-    // } else {
-    //   energyGrid.colorMapSelectorMenu->setVisible(true);
-    // }
     auto &colorMapMenu = energyGrid.colorMapRegistry[selected];
     if (energyGrid.type != grid) {
       auto &selector = colorMapMenu.selector;
@@ -1377,13 +1369,14 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
     } else {
       auto menu = colorMapMenu.menu;
       menu->setVisible(true);
-      //   energyGrid.colorMapSelectorMenu->setVisible(true);
     }
   }
   auto &defaultGrid = m_energyGrids[gridTypeIndex];
-  const auto &selected = defaultGrid.scalarSelector->selectedItem();
-  auto &colorMapMenu = defaultGrid.colorMapRegistry[selected];
-  colorMapMenu.selector->showHud(showHud);
+  if (defaultGrid.scalarSelector) {
+    const auto &selected = defaultGrid.scalarSelector->selectedItem();
+    auto &colorMapMenu = defaultGrid.colorMapRegistry[selected];
+    colorMapMenu.selector->showHud(showHud);
+  }
   switchTo(switch_to, m_grid);
 }
 
@@ -1989,7 +1982,10 @@ void EnergyPlugin::buildPowerGrid() {
   // create grid
   if (lines == nullptr || points == nullptr) return;
 
-  auto powerGroup = new osg::Group;
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+  auto &egrid = m_energyGrids[idx];
+  auto &powerGroup = egrid.group;
+  powerGroup = new osg::Group;
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
@@ -2003,10 +1999,8 @@ void EnergyPlugin::buildPowerGrid() {
   powerGrid->initDrawables();
   powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
-  addEnergyGridToGridSwitch(powerGroup);
-  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
-  m_energyGrids[idx].group = powerGroup;
-  m_energyGrids[idx].grid = std::move(powerGrid);
+  egrid.grid = std::move(powerGrid);
+  addEnergyGridToGridSwitch(egrid.group);
 
   // TODO:
   //  [ ] set trafo as 3d model or block
