@@ -2092,16 +2092,9 @@ void EnergyPlugin::readSimulationDataStream(
   heatingGrid.simUI = std::make_unique<HeatingSimUI>(sim, heatingGrid.grid);
   heatingGrid.sim = std::move(sim);
 
-  // TODO: cannot be called here => colorMapSelector will be initialized afterwards
-  // in initGrid()
-  //   auto m = heatingGrid.colorMapSelector->selectedMap();
-  //   m = heatingGrid.simUI->updateTimestepColors(m, true);
-  //   heatingGrid.colorMapSelector->setMin(m.min);
-  //   heatingGrid.colorMapSelector->setMax(m.max);
-
-  //   auto timesteps = heatingGrid.sim->getTimesteps(m.species);
-  //   std::cout << "Number of timesteps: " << timesteps << std::endl;
-  //   setAnimationTimesteps(timesteps, heatingGrid.group);
+  auto timesteps = heatingGrid.sim->getTimesteps("mass_flow");
+  std::cout << "Number of timesteps: " << timesteps << std::endl;
+  setAnimationTimesteps(timesteps, heatingGrid.group);
 }
 
 void EnergyPlugin::applySimulationDataToHeatingGrid() {
