@@ -25,13 +25,6 @@ void Simulation::computeMaxTimestep(const std::string &key,
 }
 
 void Simulation::setUnit(const std::string &key) {
-  for (auto &[names, unit] : UNIT_MAP) {
-    auto it = std::find(names.begin(), names.end(), key);
-    if (it != names.end()) {
-      m_scalarProperties[key].unit = unit;
-      return;
-    }
-  }
-  m_scalarProperties[key].unit = "unknown";
+  m_scalarProperties[key].unit = UNIT_MAP[key];
 }
 }  // namespace core::simulation

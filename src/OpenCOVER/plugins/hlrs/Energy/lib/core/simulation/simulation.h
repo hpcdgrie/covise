@@ -2,22 +2,52 @@
 
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "object.h"
 
 namespace core::simulation {
+struct UnitPair {
+  std::vector<std::string> names;
+  std::string unit;
+};
 
-const std::map<std::vector<std::string>, std::string> UNIT_MAP = {
+class UnitMap {
+ public:
+  UnitMap(std::vector<UnitPair> &&unitPairs) {
+    for (const auto &pair : unitPairs) {
+      for (const auto &name : pair.names) {
+        unit_map[name] = pair.unit;
+      }
+    }
+  }
+
+  const std::string operator[](const std::string &key) const {
+    auto it = unit_map.find(key);
+    if (it != unit_map.end()) {
+      return it->second;
+    }
+    return "unknown";
+  }
+
+  auto begin() { return unit_map.begin(); }
+  auto end() { return unit_map.end(); }
+
+ private:
+  std::unordered_map<std::string, std::string> unit_map;
+};
+
+const UnitMap UNIT_MAP = UnitMap({
     {{"kWh", "leistung", "power"}, "kWh"},
     {{"kW"}, "kW"},
     {{"q_dem_w", "waermestromdichte"}, "W/m2"},
     {{"delta_q", "aenderung_stromdichte"}, "W/m2"},
     {{"mass_flow", "massenstrom"}, "kg/s"},
     {{"celcius", "temp", "inlet_temp", "outlet_temp"}, "°C"},
-    {{"elctricity_selling_price"}, "Cent/kWh"},
-    {{"heatingCost"}, "€"},
-};
+    {{"electricity_selling_price"}, "Cent/kWh"},
+    {{"heating_cost"}, "€"},
+});
 
 struct ScalarProperty {
   std::string unit;
