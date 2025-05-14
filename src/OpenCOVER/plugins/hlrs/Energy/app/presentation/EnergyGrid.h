@@ -37,7 +37,7 @@ enum class EnergyGridConnectionType { Index, Line };
 struct EnergyGridConfig {
   EnergyGridConfig(const std::string &gridName, const grid::Points &gridPoints,
                    const grid::Indices &gridIndices,
-                   osg::ref_ptr<osg::Group> gridParent = nullptr,
+                   osg::ref_ptr<osg::MatrixTransform> gridParent = nullptr,
                    const float &gridConnectionRadius = 1.0f,
                    const grid::ConnectionDataList &extraConnectionData =
                        grid::ConnectionDataList(),
@@ -62,7 +62,7 @@ struct EnergyGridConfig {
   grid::Points points;
   grid::Indices indices;
   // optional
-  osg::ref_ptr<osg::Group> parent;
+  osg::ref_ptr<osg::MatrixTransform> parent;
   float connectionRadius;
   grid::ConnectionDataList additionalConnectionData;
   TxtBoxAttributes infoboardAttributes;

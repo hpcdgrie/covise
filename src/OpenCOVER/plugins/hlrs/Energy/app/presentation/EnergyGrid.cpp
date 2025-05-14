@@ -8,6 +8,7 @@
 #include <cassert>
 #include <memory>
 #include <osg/BoundingBox>
+#include <osg/MatrixTransform>
 #include <osg/Shape>
 #include <osg/Vec3>
 #include <osg/Vec4>
@@ -62,7 +63,7 @@ void InfoboardSensor::update() {
 // EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
 EnergyGrid::EnergyGrid(const EnergyGridConfig &data) : m_config(data) {
   if (!m_config.parent.valid()) {
-    m_config.parent = new osg::Group;
+    m_config.parent = new osg::MatrixTransform;
     m_config.parent->setName(m_config.name);
   }
   initConnections();

@@ -170,7 +170,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
     opencover::ui::SelectionList *scalarSelector = nullptr;
-    osg::ref_ptr<osg::Group> group = nullptr;
+    osg::ref_ptr<osg::MatrixTransform> group = nullptr;
     std::shared_ptr<core::interface::IEnergyGrid> grid;
     std::shared_ptr<Simulation> sim;
     std::unique_ptr<BaseSimUI> simUI;

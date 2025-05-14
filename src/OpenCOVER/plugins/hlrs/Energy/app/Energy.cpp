@@ -1985,7 +1985,7 @@ void EnergyPlugin::buildPowerGrid() {
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
   auto &egrid = m_energyGrids[idx];
   auto &powerGroup = egrid.group;
-  powerGroup = new osg::Group;
+  powerGroup = new osg::MatrixTransform;
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
@@ -2110,7 +2110,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   grid::Data pointData{};
   std::map<int, int> idMap{};
   auto egridIdx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  m_energyGrids[egridIdx].group = new osg::Group();
+  m_energyGrids[egridIdx].group = new osg::MatrixTransform;
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
