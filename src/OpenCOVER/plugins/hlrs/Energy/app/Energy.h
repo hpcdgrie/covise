@@ -412,6 +412,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Menu *m_simulationMenu = nullptr;
   opencover::ui::Group *m_energygridGroup = nullptr;
   opencover::ui::ButtonGroup *m_energygridBtnGroup = nullptr;
+  opencover::ui::Button *m_liftGrids = nullptr;
   // opencover::ui::Button *m_powerGridBtn = nullptr;
   // opencover::ui::Button *m_heatingGridBtn = nullptr;
   // opencover::ui::Button *m_coolingGridBtn = nullptr;

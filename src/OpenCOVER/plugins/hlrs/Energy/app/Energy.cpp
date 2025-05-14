@@ -1343,6 +1343,17 @@ void EnergyPlugin::initSimMenu() {
   if (m_simulationMenu != nullptr) return;
   m_simulationMenu = new ui::Menu(m_EnergyTab, "Simulation");
   m_simulationMenu->setText("Simulation");
+
+  m_liftGrids = new ui::Button(m_simulationMenu, "LiftGrids");
+  constexpr float uplift(30.0f);
+  m_liftGrids->setText("Up");
+  m_liftGrids->setCallback([this, &uplift](bool on) {
+    auto active = on ? 1 : -1;
+    for (auto &energyGrid : m_energyGrids) {
+      energyGrid.group->setMatrix(osg::Matrix::translate(
+          0, 0, energyGrid.group->getMatrix().getTrans().z() + uplift * active));
+    }
+  });
 }
 
 void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
