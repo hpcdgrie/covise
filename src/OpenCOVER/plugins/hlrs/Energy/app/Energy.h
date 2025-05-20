@@ -58,6 +58,7 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/SelectionList.h>
+
 // ennovatis
 #include <lib/ennovatis/building.h>
 #include <lib/ennovatis/rest.h>
@@ -279,6 +280,17 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::unique_ptr<FloatMap> getInlfuxDataFromCSV(CSVStream &stream, float &max,
                                                  float &min, float &sum,
                                                  int &timesteps);
+
+  struct StaticPowerData {
+    std::string name;
+    int id;
+    float val2019;
+    float val2023;
+    float average;
+    std::string citygml_id;
+  };
+
+  auto readStaticPowerData(CSVStream &stream, float &max, float &min, float &sum);
   std::unique_ptr<grid::Points> createPowerGridPoints(CSVStream &stream,
                                                       size_t &numPoints,
                                                       const float &sphereRadius,
@@ -307,7 +319,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
       std::string &name, std::map<std::string, uint> &duplicateMap);
   std::unique_ptr<grid::PointDataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
-  void applyStaticInfluxToCityGML(const std::string &filePath);
+  void applyInfluxToCityGML(const std::string &filePath);
+  void applyStaticDataToCityGML(const std::string &filePath);
   void applySimulationDataToPowerGrid();
   void updatePowerGridSelection(bool on);
   void updatePowerGridConfig(const std::string &tableName, const std::string &name,
@@ -413,6 +426,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Group *m_energygridGroup = nullptr;
   opencover::ui::ButtonGroup *m_energygridBtnGroup = nullptr;
   opencover::ui::Button *m_liftGrids = nullptr;
+  opencover::ui::Button *m_staticPower = nullptr;
   // opencover::ui::Button *m_powerGridBtn = nullptr;
   // opencover::ui::Button *m_heatingGridBtn = nullptr;
   // opencover::ui::Button *m_coolingGridBtn = nullptr;

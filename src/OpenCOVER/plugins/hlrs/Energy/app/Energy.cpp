@@ -468,6 +468,11 @@ void EnergyPlugin::initCityGMLUI() {
       gmlRoot->addChild(m_pvGroup);
     }
   });
+
+  m_staticPower = new ui::Button(m_cityGMLMenu, "Static");
+  m_staticPower->setText("StaticPower");
+  m_staticPower->setState(false);
+  m_staticPower->setCallback([&](bool on) { enableCityGML(on); });
 }
 
 void EnergyPlugin::initCityGMLColorMap() {
@@ -777,9 +782,15 @@ void EnergyPlugin::enableCityGML(bool on) {
     switchTo(m_cityGML, m_switch);
 
     // TODO: add a check if the group is already added and make sure its safe to
-    auto influxStatic =
-        configString("Simulation", "staticInfluxCSV", "default")->value();
-    applyStaticInfluxToCityGML(influxStatic);
+    if (!m_staticPower->state()) {
+      auto influxCSVPath =
+          configString("Simulation", "staticInfluxCSV", "default")->value();
+      applyInfluxToCityGML(influxCSVPath);
+    } else {
+      auto staticPower =
+          configString("Simulation", "staticPower", "default")->value();
+      applyStaticDataToCityGML(staticPower);
+    }
 
     if (m_solarPanels.empty()) {
       auto modelDirPath =
@@ -1457,8 +1468,38 @@ std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
   return std::make_unique<FloatMap>(values);
 }
 
-void EnergyPlugin::applyStaticInfluxToCityGML(
-    const std::string &filePathToInfluxCSV) {
+auto EnergyPlugin::readStaticPowerData(CSVStream &stream, float &max, float &min,
+                                       float &sum) {
+  std::vector<StaticPowerData> powerData;
+  if (!stream || stream.getHeader().size() < 1) return powerData;
+  CSVStream::CSVRow row;
+  while (stream >> row) {
+    StaticPowerData data;
+    ACCESS_CSV_ROW(row, "name", data.name);
+    ACCESS_CSV_ROW(row, "2019", data.val2019);
+    ACCESS_CSV_ROW(row, "2023", data.val2023);
+    ACCESS_CSV_ROW(row, "average", data.average);
+    ACCESS_CSV_ROW(row, "building_id", data.id);
+    ACCESS_CSV_ROW(row, "citygml_id", data.citygml_id);
+
+    max = std::max(max, data.val2019);
+    max = std::max(max, data.val2023);
+    max = std::max(max, data.average);
+
+    if (min == -1) {
+      min = data.val2019;
+      min = data.val2023;
+    }
+    min = std::min(min, data.val2019);
+    min = std::min(min, data.val2023);
+    min = std::min(min, data.average);
+
+    powerData.push_back(data);
+  }
+  return powerData;
+}
+
+void EnergyPlugin::applyInfluxToCityGML(const std::string &filePathToInfluxCSV) {
   if (m_cityGMLObjs.empty()) return;
   if (!fs::exists(filePathToInfluxCSV)) return;
   auto csvStream = CSVStream(filePathToInfluxCSV);
@@ -1482,6 +1523,26 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
     }
   }
   setAnimationTimesteps(timesteps, m_cityGML);
+}
+
+void EnergyPlugin::applyStaticDataToCityGML(const std::string &filePathToInfluxCSV) {
+  if (m_cityGMLObjs.empty()) return;
+  if (!fs::exists(filePathToInfluxCSV)) return;
+  auto csvStream = CSVStream(filePathToInfluxCSV);
+  float max = 0, min = -1;
+  float sum = 0;
+
+  auto values = readStaticPowerData(csvStream, max, min, sum);
+  m_cityGmlColorMap->setMax(max);
+  m_cityGmlColorMap->setMin(min);
+  for (const auto &v : values) {
+    if (auto it = m_cityGMLObjs.find(v.citygml_id); it != m_cityGMLObjs.end()) {
+      auto &gmlObj = it->second;
+      gmlObj->updateTimestepColors({v.val2019, v.val2023, v.average},
+                                   m_cityGmlColorMap->selectedMap());
+    }
+  }
+  setAnimationTimesteps(3, m_cityGML);
 }
 
 bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
@@ -1568,6 +1629,7 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
     auto header = stream.getHeader();
     std::vector<opencover::ui::Button *> checkBoxMap;
     for (auto &col : header) {
+      if (i >= powerGridSelection.size()) break;
       if (col.find("Unnamed") == 0) continue;
       auto checkBox = new opencover::ui::Button(menu, col);
       checkBox->setCallback([this, tableName = name, col](bool on) {
@@ -1592,8 +1654,8 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
   }
   if (initConfig) {
     m_powerGridSelectionPtr->resize(powerGridSelection.size());
-    for (auto i = 0; i < powerGridSelection.size(); ++i)
-      (*m_powerGridSelectionPtr)[i] = powerGridSelection[i];
+    for (auto j = 0; j < powerGridSelection.size(); ++j)
+      (*m_powerGridSelectionPtr)[j] = powerGridSelection[j];
   }
 }
 
