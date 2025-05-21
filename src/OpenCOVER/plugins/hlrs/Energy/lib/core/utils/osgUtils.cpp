@@ -321,6 +321,120 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
   return geode;
 }
 
+osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+    const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
+    float radius, int circleSegments, int lengthSegments, osg::Vec4 cylinderColor,
+    osg::ref_ptr<osg::TessellationHints> hints) {
+  osg::ref_ptr geode = new osg::Geode;
+  osg::Vec3 center;
+  float height;
+
+  osg::ref_ptr<osg::Geometry> clinderGeometry = new osg::Geometry();
+  osg::ref_ptr<osg::Material> pMaterial;
+
+  height = (start - end).length();
+  center = osg::Vec3((start.x() + end.x()) / 2, (start.y() + end.y()) / 2,
+                     (start.z() + end.z()) / 2);
+
+  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+  osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+
+  osg::Vec3 midPoint = (start + end) * 0.5f;
+  osg::Vec3 direction = (start - end);
+  direction.normalize();
+
+  // Find a vector perpendicular to the direction.
+  osg::Vec3 up(0.0f, 0.0f, 1.0f);  // Default up vector.
+  osg::Vec3 right = up ^ direction;
+
+  // Calculate points along the cylinder.
+  std::vector<osg::Vec3> basePoints;
+  for (int i = 0; i <= lengthSegments; ++i) {
+    float segment = static_cast<float>(i) / lengthSegments;
+    osg::Vec3 p = start + (direction * segment * height);
+    basePoints.push_back(p);
+  }
+
+  // Generate tube vertices and normalcircleSegementss.
+  for (size_t i = 0; i < basePoints.size(); ++i) {
+    osg::Vec3 currentPoint = basePoints[i];
+    // Calculate tangent, normal, and binormal.
+    osg::Vec3 tangent;
+    if (i == 0) {
+      tangent = basePoints[1] - basePoints[0];
+      tangent.normalize();
+    } else if (i == basePoints.size() - 1) {
+      tangent = basePoints[i] - basePoints[i - 1];
+      tangent.normalize();
+    } else {
+      osg::Vec3 tangent1 = basePoints[i + 1] - basePoints[i];
+      tangent1.normalize();
+      osg::Vec3 tangent2 = basePoints[i] - basePoints[i - 1];
+      tangent2.normalize();
+      tangent = (tangent1 + tangent2);
+      tangent.normalize();
+    }
+
+    osg::Vec3 normal = right ^ tangent;
+    normal.normalize();
+    osg::Vec3 binormal = tangent ^ normal;
+    binormal.normalize();
+
+    // Generate vertices around the tube.
+    for (int j = 0; j <= circleSegments; ++j) {
+      float angle = 2.0f * osg::PI * static_cast<float>(j) / circleSegments;
+      osg::Vec3 vertex =
+          currentPoint + (binormal * cos(angle) + normal * sin(angle)) * radius;
+      vertices->push_back(vertex);
+
+      osg::Vec3 outwardNormal = (binormal * cos(angle) + normal * sin(angle));
+      outwardNormal.normalize();
+      normals->push_back(outwardNormal);
+    }
+  }
+
+  // Generate indices.
+  osg::ref_ptr<osg::DrawElementsUInt> indices =
+      new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLE_STRIP);
+  for (int i = 0; i < lengthSegments; ++i) {
+    for (int j = 0; j <= circleSegments; ++j) {
+      indices->push_back((i + 0) * (lengthSegments + 1) + j);
+      indices->push_back((i + 1) * (circleSegments + 1) + j);
+    }
+  }
+
+  geometry->setVertexArray(vertices.get());
+  geometry->setNormalArray(normals.get(), osg::Array::BIND_PER_VERTEX);
+  geometry->addPrimitiveSet(indices.get());
+
+  osgUtil::SmoothingVisitor sv;
+  geometry->accept(sv);
+
+  geode->addDrawable(geometry.get());
+
+  // Add Material
+  osg::ref_ptr<osg::Material> material = new osg::Material;
+  material->setAmbient(osg::Material::FRONT_AND_BACK,
+                       osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
+  material->setColorMode(osg::Material::AMBIENT_AND_DIFFUSE);
+
+  // need to set the color per vertex because of the interpolation between end and
+  // start without a shader
+  osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+  for (int i = 0; i <= lengthSegments; ++i) {
+    auto color = i % 2 ? osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)
+                       : osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    for (int j = 0; j <= circleSegments; ++j)
+      colors->push_back(color);
+  }
+
+  geometry->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
+  geode->getOrCreateStateSet()->setAttribute(material);
+
+  return geode;
+}
+
 osg::Vec3 cubicBezier(float t, const osg::Vec3 &p0, const osg::Vec3 &p1,
                       const osg::Vec3 &p2, const osg::Vec3 &p3) {
   float u = 1 - t;

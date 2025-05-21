@@ -59,6 +59,11 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
     osg::Vec3 start, osg::Vec3 end, float radius, osg::Vec4 cylinderColor,
     osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints());
 
+osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+    const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
+    float radius, int circleSegments, int lengthSegments, osg::Vec4 cylinderColor,
+    osg::ref_ptr<osg::TessellationHints> hints);
+
 osg::Vec3 cubicBezier(float t, const osg::Vec3 &p0, const osg::Vec3 &p1,
                       const osg::Vec3 &p2, const osg::Vec3 &p3);
 osg::ref_ptr<osg::Geode> createBezierTube(
