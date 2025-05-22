@@ -460,8 +460,6 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
   // need to set the color per vertex because of the color interpolation between end
   // and start without a shader
   auto colors = createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
-      //   lengthSegments, circleSegments, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f),
-      //   osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
       lengthSegments, circleSegments, startColor, endColor);
 
   geometry->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
