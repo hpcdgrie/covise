@@ -32,6 +32,8 @@
 #include <osgText/Text>
 #include <osgUtil/Optimizer>
 #include <osgUtil/SmoothingVisitor>
+#include <utility>
+#include <vector>
 
 namespace core::utils::osgUtils {
 namespace visitors {
@@ -321,60 +323,48 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
   return geode;
 }
 
-osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
-    const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
-    float radius, int circleSegments, int lengthSegments, osg::Vec4 cylinderColor,
-    osg::ref_ptr<osg::TessellationHints> hints) {
-  osg::ref_ptr geode = new osg::Geode;
-  osg::Vec3 center;
-  float height;
-
-  osg::ref_ptr<osg::Geometry> clinderGeometry = new osg::Geometry();
-  osg::ref_ptr<osg::Material> pMaterial;
-
-  height = (start - end).length();
-  center = osg::Vec3((start.x() + end.x()) / 2, (start.y() + end.y()) / 2,
-                     (start.z() + end.z()) / 2);
-
-  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
-  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-  osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-
-  osg::Vec3 midPoint = (start + end) * 0.5f;
-  osg::Vec3 direction = (start - end);
-  direction.normalize();
-
-  // Find a vector perpendicular to the direction.
-  osg::Vec3 up(0.0f, 0.0f, 1.0f);  // Default up vector.
-  osg::Vec3 right = up ^ direction;
-
-  // Calculate points along the cylinder.
+std::vector<osg::Vec3> calculatePointsAlongLine(const osg::Vec3 &start,
+                                                const osg::Vec3 &end,
+                                                int lengthSegments) {
   std::vector<osg::Vec3> basePoints;
-  for (int i = 0; i <= lengthSegments; ++i) {
+  basePoints.push_back(start);
+  osg::Vec3 direction = start - end;
+  direction.normalize();
+  float height;
+  height = (start - end).length();
+  for (int i = 1; i <= lengthSegments; ++i) {
     float segment = static_cast<float>(i) / lengthSegments;
     osg::Vec3 p = start + (direction * segment * height);
     basePoints.push_back(p);
   }
+  return basePoints;
+}
 
-  // Generate tube vertices and normalcircleSegementss.
+std::pair<osg::ref_ptr<osg::Vec3Array>, osg::ref_ptr<osg::Vec3Array>>
+generateVerticesAndNormalsForTube(const std::vector<osg::Vec3> &basePoints,
+                                  const osg::Vec3 &direction, int circleSegments,
+                                  float radius) {
+  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+  osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+  osg::Vec3 up(0.0f, 0.0f, 1.0f);  // Default up vector.
+  osg::Vec3 right = up ^ direction;
   for (size_t i = 0; i < basePoints.size(); ++i) {
     osg::Vec3 currentPoint = basePoints[i];
+
     // Calculate tangent, normal, and binormal.
     osg::Vec3 tangent;
     if (i == 0) {
       tangent = basePoints[1] - basePoints[0];
-      tangent.normalize();
     } else if (i == basePoints.size() - 1) {
       tangent = basePoints[i] - basePoints[i - 1];
-      tangent.normalize();
     } else {
       osg::Vec3 tangent1 = basePoints[i + 1] - basePoints[i];
       tangent1.normalize();
       osg::Vec3 tangent2 = basePoints[i] - basePoints[i - 1];
       tangent2.normalize();
       tangent = (tangent1 + tangent2);
-      tangent.normalize();
     }
+    tangent.normalize();
 
     osg::Vec3 normal = right ^ tangent;
     normal.normalize();
@@ -393,8 +383,11 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
       normals->push_back(outwardNormal);
     }
   }
+  return std::make_pair(vertices, normals);
+}
 
-  // Generate indices.
+osg::ref_ptr<osg::DrawElementsUInt> createIndicesForTube(int lengthSegments,
+                                                         int circleSegments) {
   osg::ref_ptr<osg::DrawElementsUInt> indices =
       new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLE_STRIP);
   for (int i = 0; i < lengthSegments; ++i) {
@@ -403,31 +396,73 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
       indices->push_back((i + 1) * (circleSegments + 1) + j);
     }
   }
+  return indices;
+}
 
-  geometry->setVertexArray(vertices.get());
-  geometry->setNormalArray(normals.get(), osg::Array::BIND_PER_VERTEX);
-  geometry->addPrimitiveSet(indices.get());
+osg::ref_ptr<osg::Vec4Array>
+createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
+    int lengthSegments, int circleSegments, const osg::Vec4 &colorStart,
+    const osg::Vec4 &colorEnd) {
+  osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+  for (int i = 0; i <= lengthSegments; ++i) {
+    auto color = i % 2 ? colorEnd : colorStart;
+    for (int j = 0; j <= circleSegments; ++j) colors->push_back(color);
+  }
+  return colors;
+}
 
+void smoothGeometry(osg::ref_ptr<osg::Geometry> geometry) {
   osgUtil::SmoothingVisitor sv;
   geometry->accept(sv);
+}
 
-  geode->addDrawable(geometry.get());
+osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+    const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
+    float radius, int circleSegments, int lengthSegments,
+    const osg::Vec4 &startColor, const osg::Vec4 &endColor,
+    osg::ref_ptr<osg::TessellationHints> hints) {
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+  osg::ref_ptr<osg::Material> material = new osg::Material;
+  osg::Vec3 direction = start - end;
+  direction.normalize();
+
+  auto basePoints = calculatePointsAlongLine(start, end, lengthSegments);
+
+  // NOTE: for debugging basePoints
+  //   for (size_t i = 0; i < basePoints.size(); ++i) {
+  //     auto p = basePoints[i];
+  //     osg::ref_ptr<osg::Sphere> sph = new osg::Sphere(p, 0.25f);
+  //     osg::ref_ptr<osg::ShapeDrawable> d = new osg::ShapeDrawable(sph);
+  //     d->setColor(osg::Vec4(0.0f, 1.0f, 1.0f, 1.0f));
+  //     geode->addChild(d);
+  //   }
+
+  auto [vertices, normals] = generateVerticesAndNormalsForTube(
+      basePoints, direction, circleSegments, radius);
+
+  // Generate indices.
+  auto indices = createIndicesForTube(lengthSegments, circleSegments);
+
+  geometry->setVertexArray(vertices);
+  geometry->setNormalArray(normals, osg::Array::BIND_PER_VERTEX);
+  geometry->addPrimitiveSet(indices);
+
+  smoothGeometry(geometry);
+
+  geode->addDrawable(geometry);
 
   // Add Material
-  osg::ref_ptr<osg::Material> material = new osg::Material;
   material->setAmbient(osg::Material::FRONT_AND_BACK,
                        osg::Vec4(0.2f, 0.2f, 0.2f, 1.0f));
   material->setColorMode(osg::Material::AMBIENT_AND_DIFFUSE);
 
-  // need to set the color per vertex because of the interpolation between end and
-  // start without a shader
-  osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
-  for (int i = 0; i <= lengthSegments; ++i) {
-    auto color = i % 2 ? osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)
-                       : osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    for (int j = 0; j <= circleSegments; ++j)
-      colors->push_back(color);
-  }
+  // need to set the color per vertex because of the color interpolation between end
+  // and start without a shader
+  auto colors = createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
+      //   lengthSegments, circleSegments, osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f),
+      //   osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+      lengthSegments, circleSegments, startColor, endColor);
 
   geometry->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
   geode->getOrCreateStateSet()->setAttribute(material);
