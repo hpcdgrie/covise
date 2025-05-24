@@ -330,6 +330,7 @@ std::vector<osg::Vec3> calculatePointsAlongLine(const osg::Vec3 &start,
   basePoints.push_back(start);
   osg::Vec3 direction = start - end;
   direction.normalize();
+  direction = -direction;
   float height;
   height = (start - end).length();
   for (int i = 1; i <= lengthSegments; ++i) {
@@ -416,7 +417,7 @@ void smoothGeometry(osg::ref_ptr<osg::Geometry> geometry) {
   geometry->accept(sv);
 }
 
-osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+osg::ref_ptr<osg::Geode> createCylinderBetweenPointsColorInterpolation(
     const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
     float radius, int circleSegments, int lengthSegments,
     const osg::Vec4 &startColor, const osg::Vec4 &endColor,
@@ -426,6 +427,7 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
   osg::ref_ptr<osg::Material> material = new osg::Material;
   osg::Vec3 direction = start - end;
   direction.normalize();
+  direction = -direction;
 
   auto basePoints = calculatePointsAlongLine(start, end, lengthSegments);
 

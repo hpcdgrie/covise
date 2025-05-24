@@ -59,7 +59,7 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
     osg::Vec3 start, osg::Vec3 end, float radius, osg::Vec4 cylinderColor,
     osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints());
 
-osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+osg::ref_ptr<osg::Geode> createCylinderBetweenPointsColorInterpolation(
     const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
     float radius, int circleSegments, int lengthSegments,
     const osg::Vec4 &startColor, const osg::Vec4 &endColor, osg::ref_ptr<osg::TessellationHints> hints);
