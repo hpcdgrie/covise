@@ -65,7 +65,7 @@ struct ConnectionData {
   Data additionalData;
 };
 
-enum class ConnectionType { Line, Arc, Arrow };
+enum class ConnectionType { Line, LineWithColorInterpolation, Arc, Arrow };
 
 class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
@@ -78,7 +78,7 @@ class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const ConnectionData &data,
                      ConnectionType type = ConnectionType::Line)
       : DirectedConnection(data.name, data.start, data.end, data.radius, data.hints,
-                           data.additionalData) {};
+                           data.additionalData, type) {};
 
   void move(const osg::Vec3 &offset) {
     setMatrix(osg::Matrix::translate(offset));

@@ -3,11 +3,12 @@
 #include <utils/osgUtils.h>
 
 #include <algorithm>
+#include <cassert>
+#include <iostream>
 #include <osg/BoundingBox>
 #include <osg/MatrixTransform>
 #include <osg/Shape>
-#include <cassert>
-#include <iostream>
+#include <osg/Vec4>
 namespace {
 void updateMinMax(osg::Vec3 &minExtends, osg::Vec3 &maxExtends,
                   const osg::Vec3 &point) {
@@ -62,6 +63,12 @@ DirectedConnection::DirectedConnection(const std::string &name,
       m_geode = utils::osgUtils::createCylinderBetweenPoints(
           start->getPosition(), end->getPosition(), radius,
           osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), hints);
+      break;
+    case ConnectionType::LineWithColorInterpolation:
+      m_geode = utils::osgUtils::createCylinderBetweenPointsColorInterpolation(
+          start->getPosition(), end->getPosition(), radius * 2.0f, radius, 20, 1,
+          osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f),
+          hints);
       break;
     case ConnectionType::Arc:
       m_geode = utils::osgUtils::createBezierTube(
