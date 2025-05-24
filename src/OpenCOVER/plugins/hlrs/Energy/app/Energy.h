@@ -381,6 +381,21 @@ class EnergyPlugin : public opencover::coVRPlugin,
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
       grid::ConnectionDataList &additionalData);
+
+  osg::ref_ptr<grid::Line> createHeatingGridLine(
+      const grid::Points &points,
+      osg::ref_ptr<grid::Point> from,
+      const std::string &connectionsStrWithCommaDelimiter,
+      grid::ConnectionDataList &additionalData);
+  std::pair<grid::Points, grid::Data> createHeatingGridPointsAndData(
+      COVERUtils::read::CSVStream &heatingStream,
+      std::map<int, std::string> &connectionStrings);
+  grid::Lines createHeatingGridLines(
+      const grid::Points &points,
+      const std::map<int, std::string> &connectionStrings,
+      grid::ConnectionDataList &additionalData);
+  osg::ref_ptr<grid::Point> searchHeatingGridPointById(const grid::Points &points,
+                                                       int id);
   /* #endregion */
 
   /* #region COOLINGGRID */
