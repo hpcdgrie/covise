@@ -18,7 +18,6 @@
 #include <utility>
 #include <variant>
 
-#include "TxtInfoboard.h"
 #include "cover/VRViewer.h"
 
 namespace {
@@ -61,7 +60,8 @@ void InfoboardSensor::update() {
 }
 
 // EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
-EnergyGrid::EnergyGrid(const EnergyGridConfig &data) : m_config(data) {
+EnergyGrid::EnergyGrid(const EnergyGridConfig &data, bool ignoreOverlap)
+    : m_config(data), m_ignoreOverlap(ignoreOverlap) {
   if (!m_config.parent.valid()) {
     m_config.parent = new osg::MatrixTransform;
     m_config.parent->setName(m_config.name);
@@ -118,6 +118,7 @@ void EnergyGrid::initConnectionsByIndex(
 void EnergyGrid::findCorrectHeightForLine(float radius,
                                           osg::ref_ptr<grid::Line> line,
                                           grid::Lines &processedLines) {
+  if (m_ignoreOverlap) return;
   int redundantCount = 1;
   bool overlap = true;
 
@@ -183,7 +184,8 @@ osg::ref_ptr<grid::DirectedConnection> EnergyGrid::getConnectionByName(
   return nullptr;
 }
 
-const osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(const std::string &name) const{
+const osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(
+    const std::string &name) const {
   for (auto &point : m_config.points)
     if (point->getName() == name) return point;
   return nullptr;

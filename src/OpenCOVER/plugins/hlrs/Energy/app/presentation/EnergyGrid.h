@@ -102,7 +102,7 @@ class InfoboardSensor : public coPickSensor {
 class EnergyGrid : public interface::IEnergyGrid {
  public:
   //   EnergyGrid(EnergyGridConfig &&data);
-  EnergyGrid(const EnergyGridConfig &data);
+  EnergyGrid(const EnergyGridConfig &data, bool ignoreOverlap = true);
   void initDrawables() override;
   void update() override {
     for (auto &infoboard : m_infoboards) infoboard->update();
@@ -157,5 +157,6 @@ class EnergyGrid : public interface::IEnergyGrid {
   grid::Connections m_connections;
   grid::Lines m_lines;
   std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
+  bool m_ignoreOverlap;
 };
 #endif
