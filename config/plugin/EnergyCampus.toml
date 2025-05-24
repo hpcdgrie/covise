@@ -30,6 +30,7 @@ radiusCylinder = 3.0
 
 [Simulation]
 staticInfluxCSV = "/data/DiTEnS/campus/johannes.csv"
+staticPower = '/data/DiTEnS/campus/input/IEH/consumption-intern.csv'
 powerGridDir = "/data/DiTEnS/campus/input/IEH/uni_grid"
 heatingGridDir = "/data/DiTEnS/campus/input/IER/uni_heat"
 powerGridDataSelection = []
