@@ -495,7 +495,8 @@ void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
                                 std::map<std::string, PVData> &pvDataMap,
                                 float &maxPVIntensity) {
   PVData pvData;
-  ACCESS_CSV_ROW(row, "id", pvData.cityGMLID);
+//   ACCESS_CSV_ROW(row, "id", pvData.cityGMLID);
+  ACCESS_CSV_ROW(row, "gml_id", pvData.cityGMLID);
 
   if (m_cityGMLObjs.find(pvData.cityGMLID) == m_cityGMLObjs.end()) {
     std::cerr << "Error: Could not find cityGML object with ID " << pvData.cityGMLID
@@ -506,7 +507,7 @@ void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
   ACCESS_CSV_ROW(row, "energy_yearly_kwh_max", pvData.energyYearlyKWhMax);
   ACCESS_CSV_ROW(row, "pv_area_qm", pvData.pvAreaQm);
   ACCESS_CSV_ROW(row, "area_qm", pvData.area);
-  ACCESS_CSV_ROW(row, "co2savings", pvData.co2savings);
+//   ACCESS_CSV_ROW(row, "co2savings", pvData.co2savings);
   ACCESS_CSV_ROW(row, "n_modules_max", pvData.numPanelsMax);
 
   if (pvData.pvAreaQm == 0) {
@@ -516,7 +517,8 @@ void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
   }
 
   maxPVIntensity =
-      std::max(pvData.energyYearlyKWhMax / pvData.pvAreaQm, maxPVIntensity);
+    //   std::max(pvData.energyYearlyKWhMax / pvData.pvAreaQm, maxPVIntensity);
+      std::max(pvData.energyYearlyKWhMax / pvData.area, maxPVIntensity);
   pvDataMap.insert({pvData.cityGMLID, pvData});
 }
 
@@ -697,7 +699,7 @@ void EnergyPlugin::processPVDataMap(
     try {
       auto &cityGMLObj = m_cityGMLObjs.at(id);
       config.colorIntensity = CoreUtils::color::getTrafficLightColor(
-          data.energyYearlyKWhMax / data.pvAreaQm, maxPVIntensity);
+          data.energyYearlyKWhMax / data.area, maxPVIntensity);
       processSolarPanelDrawables(data, cityGMLObj->getDrawables(), m_solarPanels,
                                  config);
 
