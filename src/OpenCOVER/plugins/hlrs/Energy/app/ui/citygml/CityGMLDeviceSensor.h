@@ -2,20 +2,21 @@
 #define _CITYGMLDEVICESENSOR_H
 
 #include <PluginUtil/coSensor.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <lib/core/interfaces/IBuilding.h>
 #include <lib/core/interfaces/IInfoboard.h>
 #include <lib/core/utils/color.h>
-#include <PluginUtil/colors/coColorMap.h>
+
 #include <memory>
 #include <osg/Group>
 
 class CityGMLDeviceSensor : public coPickSensor {
-
  public:
   CityGMLDeviceSensor(
       osg::ref_ptr<osg::Group> group,
       std::unique_ptr<core::interface::IInfoboard<std::string>> &&infoBoard,
-      std::unique_ptr<core::interface::IBuilding> &&drawableBuilding);
+      std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
+      const std::vector<std::string> &textBoxTxt = {});
 
   ~CityGMLDeviceSensor();
   CityGMLDeviceSensor(const CityGMLDeviceSensor &) = delete;
@@ -35,12 +36,15 @@ class CityGMLDeviceSensor : public coPickSensor {
     return m_cityGMLBuilding->getDrawable(index);
   }
   auto getParent() { return getNode()->asGroup(); }
-  void updateTimestepColors(const std::vector<float> &values, const opencover::ColorMap &map);
+  void updateTimestepColors(const std::vector<float> &values,
+                            const opencover::ColorMap &map);
+  void updateTxtBoxTexts(const std::vector<std::string> &texts);
 
  private:
   std::unique_ptr<core::interface::IBuilding> m_cityGMLBuilding;
   std::unique_ptr<core::interface::IInfoboard<std::string>> m_infoBoard;
   std::vector<osg::Vec4> m_colors;
+  std::vector<std::string> m_textBoxTxt;
   bool m_active = false;
 };
 #endif

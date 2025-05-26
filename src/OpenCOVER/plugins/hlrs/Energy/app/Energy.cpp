@@ -1520,6 +1520,7 @@ void EnergyPlugin::applyInfluxToCityGML(const std::string &filePathToInfluxCSV) 
     if (sensorIt != m_cityGMLObjs.end()) {
       sensorIt->second->updateTimestepColors(values,
                                              m_cityGmlColorMap->selectedMap());
+      sensorIt->second->updateTxtBoxTexts({"NOT IMPLEMENTED YET"});
     }
   }
   setAnimationTimesteps(timesteps, m_cityGML);
@@ -1540,6 +1541,10 @@ void EnergyPlugin::applyStaticDataToCityGML(const std::string &filePathToInfluxC
       auto &gmlObj = it->second;
       gmlObj->updateTimestepColors({v.val2019, v.val2023, v.average},
                                    m_cityGmlColorMap->selectedMap());
+
+      gmlObj->updateTxtBoxTexts({"2019: " + std::to_string(v.val2019) + " kWh",
+                                 "2023: " + std::to_string(v.val2023) + " kWh",
+                                 "Average: " + std::to_string(v.average) + " kWh"});
     }
   }
   setAnimationTimesteps(3, m_cityGML);

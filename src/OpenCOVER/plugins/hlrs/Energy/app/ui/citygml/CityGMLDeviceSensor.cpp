@@ -1,9 +1,8 @@
 #include "CityGMLDeviceSensor.h"
 
-#include <PluginUtil/colors/coColorMap.h>
-
 #include <PluginUtil/coSensor.h>
 #include <PluginUtil/coShaderUtil.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <app/presentation/CityGMLBuilding.h>
 
 #include <memory>
@@ -12,11 +11,12 @@
 CityGMLDeviceSensor::CityGMLDeviceSensor(
     osg::ref_ptr<osg::Group> parent,
     std::unique_ptr<core::interface::IInfoboard<std::string>> &&infoBoard,
-    std::unique_ptr<core::interface::IBuilding> &&drawableBuilding)
+    std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
+    const std::vector<std::string> &textBoxTxt)
     : coPickSensor(parent),
       m_cityGMLBuilding(std::move(drawableBuilding)),
-      m_infoBoard(std::move(infoBoard))
-{
+      m_infoBoard(std::move(infoBoard)),
+      m_textBoxTxt(textBoxTxt) {
   m_cityGMLBuilding->initDrawables();
 
   // infoboard
@@ -38,7 +38,7 @@ void CityGMLDeviceSensor::update() {
 
 void CityGMLDeviceSensor::activate() {
   if (!m_active) {
-    m_infoBoard->updateInfo("DAS IST EIN TEST");
+    // m_infoBoard->updateInfo("DAS IST EIN TEST");
     m_infoBoard->showInfo();
   }
   m_active = !m_active;
@@ -49,16 +49,24 @@ void CityGMLDeviceSensor::disactivate() {
   m_infoBoard->hideInfo();
 }
 
-void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values, const opencover::ColorMap &map) {
+void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values,
+                                               const opencover::ColorMap &map) {
   m_colors.clear();
   m_colors.resize(values.size());
-  for (auto i = 0; i < m_colors.size(); ++i)
-    m_colors[i] = getColor(values[i], map);
+  for (auto i = 0; i < m_colors.size(); ++i) m_colors[i] = getColor(values[i], map);
+}
+
+void CityGMLDeviceSensor::updateTxtBoxTexts(const std::vector<std::string> &texts) {
+  m_textBoxTxt = texts;
 }
 
 void CityGMLDeviceSensor::updateTime(int timestep) {
-  if (timestep >= m_colors.size()) return;
-  m_cityGMLBuilding->updateColor(m_colors[timestep]);
-  m_cityGMLBuilding->updateTime(timestep);
-  m_infoBoard->updateTime(timestep);
+  if (timestep < m_colors.size()) {
+    m_cityGMLBuilding->updateColor(m_colors[timestep]);
+    m_cityGMLBuilding->updateTime(timestep);
+  }
+  if (timestep < m_textBoxTxt.size()) {
+    m_infoBoard->updateInfo(m_textBoxTxt[timestep]);
+    m_infoBoard->updateTime(timestep);
+  }
 }
