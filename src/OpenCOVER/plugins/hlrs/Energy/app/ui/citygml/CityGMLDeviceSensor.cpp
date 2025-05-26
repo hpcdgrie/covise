@@ -60,6 +60,13 @@ void CityGMLDeviceSensor::updateTxtBoxTexts(const std::vector<std::string> &text
   m_textBoxTxt = texts;
 }
 
+void CityGMLDeviceSensor::updateTitleOfInfoboard(const std::string &title) {
+  auto txtInfoboard = dynamic_cast<TxtInfoboard *>(m_infoBoard.get());
+  if (txtInfoboard) {
+    txtInfoboard->setTitle(title);
+  }
+}
+
 void CityGMLDeviceSensor::updateTime(int timestep) {
   if (timestep < m_colors.size()) {
     m_cityGMLBuilding->updateColor(m_colors[timestep]);

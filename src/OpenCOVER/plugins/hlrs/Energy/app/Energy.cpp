@@ -1545,6 +1545,7 @@ void EnergyPlugin::applyStaticDataToCityGML(const std::string &filePathToInfluxC
       gmlObj->updateTxtBoxTexts({"2019: " + std::to_string(v.val2019) + " kWh",
                                  "2023: " + std::to_string(v.val2023) + " kWh",
                                  "Average: " + std::to_string(v.average) + " kWh"});
+      gmlObj->updateTitleOfInfoboard(v.name);
     }
   }
   setAnimationTimesteps(3, m_cityGML);

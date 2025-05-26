@@ -6,6 +6,7 @@
 #include <lib/core/interfaces/IBuilding.h>
 #include <lib/core/interfaces/IInfoboard.h>
 #include <lib/core/utils/color.h>
+#include "app/presentation/TxtInfoboard.h"
 
 #include <memory>
 #include <osg/Group>
@@ -39,6 +40,7 @@ class CityGMLDeviceSensor : public coPickSensor {
   void updateTimestepColors(const std::vector<float> &values,
                             const opencover::ColorMap &map);
   void updateTxtBoxTexts(const std::vector<std::string> &texts);
+  void updateTitleOfInfoboard(const std::string &title);
 
  private:
   std::unique_ptr<core::interface::IBuilding> m_cityGMLBuilding;
