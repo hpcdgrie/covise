@@ -259,8 +259,8 @@ void EnergyPlugin::initOverview() {
   m_controlPanel = new ui::Menu(m_EnergyTab, "Control");
   m_controlPanel->setText("Control_Panel");
 
-  m_energySwitchControlButton = new ui::Button(m_controlPanel, "EnergySwitch");
-  m_energySwitchControlButton->setText("EnergySwitch");
+  m_energySwitchControlButton = new ui::Button(m_controlPanel, "BuildingSwitch");
+  m_energySwitchControlButton->setText("Buildings");
   m_energySwitchControlButton->setCallback([this](bool value) {
     if (value) {
       m_Energy->addChild(m_switch);
@@ -271,7 +271,7 @@ void EnergyPlugin::initOverview() {
   m_energySwitchControlButton->setState(true);
 
   m_gridControlButton = new ui::Button(m_controlPanel, "GridSwitch");
-  m_gridControlButton->setText("GridSwitch");
+  m_gridControlButton->setText("Grid");
   m_gridControlButton->setCallback([this](bool value) {
     if (value) {
       m_Energy->addChild(m_grid);
@@ -2114,7 +2114,6 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
     grid::Data connectionData{{"name", pointName + "_" + connection}};
     additionalConnectionData.emplace_back(std::vector{connectionData});
-    // additionalConnectionData.emplace_back("name", pointName + "_" + connection);
     connectivityList.push_back(std::stoi(connection));
   }
   return connectivityList;
