@@ -116,13 +116,8 @@ void cuIsoSurface::addObject(const RenderObject *container, osg::Group * /*setNa
             const char *attr = tex->getAttribute("COLORMAP");
             if (attr)
             {
-                std::string species;
-                std::vector<float> r, g, b, a;
-                int numColors;
-                float min, max;
-                ColorBar::parseAttrib(attr, species, min, max,
-                                      numColors, r, g, b, a);
-                struct minmax m = { min, max };
+                auto cm = CoviseColorBar::parseAttribute(attr);
+                struct minmax m = { cm.min(), cm.max() };
                 minMax[container->getName()] = m;
             }
         }

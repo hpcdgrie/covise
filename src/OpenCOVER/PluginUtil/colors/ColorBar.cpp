@@ -623,6 +623,13 @@ CoviseColorBar::~CoviseColorBar()
 
 void CoviseColorBar::updateFromAttribute(const char *attrib)
 {
+    map_ = parseAttribute(attrib);
+    updateGui();
+    displayColorMap();
+}
+
+ColorMap CoviseColorBar::parseAttribute(const char *attrib)
+{
     int bufLen = strlen(attrib) + 1;
     istringstream attribs(attrib);
     
@@ -644,9 +651,7 @@ void CoviseColorBar::updateFromAttribute(const char *attrib)
         attribs >> colors[i].r() >> colors[i].g() >> colors[i].b() >> colors[i].a();
         samplingPoints[i] = static_cast<float>(i) / (numColors - 1);
     }
-    map_ = ColorMap(BaseColorMap{colors, samplingPoints, s.data()}, min, max);
-    updateGui();
-    displayColorMap();
+    return ColorMap(BaseColorMap{colors, samplingPoints, s.data()}, min, max); 
 }
 
 

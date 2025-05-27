@@ -120,6 +120,7 @@ public:
    void updateInteractor();
    ~CoviseColorBar();
    void updateFromAttribute(const char *attrib);
+   static ColorMap parseAttribute(const char *attrib);
 private:
    ui::Action *execute_ = nullptr;
    opencover::coInteractor *inter_ = nullptr;
