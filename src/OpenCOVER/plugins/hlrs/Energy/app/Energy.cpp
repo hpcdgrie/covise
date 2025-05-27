@@ -1816,6 +1816,8 @@ void EnergyPlugin::initEnergyGridColorMaps() {
     const auto &scalarProperties = energyGrid.sim->getScalarProperties();
     std::vector<std::string> scalarPropertyNames;
     int idx{0};
+    auto scalarSelector =
+        new ui::SelectionList(m_simulationMenu, energyGrid.name + "_scalarSelector");
     for (const auto &[name, scalarProperty] : scalarProperties) {
       if (std::find(scalarPropertyNames.begin(), scalarPropertyNames.end(), name) ==
           scalarPropertyNames.end())
@@ -1824,7 +1826,7 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       auto menu =
           new ui::Menu(m_simulationMenu, energyGrid.name + "_" + energyGrid.species +
                                              " " + std::to_string(idx++));
-
+      menu->setVisible(false);
       auto cms = std::make_unique<opencover::CoverColorBar>(menu);
       cms->setSpecies(scalarProperty.species);
       cms->setUnit(scalarProperty.unit);
@@ -1832,21 +1834,36 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       cms->setCallback(
           [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
       cms->setName(energyGrid.name);
-      cms->setMinMax(energyGrid.simUI->min(scalarProperty.species), energyGrid.simUI->max(scalarProperty.species));
+      auto min = energyGrid.simUI->min(scalarProperty.species);
+      auto max = energyGrid.simUI->max(scalarProperty.species);
+      cms->setMinMax(min, max);
+      auto halfSpan = (max - min) / 2;
+      cms->setMinBounds(min - halfSpan, min + halfSpan);
+      cms->setMaxBounds(max - halfSpan, max + halfSpan);
+      
       energyGrid.simUI->updateTimestepColors(cms->colorMap());
-
       energyGrid.colorMapRegistry.emplace(scalarProperty.species,
                                           ColorMapMenu{menu, std::move(cms)});
     }
 
-    auto scalarSelector =
-        new ui::SelectionList(m_simulationMenu, energyGrid.name + "_scalarSelector");
     scalarSelector->setList(scalarPropertyNames);
     scalarSelector->setCallback([this, &energyGrid](int selected) {
       auto scalarSelection = energyGrid.scalarSelector->selectedItem();
       // NOTE: colormap registry and scalar selector are in sync => if not make sure
       // to adjust this
+      bool hudVisible = false;
+      for(const auto &colorMap : energyGrid.colorMapRegistry)
+      {
+        if(colorMap.second.selector->hudVisible())
+        {
+          hudVisible = true;
+          colorMap.second.selector->show(false);
+          break;
+        }
+      }
+      
       auto &colorMapMenu = energyGrid.colorMapRegistry[scalarSelection];
+      colorMapMenu.selector->show(hudVisible);
       colorMapMenu.menu->setVisible(true);
       for (auto &[name, menu] : energyGrid.colorMapRegistry) {
         if (name != scalarSelection) {
@@ -1857,6 +1874,7 @@ void EnergyPlugin::initEnergyGridColorMaps() {
     });
     energyGrid.scalarSelector = scalarSelector;
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
+    energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
   }
 }
 
