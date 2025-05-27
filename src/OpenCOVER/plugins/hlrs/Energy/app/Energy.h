@@ -262,8 +262,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void restoreCityGMLDefaultStatesets();
   void restoreGeodesStatesets(CityGMLDeviceSensor &sensor, const std::string &name,
                               const Geodes &citygmlGeodes);
-  void transformCityGML(const osg::Vec3 &translation,
-                        const osg::Quat &rotation,
+  void transformCityGML(const osg::Vec3 &translation, const osg::Quat &rotation,
                         const osg::Vec3 &scale = osg::Vec3(1.0, 1.0, 1.0));
   osg::Vec3 getCityGMLTranslation() const;
   /* #endregion */
@@ -294,6 +293,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
     std::string citygml_id;
   };
 
+  struct StaticPowerCampusData {
+    std::string citygml_id;
+    float yearlyConsumption;
+  };
+
+  auto readStaticCampusData(CSVStream &stream, float &max, float &min, float &sum);
   auto readStaticPowerData(CSVStream &stream, float &max, float &min, float &sum);
   std::unique_ptr<grid::Points> createPowerGridPoints(CSVStream &stream,
                                                       size_t &numPoints,
@@ -325,6 +330,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
       const std::size_t &numOfBus);
   void applyInfluxToCityGML(const std::string &filePath);
   void applyStaticDataToCityGML(const std::string &filePath);
+  void applyStaticDataCampusToCityGML(const std::string &filePath);
   void applySimulationDataToPowerGrid();
   void updatePowerGridSelection(bool on);
   void updatePowerGridConfig(const std::string &tableName, const std::string &name,
@@ -387,8 +393,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
       grid::ConnectionDataList &additionalData);
 
   osg::ref_ptr<grid::Line> createHeatingGridLine(
-      const grid::Points &points,
-      osg::ref_ptr<grid::Point> from,
+      const grid::Points &points, osg::ref_ptr<grid::Point> from,
       const std::string &connectionsStrWithCommaDelimiter,
       grid::ConnectionDataList &additionalData);
   std::pair<grid::Points, grid::Data> createHeatingGridPointsAndData(
@@ -437,9 +442,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   // citygml UI
   opencover::ui::Menu *m_cityGMLMenu = nullptr;
-  opencover::ui::Button *m_cityGMLEnable = nullptr;
+  opencover::ui::Button *m_cityGMLEnableInflux = nullptr;
   opencover::ui::Button *m_PVEnable = nullptr;
-  opencover::ui::EditField *m_cityGMLX = nullptr, *m_cityGMLY = nullptr, *m_cityGMLZ = nullptr;
+  //   opencover::ui::Button *m_cityGMLDisableBuildings = nullptr;
+  opencover::ui::EditField *m_cityGMLX = nullptr, *m_cityGMLY = nullptr,
+                           *m_cityGMLZ = nullptr;
 
   // Simulation UI
   opencover::ui::Menu *m_simulationMenu = nullptr;
@@ -447,6 +454,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::ButtonGroup *m_energygridBtnGroup = nullptr;
   opencover::ui::Button *m_liftGrids = nullptr;
   opencover::ui::Button *m_staticPower = nullptr;
+  opencover::ui::Button *m_staticCampusPower = nullptr;
   // opencover::ui::Button *m_powerGridBtn = nullptr;
   // opencover::ui::Button *m_heatingGridBtn = nullptr;
   // opencover::ui::Button *m_coolingGridBtn = nullptr;

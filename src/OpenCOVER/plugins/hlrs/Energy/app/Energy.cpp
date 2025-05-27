@@ -450,8 +450,14 @@ void EnergyPlugin::setAnimationTimesteps(size_t maxTimesteps, const void *who) {
 void EnergyPlugin::initCityGMLUI() {
   checkEnergyTab();
   m_cityGMLMenu = new ui::Menu(m_EnergyTab, "CityGML");
-  m_cityGMLEnable = new ui::Button(m_cityGMLMenu, "Enable");
-  m_cityGMLEnable->setCallback([this](bool on) { enableCityGML(on); });
+  m_cityGMLEnableInflux = new ui::Button(m_cityGMLMenu, "Influx");
+  m_cityGMLEnableInflux->setCallback([this](bool on) {
+    if (on) {
+      m_staticPower->setState(false);
+      m_staticCampusPower->setState(false);
+    }
+    enableCityGML(on);
+  });
   m_PVEnable = new ui::Button(m_cityGMLMenu, "PV");
   m_PVEnable->setText("PV");
   m_PVEnable->setState(true);
@@ -474,7 +480,24 @@ void EnergyPlugin::initCityGMLUI() {
   m_staticPower = new ui::Button(m_cityGMLMenu, "Static");
   m_staticPower->setText("StaticPower");
   m_staticPower->setState(false);
-  m_staticPower->setCallback([&](bool on) { enableCityGML(on); });
+  m_staticPower->setCallback([&](bool on) {
+    if (on) {
+      m_cityGMLEnableInflux->setState(false);
+      m_staticCampusPower->setState(false);
+    }
+    enableCityGML(on);
+  });
+
+  m_staticCampusPower = new ui::Button(m_cityGMLMenu, "StaticCampus");
+  m_staticCampusPower->setText("StaticPowerCampus");
+  m_staticCampusPower->setState(false);
+  m_staticCampusPower->setCallback([&](bool on) {
+    if (on) {
+      m_cityGMLEnableInflux->setState(false);
+      m_staticPower->setState(false);
+    }
+    enableCityGML(on);
+  });
 
   m_cityGMLX = new ui::EditField(m_cityGMLMenu, "X");
   m_cityGMLY = new ui::EditField(m_cityGMLMenu, "Y");
@@ -807,6 +830,54 @@ osg::Vec3 EnergyPlugin::getCityGMLTranslation() const {
   return osg::Vec3(m_cityGMLX->number(), m_cityGMLY->number(), m_cityGMLZ->number());
 }
 
+auto EnergyPlugin::readStaticCampusData(CSVStream &stream, float &max, float &min,
+                                        float &sum) {
+  std::vector<StaticPowerCampusData> yearlyValues;
+  if (!stream || stream.getHeader().size() < 1) return yearlyValues;
+  CSVStream::CSVRow row;
+  while (stream >> row) {
+    StaticPowerCampusData data;
+    ACCESS_CSV_ROW(row, "gml_id", data.citygml_id);
+    ACCESS_CSV_ROW(row, "energy_mwh", data.yearlyConsumption);
+
+    max = std::max(max, data.yearlyConsumption);
+
+    if (min == -1) {
+      min = data.yearlyConsumption;
+    }
+    min = std::min(min, data.yearlyConsumption);
+
+    yearlyValues.push_back(data);
+  }
+  return yearlyValues;
+}
+
+void EnergyPlugin::applyStaticDataCampusToCityGML(const std::string &filePath) {
+  if (m_cityGMLObjs.empty()) return;
+  if (!fs::exists(filePath)) return;
+  auto csvStream = CSVStream(filePath);
+  float max = 0, min = -1;
+  float sum = 0;
+
+  auto values = readStaticCampusData(csvStream, max, min, sum);
+
+  max = 400.00f;
+  m_cityGmlColorMap->setMax(max);
+  m_cityGmlColorMap->setMin(min);
+
+  for (const auto &v : values) {
+    if (auto it = m_cityGMLObjs.find(v.citygml_id); it != m_cityGMLObjs.end()) {
+      auto &gmlObj = it->second;
+      gmlObj->updateTimestepColors({v.yearlyConsumption},
+                                   m_cityGmlColorMap->selectedMap());
+
+      gmlObj->updateTxtBoxTexts(
+          {"Yearly Consumption: " + std::to_string(v.yearlyConsumption) + " MWh"});
+    }
+  }
+  setAnimationTimesteps(1, m_cityGML);
+}
+
 void EnergyPlugin::enableCityGML(bool on) {
   if (on) {
     if (m_cityGMLObjs.empty()) {
@@ -831,11 +902,16 @@ void EnergyPlugin::enableCityGML(bool on) {
     switchTo(m_cityGML, m_switch);
 
     // TODO: add a check if the group is already added and make sure its safe to
-    if (!m_staticPower->state()) {
+    if (m_cityGMLEnableInflux->state()) {
       auto influxCSVPath =
           configString("Simulation", "staticInfluxCSV", "default")->value();
       applyInfluxToCityGML(influxCSVPath);
-    } else {
+    }
+    if (m_staticCampusPower->state()) {
+      auto campusPath = configString("Simulation", "campusPath", "default")->value();
+      applyStaticDataCampusToCityGML(campusPath);
+    }
+    if (m_staticPower->state()) {
       auto staticPower =
           configString("Simulation", "staticPower", "default")->value();
       applyStaticDataToCityGML(staticPower);
