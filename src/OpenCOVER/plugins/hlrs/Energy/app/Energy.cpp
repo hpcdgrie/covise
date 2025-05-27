@@ -521,7 +521,7 @@ void EnergyPlugin::initCityGMLUI() {
 void EnergyPlugin::initCityGMLColorMap() {
   auto menu = new ui::Menu(m_simulationMenu, "CityGml_grid");
 
-  m_cityGmlColorMap = std::make_unique<opencover::ColorMapSelector>(*menu);
+  m_cityGmlColorMap = std::make_unique<opencover::CoverColorBar>(menu);
   m_cityGmlColorMap->setSpecies("Leistung");
   m_cityGmlColorMap->setUnit("kWh");
   m_cityGmlColorMap->setCallback([this](const opencover::ColorMap &cm) {
@@ -1465,12 +1465,11 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
 void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
                                   EnergyGridType type) {
-  auto m = map;
   auto gridTypeIndex = getEnergyGridTypeIndex(type);
   auto &grid = m_energyGrids[gridTypeIndex];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
     // heating simulation
-    m = grid.simUI->updateTimestepColors(m);
+    grid.simUI->updateTimestepColors(map);
   }
 }
 
@@ -1511,7 +1510,7 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
       auto &selector = colorMapMenu.selector;
       auto &menu = colorMapMenu.menu;
       showHud |= selector->hudVisible();
-      selector->showHud(false);
+      selector->show(false);
       menu->setVisible(false);
     } else {
       auto menu = colorMapMenu.menu;
@@ -1522,7 +1521,7 @@ void EnergyPlugin::switchEnergyGrid(EnergyGridType grid) {
   if (defaultGrid.scalarSelector) {
     const auto &selected = defaultGrid.scalarSelector->selectedItem();
     auto &colorMapMenu = defaultGrid.colorMapRegistry[selected];
-    colorMapMenu.selector->showHud(showHud);
+    colorMapMenu.selector->show(showHud);
   }
   switchTo(switch_to, m_grid);
 }
@@ -1532,7 +1531,7 @@ void EnergyPlugin::initEnergyGridUI() {
     initSimMenu();
   }
 
-
+  m_energygridGroup = new ui::Group(m_simulationMenu, "EnergyGrid");
   m_energygridBtnGroup = new ui::ButtonGroup(m_energygridGroup, "EnergyGrid");
   m_energygridBtnGroup->setCallback(
       [this](int value) { switchEnergyGrid(EnergyGridType(value)); });
@@ -1554,24 +1553,39 @@ void EnergyPlugin::initSimUI() {
 void EnergyPlugin::initPowerGridStreams() {
   auto powerGridDir = configString("Simulation", "powerGridDir", "default")->value();
   fs::path dir_path(powerGridDir);
-  FloatMap values;
-  if (stream && headers.size() > 1) {
-    CSVStream::CSVRow row;
-    while (stream >> row) {
-      for (auto cityGMLBuildingName : headers) {
-        auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
-        if (sensor == m_cityGMLObjs.end()) continue;
-        float value = 0;
-        ACCESS_CSV_ROW(row, cityGMLBuildingName, value);
-        if (value > max)
-          max = value;
-        else if (value < min || min == -1)
-          min = value;
-        sum += value;
-        if (values.find(cityGMLBuildingName) == values.end())
-          values.insert({cityGMLBuildingName, {value}});
-        else
-          values[cityGMLBuildingName].push_back(value);
+  if (!fs::exists(dir_path)) return;
+  m_powerGridStreams = getCSVStreams(dir_path);
+  if (m_powerGridStreams.empty()) {
+    std::cout << "No csv files found in " << powerGridDir << std::endl;
+    return;
+  }
+}
+
+// TODO:
+// [ ] - add a button to enable/disable the simulation data
+// [ ] - plan uniform grid structure file => csv file in specific format
+std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
+  COVERUtils::read::CSVStream &stream, float &max, float &min, float &sum,
+  int &timesteps) {
+    const auto &headers = stream.getHeader();
+    FloatMap values;
+    if (stream && headers.size() > 1) {
+      CSVStream::CSVRow row;
+      while (stream >> row) {
+        for (auto cityGMLBuildingName : headers) {
+          auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
+          if (sensor == m_cityGMLObjs.end()) continue;
+          float value = 0;
+          ACCESS_CSV_ROW(row, cityGMLBuildingName, value);
+          if (value > max)
+            max = value;
+          else if (value < min || min == -1)
+            min = value;
+          sum += value;
+          if (values.find(cityGMLBuildingName) == values.end())
+            values.insert({cityGMLBuildingName, {value}});
+          else
+            values[cityGMLBuildingName].push_back(value);
       }
       ++timesteps;
     }
@@ -1620,9 +1634,7 @@ void EnergyPlugin::applyInfluxToCityGML(const std::string &filePathToInfluxCSV) 
   auto values = getInlfuxDataFromCSV(csvStream, max, min, sum, timesteps);
 
   auto distributionCenter = sum / (timesteps * values->size());
-
-  m_cityGmlColorMap->setMax(max);
-  m_cityGmlColorMap->setMin(min);
+  m_cityGmlColorMap->setMinMax(min, max);
   m_cityGmlColorMap->setMinBounds(0, distributionCenter);
   m_cityGmlColorMap->setMaxBounds(distributionCenter, max);
 
@@ -1630,7 +1642,7 @@ void EnergyPlugin::applyInfluxToCityGML(const std::string &filePathToInfluxCSV) 
     auto sensorIt = m_cityGMLObjs.find(name);
     if (sensorIt != m_cityGMLObjs.end()) {
       sensorIt->second->updateTimestepColors(values,
-                                             m_cityGmlColorMap->selectedMap());
+                                             m_cityGmlColorMap->colorMap());
       sensorIt->second->updateTxtBoxTexts({"NOT IMPLEMENTED YET"});
     }
   }
@@ -1645,13 +1657,12 @@ void EnergyPlugin::applyStaticDataToCityGML(const std::string &filePathToInfluxC
   float sum = 0;
 
   auto values = readStaticPowerData(csvStream, max, min, sum);
-  m_cityGmlColorMap->setMax(max);
-  m_cityGmlColorMap->setMin(min);
+  m_cityGmlColorMap->setMinMax(min, max);
   for (const auto &v : values) {
     if (auto it = m_cityGMLObjs.find(v.citygml_id); it != m_cityGMLObjs.end()) {
       auto &gmlObj = it->second;
       gmlObj->updateTimestepColors({v.val2019, v.val2023, v.average},
-                                   m_cityGmlColorMap->selectedMap());
+                                   m_cityGmlColorMap->colorMap());
 
       gmlObj->updateTxtBoxTexts({"2019: " + std::to_string(v.val2019) + " kWh",
                                  "2023: " + std::to_string(v.val2023) + " kWh",
@@ -1814,19 +1825,15 @@ void EnergyPlugin::initEnergyGridColorMaps() {
           new ui::Menu(m_simulationMenu, energyGrid.name + "_" + energyGrid.species +
                                              " " + std::to_string(idx++));
 
-      auto cms = std::make_unique<opencover::ColorMapSelector>(*menu);
+      auto cms = std::make_unique<opencover::CoverColorBar>(menu);
       cms->setSpecies(scalarProperty.species);
       cms->setUnit(scalarProperty.unit);
       auto type = energyGrid.type;
       cms->setCallback(
           [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
       cms->setName(energyGrid.name);
-
-      auto cmap = cms->selectedMap();
-      cmap = energyGrid.simUI->updateTimestepColors(cmap, true);
-
-      cms->setMin(cmap.min);
-      cms->setMax(cmap.max);
+      cms->setMinMax(energyGrid.simUI->min(scalarProperty.species), energyGrid.simUI->max(scalarProperty.species));
+      energyGrid.simUI->updateTimestepColors(cms->colorMap());
 
       energyGrid.colorMapRegistry.emplace(scalarProperty.species,
                                           ColorMapMenu{menu, std::move(cms)});
@@ -1846,7 +1853,7 @@ void EnergyPlugin::initEnergyGridColorMaps() {
           menu.menu->setVisible(false);
         }
       }
-      updateColorMap(colorMapMenu.selector->selectedMap(), energyGrid.type);
+      updateColorMap(colorMapMenu.selector->colorMap(), energyGrid.type);
     });
     energyGrid.scalarSelector = scalarSelector;
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);

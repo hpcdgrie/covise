@@ -37,6 +37,9 @@ class BaseSimulationUI {
   BaseSimulationUI &operator=(const BaseSimulationUI &) = delete;
 
   virtual void updateTime(int timestep) = 0;
+  //toDo: make these const
+  virtual float min(const std::string& species) = 0;
+  virtual float max(const std::string& species)  = 0;
   virtual void updateTimestepColors(const opencover::ColorMap& map) = 0;
 
  protected:
@@ -74,8 +77,8 @@ class BaseSimulationUI {
         return;
       }
 
-      minKeyVal = simulation->getMin(color_map.species);
-      maxKeyVal = simulation->getMax(color_map.species);
+      minKeyVal = simulation->getMin(color_map.species());
+      maxKeyVal = simulation->getMax(color_map.species());
     } catch (const std::out_of_range &e) {
       std::cerr << "Key not found in minMaxValues: " << color_map.species() << std::endl;
       return;
@@ -83,12 +86,12 @@ class BaseSimulationUI {
 
     for (auto &[name, object] : objectContainer) {
       const auto &data = object.getData();
-      auto it = data.find(color_map.species);
+      auto it = data.find(color_map.species());
       if (it == data.end()) {
-        std::cerr << "Key not found in data: " << color_map.species << std::endl;
+        std::cerr << "Key not found in data: " << color_map.species() << std::endl;
         continue;
       }
-      const auto &values = data.at(color_map.species);
+      const auto &values = data.at(color_map.species());
       if (auto color_it = m_colors.find(name); color_it == m_colors.end()) {
         m_colors.insert({name, std::vector<osg::Vec4>(values.size())});
       }

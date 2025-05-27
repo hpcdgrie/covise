@@ -133,15 +133,7 @@ void ColorMap::setSpecies(const std::string &species)
 
 void ColorMap::setUnit(const std::string &unit)
 {
-<<<<<<< HEAD
-  for (auto &[_,cMap] : m_colors) {
-    cMap.min = min;
-  }
-  m_colorBar->update(m_selectedMap->second);
-
-=======
   m_unit = unit;
->>>>>>> f3db5778b (Rework of ColorBar, ColorMapSelector and ColorMap)
 }
 
 float ColorMap::min() const { return m_min; }

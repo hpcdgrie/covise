@@ -53,7 +53,7 @@ void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values,
                                                const opencover::ColorMap &map) {
   m_colors.clear();
   m_colors.resize(values.size());
-  for (auto i = 0; i < m_colors.size(); ++i) m_colors[i] = getColor(values[i], map);
+  for (auto i = 0; i < m_colors.size(); ++i) m_colors[i] = map.getColor(values[i]);
 }
 
 void CityGMLDeviceSensor::updateTxtBoxTexts(const std::vector<std::string> &texts) {

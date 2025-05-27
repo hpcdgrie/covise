@@ -38,16 +38,15 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
     }
   }
 
-  opencover::ColorMap updateTimestepColors(const opencover::ColorMap& map, bool resetMinMax = false) override {
+  float min(const std::string& species) override {
+    return this->heatingSimulationPtr()->getMin(species);
+  }
 
-    auto m = map;
+  float max(const std::string& species) override {
+    return this->heatingSimulationPtr()->getMax(species);
+  }
 
-    if (m.min > m.max) m.min = m.max;
-
-    if (resetMinMax) {
-      m.min = heatingSimulationPtr()->getMin(map.species);
-      m.max = heatingSimulationPtr()->getMax(map.species);
-    }
+  void updateTimestepColors(const opencover::ColorMap& map) override {
 
     // compute colors
     auto heatingSim = this->heatingSimulationPtr();

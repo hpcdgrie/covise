@@ -160,7 +160,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   struct ColorMapMenu {
     opencover::ui::Menu *menu;
-    std::unique_ptr<opencover::ColorMapSelector> selector;
+    std::unique_ptr<opencover::CoverColorBar> selector;
   };
 
   struct EnergyGrid {
@@ -422,7 +422,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   std::array<EnergyGrid, static_cast<std::size_t>(EnergyGridType::NUM_ENERGY_TYPES)>
       m_energyGrids;
-  std::unique_ptr<opencover::ColorMapSelector> m_cityGmlColorMap;
+  std::unique_ptr<opencover::CoverColorBar> m_cityGmlColorMap;
 
   // historical
   opencover::ui::Button *ShowGraph = nullptr;
