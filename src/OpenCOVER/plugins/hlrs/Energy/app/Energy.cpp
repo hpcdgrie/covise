@@ -819,12 +819,11 @@ void EnergyPlugin::enableCityGML(bool on) {
           if (name.find(".gml") != std::string::npos) {
             addCityGMLObjects(child);
             m_cityGML->addChild(child);
+            auto translation = getCityGMLTranslation();
+            child->setMatrix(osg::Matrix::translate(translation));
+            transformCityGML(translation, {});
           }
         }
-
-        auto translation = getCityGMLTranslation();
-        child->setMatrix(osg::Matrix::translate(translation));
-        transformCityGML(translation, {});
       }
       CoreUtils::osgUtils::deleteChildrenFromOtherGroup(root, m_cityGML);
     }
