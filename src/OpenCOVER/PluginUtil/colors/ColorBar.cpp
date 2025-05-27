@@ -696,9 +696,15 @@ CoverColorBar::CoverColorBar(ui::Group *menu)
 
 }
 
-void CoverColorBar::setMinMax(float min, float max)
+void CoverColorBar::setMinMax(float min, float max, bool autoBounds)
 {
     map_.setMinMax(min, max);
+    if(autoBounds)
+    {
+        auto halfSpan = (max - min) / 2;
+        setMinBounds(min - halfSpan, min + halfSpan);
+        setMaxBounds(max - halfSpan, max + halfSpan);
+    }
     displayColorMap();
 }
 void CoverColorBar::setSteps(int steps)

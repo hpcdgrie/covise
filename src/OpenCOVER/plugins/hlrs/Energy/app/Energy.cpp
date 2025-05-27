@@ -814,7 +814,7 @@ void EnergyPlugin::transformCityGML(const osg::Vec3 &translation,
     std::cout << "No CityGML objects to transform." << std::endl;
     return;
   }
-  for (auto i = 0; i < m_cityGML->getNumChildren(); ++i) {
+  for (unsigned int i = 0; i < m_cityGML->getNumChildren(); ++i) {
     osg::ref_ptr<osg::Node> child = m_cityGML->getChild(i);
     if (auto mt = dynamic_cast<osg::MatrixTransform *>(child.get())) {
       osg::Matrix matrix = osg::Matrix::translate(translation) *
@@ -862,14 +862,13 @@ void EnergyPlugin::applyStaticDataCampusToCityGML(const std::string &filePath) {
   auto values = readStaticCampusData(csvStream, max, min, sum);
 
   max = 400.00f;
-  m_cityGmlColorMap->setMax(max);
-  m_cityGmlColorMap->setMin(min);
+  m_cityGmlColorMap->setMinMax(min, max);
 
   for (const auto &v : values) {
     if (auto it = m_cityGMLObjs.find(v.citygml_id); it != m_cityGMLObjs.end()) {
       auto &gmlObj = it->second;
       gmlObj->updateTimestepColors({v.yearlyConsumption},
-                                   m_cityGmlColorMap->selectedMap());
+                                   m_cityGmlColorMap->colorMap());
 
       gmlObj->updateTxtBoxTexts(
           {"Yearly Consumption: " + std::to_string(v.yearlyConsumption) + " MWh"});
@@ -1837,9 +1836,6 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       auto min = energyGrid.simUI->min(scalarProperty.species);
       auto max = energyGrid.simUI->max(scalarProperty.species);
       cms->setMinMax(min, max);
-      auto halfSpan = (max - min) / 2;
-      cms->setMinBounds(min - halfSpan, min + halfSpan);
-      cms->setMaxBounds(max - halfSpan, max + halfSpan);
       
       energyGrid.simUI->updateTimestepColors(cms->colorMap());
       energyGrid.colorMapRegistry.emplace(scalarProperty.species,

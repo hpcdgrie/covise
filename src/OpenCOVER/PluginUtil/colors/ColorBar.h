@@ -134,7 +134,7 @@ public:
    CoverColorBar(ui::Group *menu);
 
    void setCallback(const std::function<void(const ColorMap &)> &f);
-   void setMinMax(float min, float max);
+   void setMinMax(float min, float max, bool autoBounds = true);
    void setSteps(int steps);
    void setSpecies(const std::string &species);
    void setUnit(const std::string &unit);
