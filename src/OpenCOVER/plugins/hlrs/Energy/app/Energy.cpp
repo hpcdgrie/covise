@@ -745,7 +745,7 @@ void EnergyPlugin::processPVDataMap(
       processSolarPanelDrawables(data, cityGMLObj->getDrawables(), m_solarPanels,
                                  config);
 
-    } catch (const std::out_of_range &e) {
+    } catch (const std::out_of_range &) {
       std::cerr << "Error: Could not find cityGML object with ID " << id
                 << " in m_cityGMLObjs." << std::endl;
       continue;
@@ -1532,7 +1532,6 @@ void EnergyPlugin::initEnergyGridUI() {
     initSimMenu();
   }
 
-  m_energygridGroup = new ui::Group(m_simulationMenu, "EnergyGrid");
 
   m_energygridBtnGroup = new ui::ButtonGroup(m_energygridGroup, "EnergyGrid");
   m_energygridBtnGroup->setCallback(
@@ -1555,18 +1554,6 @@ void EnergyPlugin::initSimUI() {
 void EnergyPlugin::initPowerGridStreams() {
   auto powerGridDir = configString("Simulation", "powerGridDir", "default")->value();
   fs::path dir_path(powerGridDir);
-  if (!fs::exists(dir_path)) return;
-  m_powerGridStreams = getCSVStreams(dir_path);
-  if (m_powerGridStreams.empty()) {
-    std::cout << "No csv files found in " << powerGridDir << std::endl;
-    return;
-  }
-}
-
-std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
-    COVERUtils::read::CSVStream &stream, float &max, float &min, float &sum,
-    int &timesteps) {
-  const auto &headers = stream.getHeader();
   FloatMap values;
   if (stream && headers.size() > 1) {
     CSVStream::CSVRow row;

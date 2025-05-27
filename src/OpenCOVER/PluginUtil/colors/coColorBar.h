@@ -23,7 +23,7 @@
 #include <OpenVRUI/coMenuItem.h>
 #include <util/coTypes.h>
 #include <vector>
-
+#include "coColorMap.h"
 namespace vrui
 {
 class coLabel;
@@ -35,22 +35,7 @@ class coColoredBackground;
 namespace opencover
 {
 
-struct ColorMap {
-   std::vector<float> r{0., 1.}, g{0., 1.}, b{0., 1.}, a{0., 1.}, samplingPoints{0., 1.};
-   float min = 0.0, max = 1.0;
-   int steps = 32;
-   std::string species = "default";
-   std::string unit = "NoUnit";
-   size_t numColors() const {
-      return r.size();
-   };
-   bool concretisized() const {
-      return steps < 0;
-   };
-   void setConcretisized() {
-      steps = -1;
-   };
-};
+
 /** class coColorBar, derived from coMenuItem
  *  colorbar is a window containing a texture and labels
  */
@@ -81,13 +66,13 @@ private:
     float labelValues_[MAX_LABELS]; // numerical values of labels
     char format_str_[32]; // precision of float values
 
-    ColorMap map_;
+   //  const opencover::ColorMap &map_;
     std::vector<unsigned char> image_, tickImage_;
     std::string name_; // the name of the colors module for example Colors_1
 
     void makeImage(const ColorMap &map, bool swapped);
     void makeTickImage();
-    void makeLabelValues();
+    void makeLabelValues(const ColorMap &map);
 
 public:
     /** constructor

@@ -18,14 +18,15 @@ osg::ref_ptr<osg::Texture1D> opencover::colorMapTexture(const ColorMap &colorMap
     texture->setWrap(osg::Texture1D::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
 
     osg::ref_ptr<osg::Image> image(new osg::Image);
-    image->allocateImage(colorMap.samplingPoints.size(), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE);
+    image->allocateImage(colorMap.steps(), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE);
     unsigned char *rgba = image->data();
-    for (size_t i = 0; i < colorMap.samplingPoints.size(); ++i)
+    for (size_t i = 0; i < colorMap.steps(); ++i)
     {
-        rgba[4 * i + 0] = 255 * colorMap.r[i];
-        rgba[4 * i + 1] = 255 * colorMap.g[i];
-        rgba[4 * i + 2] = 255 * colorMap.b[i];
-        rgba[4 * i + 3] = 255 * colorMap.a[i];
+        auto color = colorMap.getColorPerStep(i);
+        rgba[4 * i + 0] = 255 * color.r();
+        rgba[4 * i + 1] = 255 * color.g();
+        rgba[4 * i + 2] = 255 * color.b();
+        rgba[4 * i + 3] = 255 * color.a();
     }
 
     texture->setImage(image);
@@ -46,8 +47,8 @@ coVRShader *opencover::applyShader(osg::Drawable *drawable, const ColorMap &colo
 
     auto state = drawable->getOrCreateStateSet();
     state->setTextureAttribute(TfTexUnit, texture, osg::StateAttribute::ON);
-    shader->setFloatUniform("rangeMin", colorMap.min);
-    shader->setFloatUniform("rangeMax", colorMap.max);
+    shader->setFloatUniform("rangeMin", colorMap.min());
+    shader->setFloatUniform("rangeMax", colorMap.max());
     shader->apply(state);
     drawable->setStateSet(state);
     return shader;

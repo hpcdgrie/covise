@@ -230,7 +230,7 @@ ColorBarPlugin::newInteractor(const RenderObject *container, coInteractor *inter
         mod.menu = new ui::Menu(menuName, &mod);
         colorSubmenu->add(mod.menu);
 
-        mod.colorbar = std::make_unique<ColorBar>(mod.menu);
+        mod.colorbar = std::make_unique<CoviseColorBar>(mod.menu);
     }
     ColorsModule &mod = it->second;
     ++mod.useCount;
@@ -240,7 +240,7 @@ ColorBarPlugin::newInteractor(const RenderObject *container, coInteractor *inter
         mod.colorbar->addInter(inter);
         mod.colorbar->setName(menuName.c_str());
         if (colormapString)
-            mod.colorbar->update(mod.colorbar->parseAttrib(colormapString));
+            mod.colorbar->updateFromAttribute(colormapString);
     }
 }
 

@@ -8,7 +8,6 @@
 #ifndef COVER_PLUGIN_OCT_H
 #define COVER_PLUGIN_OCT_H
 #include "DataTable.h"
-#include "Interactor.h"
 
 #include <PluginUtil/colors/ColorBar.h>
 
@@ -58,9 +57,6 @@ public:
   void setTimestep(int t) override;
   void test();
 
-protected:
-  bool update() override;
-
 private:
   typedef exprtk::expression<float> expression_t;
   typedef exprtk::parser<float> parser_t;
@@ -84,7 +80,7 @@ private:
   //simple options
   ui::Menu *m_CsvPointCloudMenu;
   std::unique_ptr<ui::SliderConfigValue> m_pointSizeSlider, m_numPointsSlider, m_speedSlider;
-  ColorMapSelector m_colorMapSelector;
+  opencover::CoverColorBar m_colorMapSelector;
   std::unique_ptr<ui::SelectionListConfigValue> m_dataSelector;
   std::unique_ptr<ui::ButtonConfigValue> m_moveMachineBtn;
   std::unique_ptr<ui::ButtonConfigValue> m_showSurfaceBtn;
@@ -115,7 +111,6 @@ private:
   size_t m_lastNumFullDrawnPoints = 0;
   int m_numColorSteps = 0;
 
-  CsvInteractor *m_colorInteractor = nullptr;
   int m_lastTimestep = 0;
   void createGeodes(osg::Group *, const std::string &);
   void createGeometries(DataTable &symbols);
@@ -129,7 +124,7 @@ private:
   void resetMachineSpeed(std::array<float, 3> &machineSpeed);
 
   void advanceMachineSpeed(std::array<float, 3> &machineSpeed, size_t i);
-  void updateColorMap();
+  void updateColorMap(const opencover::ColorMap & cm);
   bool destroy() override;
   struct ScalarData
   {

@@ -16,7 +16,7 @@
 
 #include <osg/MatrixTransform>
 #include <osg/Observer>
-#include <PluginUtil/colors/coColorMap.h>
+#include <PluginUtil/colors/ColorBar.h>
 #include <OpcUaClient/opcua.h>
 #include <OpcUaClient/variantAccess.h>
 
@@ -52,7 +52,7 @@ protected:
     osg::MatrixTransform *m_tableNode = nullptr;
     std::unique_ptr<opencover::ui::Group> m_group;
     std::unique_ptr<opencover::ui::SliderConfigValue> m_numSectionsSlider;
-    opencover::ColorMapSelector *m_colorMapSelector;
+    opencover::CoverColorBar *m_colorMapSelector;
 
     opencover::opcua::Client *m_client;
     bool m_paused = false;

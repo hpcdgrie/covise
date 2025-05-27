@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "app/presentation/EnergyGrid.h"
+#include <PluginUtil/colors/coColorMap.h>
 
 using namespace core::simulation;
 
@@ -36,7 +37,7 @@ class BaseSimulationUI {
   BaseSimulationUI &operator=(const BaseSimulationUI &) = delete;
 
   virtual void updateTime(int timestep) = 0;
-  virtual opencover::ColorMap updateTimestepColors(const opencover::ColorMap& map, bool resetMinMax = false) = 0;
+  virtual void updateTimestepColors(const opencover::ColorMap& map) = 0;
 
  protected:
   template <typename simulationObject>
@@ -76,7 +77,7 @@ class BaseSimulationUI {
       minKeyVal = simulation->getMin(color_map.species);
       maxKeyVal = simulation->getMax(color_map.species);
     } catch (const std::out_of_range &e) {
-      std::cerr << "Key not found in minMaxValues: " << color_map.species << std::endl;
+      std::cerr << "Key not found in minMaxValues: " << color_map.species() << std::endl;
       return;
     }
 
@@ -96,9 +97,8 @@ class BaseSimulationUI {
       // color_map
       for (auto i = 0; i < values.size(); ++i) {
         auto interpolated_value = core::utils::math::interpolate(
-            values[i], minKeyVal, maxKeyVal, color_map.min, color_map.max);
-        auto color = getColor(interpolated_value, color_map);
-        colors[i] = color;
+            values[i], minKeyVal, maxKeyVal, color_map.min(), color_map.max());
+            colors[i] = color_map.getColor(interpolated_value);
       }
     }
   }

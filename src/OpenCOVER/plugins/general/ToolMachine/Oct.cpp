@@ -298,7 +298,7 @@ void Oct::updateGeo(bool paused, const opencover::opcua::MultiDimensionalArray<d
 
 Oct::Section &Oct::addSection(size_t numVerts)
 {
-    auto &section = m_sections.emplace_back(numVerts, m_pointSizeSlider->value(), m_colorMapSelector->selectedMap(), m_tableNode);
+    auto &section = m_sections.emplace_back(numVerts, m_pointSizeSlider->value(), m_colorMapSelector->colorMap(), m_tableNode);
     if(m_sections.size() > numSections)
         m_sections.pop_front();
     if(m_numSectionsSlider->getValue() > 0 && m_sections.size() > m_numSectionsSlider->getValue())

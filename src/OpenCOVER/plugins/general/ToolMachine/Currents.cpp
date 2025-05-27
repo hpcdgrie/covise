@@ -64,10 +64,8 @@ void Currents::initGeo()
     linewidth->setWidth(10.0f);
     stateSet->setAttributeAndModes(linewidth, osg::StateAttribute::ON);
     m_tableNode->addChild(m_traceLine);
-    auto m = m_colorMapSelector->selectedMap();
-    m.min = getMinAttribute();
-    m.max = getMaxAttribute();
-    applyLineShader(m_traceLine, m);
+    m_colorMapSelector->setMinMax(getMinAttribute(), getMaxAttribute());
+    applyLineShader(m_traceLine, m_colorMapSelector->colorMap());
 
 }
 

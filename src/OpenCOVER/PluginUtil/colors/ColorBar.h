@@ -41,14 +41,17 @@ namespace opencover
 namespace ui
 {
 class SpecialElement;
+class SelectionList;
 }
-ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm); //creates a color map with numSteps dedicated colors
+// for now colorMaps can only have the configured sample colors, colorMap::getColor interpolates the color for the number of colorMaps's steps   
+// this might be inefficient for a lot aof getColorCalls
+// ColorMap PLUGIN_UTILEXPORT interpolateColorMap(const ColorMap &cm); //creates a color map with numSteps dedicated colors
 
 class PLUGIN_UTILEXPORT ColorBar: public ui::Owner
 {
-private:
+protected:
     vrui::vruiMatrix *floatingMat_ = nullptr;
-    coColorBar *colorbar_ = nullptr, *hudbar_ = nullptr;
+    std::unique_ptr<coColorBar> colorbar_, hudbar_;
     ui::Group *colorsMenu_ = nullptr;
     std::string title_;
     std::string name_;
@@ -57,26 +60,24 @@ private:
     ui::Slider *maxSlider_ = nullptr;
     ui::Slider *stepSlider_ = nullptr;
     ui::Button *autoScale_ = nullptr;
-    ui::Action *execute_ = nullptr;
+   //  ui::Action *execute_ = nullptr;
     ui::Slider *center_ = nullptr;
     ui::Slider *compress_ = nullptr;
     ui::Slider *insetCenter_ = nullptr;
     ui::Slider *insetWidth_ = nullptr;
     ui::Slider *opacityFactor_ = nullptr;
     ui::Button *show_ = nullptr;
+    ColorMap map_;
+   void displayColorMap();
 
-    opencover::coInteractor *inter_ = nullptr;
-
+private:
     void updateTitle();
-    void displayColorMap();
     void init();
-   ColorMap map_;
-   std::function<void(const ColorMap &)> m_callback;
 public:
 
-    ColorBar(ui::Menu *menu);
+   //  ColorBar(ui::Menu *menu);
     ColorBar(ui::Group *group);
-    ~ColorBar();
+    virtual ~ColorBar() = default;
 
     bool hudVisible() const;
     struct PLUGIN_UTILEXPORT HudPosition
@@ -90,11 +91,7 @@ public:
     };
     void setHudPosition(const HudPosition &pos);
 
-    /** colorbar update
-       *  @param species title bar content
-       *  @param map color map to display
-       */
-    void update(const ColorMap &map);
+   //  void update(const ColorMap &map);
 
     void setName(const std::string &name);
     void show(bool state);
@@ -103,21 +100,50 @@ public:
      */
     const char *getName();
 
-    /** parseAttrib
-       * @param attrib COLORMAP attribute
-       * @return map: colormap to be filled
-       */
-      [[nodiscard]] static ColorMap parseAttrib(const char *attrib);
-
     void setVisible(bool);
     bool isVisible();
 
-    void addInter(opencover::coInteractor *inter);
-    void updateInteractor();
-    void setCallback(const std::function<void(const ColorMap &)> &f);
+   //  void addInter(opencover::coInteractor *inter);
+   //  void updateInteractor();
+   //  void setCallback(const std::function<void(const ColorMap &)> &f);
     void setMinBounds(float min, float max);
     void setMaxBounds(float min, float max);
     void setMaxNumSteps(int maxSteps);
 };
+
+// ColorBar for COVISE/Vistle plugin based on coInteractor
+class PLUGIN_UTILEXPORT CoviseColorBar: public ColorBar
+{
+public:
+   CoviseColorBar(ui::Group *menu);
+   void addInter(opencover::coInteractor *inter);
+   void updateInteractor();
+   ~CoviseColorBar();
+   void updateFromAttribute(const char *attrib);
+private:
+   ui::Action *execute_ = nullptr;
+   opencover::coInteractor *inter_ = nullptr;
+   void updateGui();
+};
+
+// Colorbar for OpenCOVER plugins with direct access to the colorMap
+class PLUGIN_UTILEXPORT CoverColorBar: public ColorBar
+{
+public:
+   CoverColorBar(ui::Group *menu);
+
+   void setCallback(const std::function<void(const ColorMap &)> &f);
+   void setMinMax(float min, float max);
+   void setSteps(int steps);
+   void setSpecies(const std::string &species);
+   void setUnit(const std::string &unit);
+   const ColorMap &colorMap() const;
+   void setColorMap(const std::string& name);
+private:
+   opencover::ui::SelectionList *m_selector;
+   std::function<void(const ColorMap &)> m_callback;
+
+};
+
 }
 #endif

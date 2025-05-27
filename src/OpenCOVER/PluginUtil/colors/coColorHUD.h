@@ -15,7 +15,7 @@ struct ColorsModule: public opencover::ui::Owner
         return colorbar && colorbar->hudVisible();
     }
     int useCount = 0;
-    std::unique_ptr<opencover::ColorBar> colorbar = nullptr;
+    std::unique_ptr<opencover::CoviseColorBar> colorbar = nullptr;
     opencover::ui::Menu *menu = nullptr;
 };
 

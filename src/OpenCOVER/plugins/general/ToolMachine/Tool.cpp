@@ -23,20 +23,19 @@ Tool::Tool(ui::Group *group, config::File &file, osg::MatrixTransform *toolHeadN
     m_minAttribute = std::make_unique<ui::EditFieldConfigValue>(group, "minAttribute", "0", file, "ToolMachinePlugin", config::Flag::PerModel);
     m_maxAttribute = std::make_unique<ui::EditFieldConfigValue>(group, "maxAttribute", "1", file, "ToolMachinePlugin", config::Flag::PerModel);
     m_maxAttribute->setUpdater([this](){
-        m_colorMapSelector->setMax(m_maxAttribute->ui()->number());
-        applyShader(m_colorMapSelector->selectedMap());
+        m_colorMapSelector->setMinMax(m_minAttribute->ui()->number(), m_maxAttribute->ui()->number());
+        applyShader(m_colorMapSelector->colorMap());
     });
     m_minAttribute->setUpdater([this](){
-        m_colorMapSelector->setMin(m_minAttribute->ui()->number());
-        applyShader(m_colorMapSelector->selectedMap());
+        m_colorMapSelector->setMinMax(m_minAttribute->ui()->number(), m_maxAttribute->ui()->number());
+        applyShader(m_colorMapSelector->colorMap());
     });
-    m_colorMapSelector = new ColorMapSelector(*group);
+    m_colorMapSelector = new CoverColorBar(group);
     m_colorMapSelector->setCallback([this](const ColorMap &cm)
     {
-        applyShader(m_colorMapSelector->selectedMap());
+        applyShader(cm);
     });
-    m_colorMapSelector->setMin(m_minAttribute->ui()->number());
-    m_colorMapSelector->setMax(m_maxAttribute->ui()->number());
+    m_colorMapSelector->setMinMax(m_minAttribute->ui()->number(), m_maxAttribute->ui()->number());
     m_attributeName = std::make_unique<ui::SelectionListConfigValue>(group, "attribute", 0, file, "ToolMachinePlugin", config::Flag::PerModel);
     m_attributeName->setUpdater([this](){
         

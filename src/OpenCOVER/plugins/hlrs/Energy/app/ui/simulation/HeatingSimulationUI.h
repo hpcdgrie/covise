@@ -51,14 +51,14 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
 
     // compute colors
     auto heatingSim = this->heatingSimulationPtr();
-    if (!heatingSim) return m;
+    if (!heatingSim) 
+      return;
     auto computeColorsForContainer = [&](auto entities) {
-      this->computeColors(m, entities);
+      this->computeColors(map, entities);
     };
 
     computeColorsForContainer(heatingSim->Consumers().get());
     computeColorsForContainer(heatingSim->Producers().get());
-    return m;
   }
 
  private:

@@ -34,28 +34,19 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
     }
   }
 
-  opencover::ColorMap updateTimestepColors(const opencover::ColorMap& map, bool resetMinMax = false) override {
-
-    auto m = map;
-    if (m.min > m.max) m.min = m.max;
-
-    if (resetMinMax) {
-      auto &[res_min, res_max] = powerSimulationPtr()->getMinMax(m.species);
-      m.max = res_max;
-      m.min = res_min;
-    }
+  void updateTimestepColors(const opencover::ColorMap& map) override {
 
     // compute colors
     auto powerSim = this->powerSimulationPtr();
-    if (!powerSim) return m;
+    if (!powerSim)
+      return;
     auto computeColorsForContainer = [&](auto container) {
-      this->computeColors(m, container);
+      this->computeColors(map, container);
     };
 
     computeColorsForContainer(powerSim->Buses().get());
     computeColorsForContainer(powerSim->Generators().get());
     computeColorsForContainer(powerSim->Transformators().get());
-    return m;
   }
 
  private:
