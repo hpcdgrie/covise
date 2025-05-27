@@ -192,6 +192,7 @@ EnergyPlugin::EnergyPlugin()
   // correctly via q or closing the window
 
   config()->setSaveOnExit(true);
+
   fprintf(stderr, "Starting Energy Plugin\n");
   m_plugin = this;
 
@@ -474,6 +475,24 @@ void EnergyPlugin::initCityGMLUI() {
   m_staticPower->setText("StaticPower");
   m_staticPower->setState(false);
   m_staticPower->setCallback([&](bool on) { enableCityGML(on); });
+
+  m_cityGMLX = new ui::EditField(m_cityGMLMenu, "X");
+  m_cityGMLY = new ui::EditField(m_cityGMLMenu, "Y");
+  m_cityGMLZ = new ui::EditField(m_cityGMLMenu, "Z");
+  auto x = configFloat("CityGML", "X", 0.0);
+  auto y = configFloat("CityGML", "Y", 0.0);
+  auto Z = configFloat("CityGML", "Z", 0.0);
+  m_cityGMLX->setValue(x->value());
+  m_cityGMLY->setValue(y->value());
+  m_cityGMLZ->setValue(Z->value());
+  auto updateFunction = [this](auto &value) {
+    if (!isActiv(m_switch, m_cityGML)) return;
+    auto translation = getCityGMLTranslation();
+    transformCityGML(translation, {});
+  };
+  m_cityGMLX->setCallback(updateFunction);
+  m_cityGMLY->setCallback(updateFunction);
+  m_cityGMLZ->setCallback(updateFunction);
 }
 
 void EnergyPlugin::initCityGMLColorMap() {
@@ -764,6 +783,30 @@ void EnergyPlugin::addSolarPanelsToCityGML(const fs::path &dirPath) {
   initPV(masterPanel, pvDataMap, maxPVIntensity);
 }
 
+void EnergyPlugin::transformCityGML(const osg::Vec3 &translation,
+                                    const osg::Quat &rotation,
+                                    const osg::Vec3 &scale) {
+  assert(m_cityGML && "CityGML group is not initialized.");
+  if (m_cityGML->getNumChildren() == 0) {
+    std::cout << "No CityGML objects to transform." << std::endl;
+    return;
+  }
+  for (auto i = 0; i < m_cityGML->getNumChildren(); ++i) {
+    osg::ref_ptr<osg::Node> child = m_cityGML->getChild(i);
+    if (auto mt = dynamic_cast<osg::MatrixTransform *>(child.get())) {
+      osg::Matrix matrix = osg::Matrix::translate(translation) *
+                           osg::Matrix::rotate(rotation) * osg::Matrix::scale(scale);
+      mt->setMatrix(matrix);
+    } else {
+      std::cerr << "Child is not a MatrixTransform." << std::endl;
+    }
+  }
+}
+
+osg::Vec3 EnergyPlugin::getCityGMLTranslation() const {
+  return osg::Vec3(m_cityGMLX->number(), m_cityGMLY->number(), m_cityGMLZ->number());
+}
+
 void EnergyPlugin::enableCityGML(bool on) {
   if (on) {
     if (m_cityGMLObjs.empty()) {
@@ -778,6 +821,10 @@ void EnergyPlugin::enableCityGML(bool on) {
             m_cityGML->addChild(child);
           }
         }
+
+        auto translation = getCityGMLTranslation();
+        child->setMatrix(osg::Matrix::translate(translation));
+        transformCityGML(translation, {});
       }
       CoreUtils::osgUtils::deleteChildrenFromOtherGroup(root, m_cityGML);
     }

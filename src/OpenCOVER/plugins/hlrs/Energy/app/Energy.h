@@ -262,6 +262,10 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void restoreCityGMLDefaultStatesets();
   void restoreGeodesStatesets(CityGMLDeviceSensor &sensor, const std::string &name,
                               const Geodes &citygmlGeodes);
+  void transformCityGML(const osg::Vec3 &translation,
+                        const osg::Quat &rotation,
+                        const osg::Vec3 &scale = osg::Vec3(1.0, 1.0, 1.0));
+  osg::Vec3 getCityGMLTranslation() const;
   /* #endregion */
 
   /* #region SIMULATION */
@@ -435,6 +439,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Menu *m_cityGMLMenu = nullptr;
   opencover::ui::Button *m_cityGMLEnable = nullptr;
   opencover::ui::Button *m_PVEnable = nullptr;
+  opencover::ui::EditField *m_cityGMLX = nullptr, *m_cityGMLY = nullptr, *m_cityGMLZ = nullptr;
 
   // Simulation UI
   opencover::ui::Menu *m_simulationMenu = nullptr;
