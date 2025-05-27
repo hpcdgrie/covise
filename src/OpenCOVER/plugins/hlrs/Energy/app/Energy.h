@@ -253,7 +253,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initCityGMLUI();
   void initCityGMLColorMap();
   void addSolarPanelsToCityGML(const boost::filesystem::path &dirPath);
-  void enableCityGML(bool on);
+//   void enableCityGML(bool on);
+  void enableCityGML(bool on, bool updateColorMap = true);
   void addCityGMLObjects(osg::ref_ptr<osg::Group> citygmlGroup);
   void addCityGMLObject(const std::string &name,
                         osg::ref_ptr<osg::Group> citygmlObjGroup);
@@ -328,9 +329,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
       std::string &name, std::map<std::string, uint> &duplicateMap);
   std::unique_ptr<grid::PointDataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
-  void applyInfluxToCityGML(const std::string &filePath);
-  void applyStaticDataToCityGML(const std::string &filePath);
-  void applyStaticDataCampusToCityGML(const std::string &filePath);
+//   void applyInfluxToCityGML(const std::string &filePath);
+//   void applyStaticDataToCityGML(const std::string &filePath);
+//   void applyStaticDataCampusToCityGML(const std::string &filePath);
+  void applyInfluxToCityGML(const std::string &filePath, bool updateColorMap = true);
+  void applyStaticDataToCityGML(const std::string &filePath, bool updateColorMap = true);
+  void applyStaticDataCampusToCityGML(const std::string &filePath, bool updateColorMap = true);
   void applySimulationDataToPowerGrid();
   void updatePowerGridSelection(bool on);
   void updatePowerGridConfig(const std::string &tableName, const std::string &name,
