@@ -716,11 +716,13 @@ void CoverColorBar::setSpecies(const std::string &species)
 {
     map_.setSpecies(species);
     displayColorMap();
+    updateTitle();
 }
 void CoverColorBar::setUnit(const std::string &unit)
 {
     map_.setUnit(unit);
     displayColorMap();
+    updateTitle();
 }
 
 const ColorMap &CoverColorBar::colorMap() const { return map_; }

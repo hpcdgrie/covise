@@ -69,9 +69,9 @@ protected:
     ui::Button *show_ = nullptr;
     ColorMap map_;
    void displayColorMap();
+   void updateTitle();
 
 private:
-    void updateTitle();
     void init();
 public:
 
