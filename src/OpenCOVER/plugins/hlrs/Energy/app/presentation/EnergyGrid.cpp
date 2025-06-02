@@ -1,5 +1,6 @@
 #include "EnergyGrid.h"
 
+#include <cover/coVRSelectionManager.h>
 #include <lib/core/constants.h>
 #include <lib/core/simulation/grid.h>
 #include <lib/core/utils/color.h>
@@ -43,9 +44,24 @@ InfoboardSensor::InfoboardSensor(
 }
 
 void InfoboardSensor::activate() {
+  auto selectionManager = opencover::coVRSelectionManager::instance();
+  selectionManager->clearSelection();
+  auto selectedNode = getNode();
+  if (!selectedNode) {
+    std::cerr << "InfoboardSensor: No node selected for activation." << std::endl;
+    return;
+  }
+  auto parent = selectedNode->getParent(0);
+  if (!parent) {
+    std::cerr << "InfoboardSensor: No parent node found for selected node."
+              << std::endl;
+    return;
+  }
+
   if (!m_enabled) {
     m_infoBoard->showInfo();
     m_enabled = true;
+    selectionManager->addSelection(parent, getNode());
   } else {
     m_infoBoard->hideInfo();
     m_enabled = false;
