@@ -35,8 +35,10 @@ enum class EnergyGridConnectionType { Index, Line };
  * @param additionalConData Additional connection data (default is an empty list).
  */
 struct EnergyGridConfig {
+  //   EnergyGridConfig(const std::string &gridName, const grid::Points &gridPoints,
   EnergyGridConfig(const std::string &gridName, const grid::Points &gridPoints,
                    const grid::Indices &gridIndices,
+                   const grid::PointsMap &gridPointsMap = {},
                    osg::ref_ptr<osg::MatrixTransform> gridParent = nullptr,
                    const float &gridConnectionRadius = 1.0f,
                    const grid::ConnectionDataList &extraConnectionData =
@@ -50,6 +52,7 @@ struct EnergyGridConfig {
       : name(gridName),
         points(gridPoints),
         indices(gridIndices),
+        pointsMap(gridPointsMap),
         parent(gridParent),
         connectionRadius(gridConnectionRadius),
         additionalConnectionData(extraConnectionData),
@@ -62,6 +65,7 @@ struct EnergyGridConfig {
   grid::Points points;
   grid::Indices indices;
   // optional
+  grid::PointsMap pointsMap;  // for faster access
   osg::ref_ptr<osg::MatrixTransform> parent;
   float connectionRadius;
   grid::ConnectionDataList additionalConnectionData;
@@ -70,7 +74,12 @@ struct EnergyGridConfig {
   grid::Lines lines;
 
   bool valid() const {
-    bool isMandatoryValid = !name.empty() || !points.empty() || !indices.empty();
+    // bool isMandatoryValid = !name.empty() || (!points.empty() &&
+    // pointsMap.empty()) || !indices.empty();
+    bool isMandatoryValid = !name.empty() ||
+                            ((points.empty() || pointsMap.empty()) &&
+                             (points.empty() && pointsMap.empty())) ||
+                            !indices.empty();
     return connectionType == EnergyGridConnectionType::Index ? isMandatoryValid
                                                              : !lines.empty();
   }

@@ -184,7 +184,10 @@ EnergyPlugin::EnergyPlugin()
       m_cityGML(new osg::Group()),
       m_energyGrids({
           EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGridType::PowerGrid},
-          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s", EnergyGridType::HeatingGrid}
+          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s",
+                     EnergyGridType::HeatingGrid},
+          EnergyGrid{"PowerGridSonder", "Leistung", "kWh",
+                     EnergyGridType::PowerGridSonder},
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -1716,7 +1719,9 @@ bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
 
 void EnergyPlugin::rebuildPowerGrid() {
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+  auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
   m_grid->removeChild(m_energyGrids[idx].group);
+  m_grid->removeChild(m_energyGrids[idxSonder].group);
   initPowerGridStreams();
   buildPowerGrid();
 }
@@ -1900,19 +1905,28 @@ void EnergyPlugin::initGrid() {
   initEnergyGridColorMaps();
 }
 
-std::unique_ptr<EnergyPlugin::IDLookupTable> EnergyPlugin::retrieveBusNameIdMapping(
+std::vector<EnergyPlugin::IDLookupTable> EnergyPlugin::retrieveBusNameIdMapping(
     COVERUtils::read::CSVStream &stream) {
   auto busNames = IDLookupTable();
+  auto busNamesSonder = IDLookupTable();
   CSVStream::CSVRow bus;
-  std::string busName("");
+  std::string busName(""), type("");
   int id = 0;
   while (stream >> bus) {
     ACCESS_CSV_ROW(bus, "name", busName);
     ACCESS_CSV_ROW(bus, "id", id);
+    if (bus.find("grid") != bus.end())
+      ACCESS_CSV_ROW(bus, "grid", type);
+    else
+      type = "Normalnetz";  // default type if not specified
 
+    if (type == "Sondernetz") {
+      busNamesSonder.insert({id, busName});
+      continue;
+    }
     busNames.insert({id, busName});
   }
-  return std::make_unique<IDLookupTable>(busNames);
+  return {busNames, busNamesSonder};
 }
 
 void EnergyPlugin::helper_getAdditionalPowerGridPointData_addData(
@@ -1976,15 +1990,16 @@ std::unique_ptr<grid::PointDataList> EnergyPlugin::getAdditionalPowerGridPointDa
   return std::make_unique<PDL>(additionalData);
 }
 
-std::unique_ptr<grid::Points> EnergyPlugin::createPowerGridPoints(
+std::vector<grid::PointsMap> EnergyPlugin::createPowerGridPoints(
     COVERUtils::read::CSVStream &stream, size_t &numPoints,
-    const float &sphereRadius, const IDLookupTable &busNames) {
-  using Points = grid::Points;
+    const float &sphereRadius, const std::vector<IDLookupTable> &busNames) {
+  using PointsMap = grid::PointsMap;
 
   CSVStream::CSVRow point;
   float lat = 0, lon = 0;
-  Points points;
-  std::string busName = "";
+  PointsMap points;
+  PointsMap pointsSonder;
+  std::string busName = "", type = "";
   int busID = 0;
 
   // TODO: need to be adjusted
@@ -1999,10 +2014,19 @@ std::unique_ptr<grid::Points> EnergyPlugin::createPowerGridPoints(
     lon += m_offset[0];
     lat += m_offset[1];
 
-    try {
-      busName = busNames.at(busID);
-    } catch (const std::out_of_range &) {
-      busName = "Base_" + std::to_string(busID);
+    int i = 0;
+    for (const auto &busNames : busNames) {
+      if (auto it = busNames.find(busID); it != busNames.end()) {
+        if (i == 0)
+          type = "Normalnetz";
+        else
+          type = "Sondernetz";
+        busName = it->second;
+        break;
+      } else {
+        busName = busName = "Base_" + std::to_string(busID);
+      }
+      ++i;
     }
 
     grid::Data busData;
@@ -2014,10 +2038,13 @@ std::unique_ptr<grid::Points> EnergyPlugin::createPowerGridPoints(
 
     osg::ref_ptr<grid::Point> p =
         new grid::Point(busName, lon, lat, m_offset[2], sphereRadius, busData);
-    points.push_back(p);
+    if (type == "Sondernetz")
+      pointsSonder.insert({busID, p});
+    else
+      points.insert({busID, p});
     ++numPoints;
   }
-  return std::make_unique<Points>(points);
+  return {points, pointsSonder};
 }
 
 void EnergyPlugin::processGeoBuses(grid::Indices &indices, int &from,
@@ -2027,10 +2054,9 @@ void EnergyPlugin::processGeoBuses(grid::Indices &indices, int &from,
   std::stringstream ss(geoBuses_comma_seperated);
   std::string bus("");
 
-  // index is not corresponding to the bus id => index = bus_id - 1
-  int from_last = from - 1;
+  int from_last = from;
   while (std::getline(ss, bus, ',')) {
-    auto to_new = std::stoi(bus) - 1;
+    auto to_new = std::stoi(bus);
     if (from_last == to_new) continue;
     auto &lastIndicesVec = indices[from_last];
     auto &additionalDataVec = additionalData[from_last];
@@ -2065,27 +2091,31 @@ void EnergyPlugin::processGeoBuses(grid::Indices &indices, int &from,
 
 osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
     const std::string &name, int &from, const std::string &geoBuses_comma_seperated,
-    grid::Data &data, const grid::Points &points) {
+    // grid::Data &data, const grid::Points &points) {
+    grid::Data &data, const grid::PointsMap &points) {
   std::stringstream ss(geoBuses_comma_seperated);
   std::string bus("");
 
-  // index is not corresponding to the bus id => index = bus_id - 1
-  int from_last = from - 1;
+  int from_last = from;
+
   grid::Connections connections;
   while (std::getline(ss, bus, ',')) {
-    auto to_new = std::stoi(bus) - 1;
+    auto to_new = std::stoi(bus);
     if (from_last == to_new) continue;
-    if (to_new < 0 || to_new >= points.size()) {
-      std::cerr << "Invalid bus ID: " << to_new + 1 << std::endl;
-      continue;
-    }
-    if (from_last < 0 || from_last >= points.size()) {
-      std::cerr << "Invalid bus ID: " << from_last + 1 << std::endl;
+    auto toIt = points.find(to_new);
+    if (toIt == points.end()) {
+      std::cerr << "Invalid bus ID: " << to_new << std::endl;
       continue;
     }
 
-    auto fromPoint = points[from_last];
-    auto toPoint = points[to_new];
+    auto fromIt = points.find(from_last);
+    if (fromIt == points.end()) {
+      std::cerr << "Invalid bus ID: " << from_last << std::endl;
+      continue;
+    }
+
+    auto fromPoint = fromIt->second;
+    auto toPoint = toIt->second;
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
@@ -2097,19 +2127,21 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
   return new grid::Line(name, connections);
 }
 
-std::pair<std::unique_ptr<grid::Lines>, std::unique_ptr<grid::ConnectionDataList>>
+std::pair<std::vector<grid::Lines>, std::vector<grid::ConnectionDataList>>
 EnergyPlugin::getPowerGridLines(COVERUtils::read::CSVStream &stream,
-                                const grid::Points &points) {
+                                // const std::vector<grid::Points> &points) {
+                                const std::vector<grid::PointsMap> &points) {
   using Lines = grid::Lines;
   using CDL = grid::ConnectionDataList;
-  auto numPoints = points.size();
   Lines lines;
-  CDL additionalData(numPoints);
+  CDL additionalData(points[0].size());
+  Lines linesSonder;
+  CDL additionalDataSonder(points[1].size());
 
   CSVStream::CSVRow row;
   int from = 0, to = 0;
   std::string geoBuses = "";
-  std::string name = "";
+  std::string name = "", type = "";
   auto header = stream.getHeader();
   while (stream >> row) {
     grid::Data data;
@@ -2126,14 +2158,24 @@ EnergyPlugin::getPowerGridLines(COVERUtils::read::CSVStream &stream,
     ACCESS_CSV_ROW(row, "geo_buses", geoBuses);
     ACCESS_CSV_ROW(row, "from_bus", from);
     ACCESS_CSV_ROW(row, "name", name);
+    if (row.find("grid") != row.end())
+      ACCESS_CSV_ROW(row, "grid", type);
+    else
+      type = "Normalnetz";  // default type if not specified
 
     if (geoBuses.empty()) continue;
-    auto line = createLine(name, from, geoBuses, data, points);
-    lines.push_back(line);
+    auto gridPoints =
+        (type == "Sondernetz") ? points[1] : points[0];  // Sondernetz is at index 1
+    auto line = createLine(name, from, geoBuses, data, gridPoints);
+    if (type == "Sondernetz") {
+      linesSonder.push_back(line);
+    } else {
+      lines.push_back(line);
+    }
   }
 
-  return std::make_pair(std::make_unique<Lines>(lines),
-                        std::make_unique<CDL>(additionalData));
+  return std::make_pair<vector<Lines>, vector<grid::ConnectionDataList>>(
+      {lines, linesSonder}, {additionalData, additionalDataSonder});
 }
 
 std::pair<std::unique_ptr<grid::Indices>, std::unique_ptr<grid::ConnectionDataList>>
@@ -2178,52 +2220,61 @@ void EnergyPlugin::buildPowerGrid() {
   using grid::Point;
   if (m_powerGridStreams.empty()) return;
 
-  const float connectionsRadius(0.5f);
-  const float sphereRadius(1.0f);
+  constexpr float connectionsRadius(0.5f);
+  constexpr float sphereRadius(1.0f);
   size_t numPoints(0);
 
   // fetch bus names
   auto busData = m_powerGridStreams.find("bus");
-  std::unique_ptr<IDLookupTable> busNames(nullptr);
+  std::vector<IDLookupTable> busNames;
   if (busData != m_powerGridStreams.end()) {
     auto &[name, busStream] = *busData;
     busNames = retrieveBusNameIdMapping(busStream);
   }
 
-  if (!busNames) return;
+  if (busNames.empty()) return;
 
   // create points
   auto pointsData = m_powerGridStreams.find("bus_geodata");
-  std::unique_ptr<grid::Points> points(nullptr);
+  std::vector<grid::PointsMap> points;
   if (pointsData != m_powerGridStreams.end()) {
     auto &[name, pointStream] = *pointsData;
-    points = createPowerGridPoints(pointStream, numPoints, sphereRadius, *busNames);
+    points = createPowerGridPoints(pointStream, numPoints, sphereRadius, busNames);
   }
 
   // create line
   auto lineData = m_powerGridStreams.find("line");
-  std::unique_ptr<grid::Lines> lines = nullptr;
-  std::unique_ptr<grid::ConnectionDataList> optData = nullptr;
+  std::vector<grid::Lines> lines;
+  std::vector<grid::ConnectionDataList> optData;
   if (lineData != m_powerGridStreams.end()) {
     auto &[name, lineStream] = *lineData;
-    std::tie(lines, optData) = getPowerGridLines(lineStream, *points);
+    std::tie(lines, optData) = getPowerGridLines(lineStream, points);
   }
 
   // create grid
-  if (lines == nullptr || points == nullptr) return;
+  if (lines.empty() || points.empty()) return;
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+  auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
   auto &egrid = m_energyGrids[idx];
+  auto &egridSonder = m_energyGrids[idxSonder];
   auto &powerGroup = egrid.group;
+  auto &powerGroupSonder = egridSonder.group;
   powerGroup = new osg::MatrixTransform;
+  powerGroupSonder = new osg::MatrixTransform;
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   powerGroup->setName("PowerGrid");
+  powerGroupSonder->setName("PowerGridSonder");
 
-  EnergyGridConfig econfig("POWER", *points, grid::Indices(), powerGroup,
-                           connectionsRadius, *optData, infoboardAttributes,
-                           EnergyGridConnectionType::Line, *lines);
+  EnergyGridConfig econfig("POWER", {}, grid::Indices(), points[0], powerGroup,
+                           connectionsRadius, optData[0], infoboardAttributes,
+                           EnergyGridConnectionType::Line, lines[0]);
+  EnergyGridConfig econfigSonder("POWERSonder", {}, grid::Indices(), points[1],
+                                 powerGroupSonder, connectionsRadius, optData[1],
+                                 infoboardAttributes, EnergyGridConnectionType::Line,
+                                 lines[1]);
 
   auto powerGrid = std::make_unique<EnergyGridOsg>(econfig, false);
   powerGrid->initDrawables();
@@ -2231,6 +2282,13 @@ void EnergyPlugin::buildPowerGrid() {
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   egrid.grid = std::move(powerGrid);
   addEnergyGridToGridSwitch(egrid.group);
+
+  auto powerGridSonder = std::make_unique<EnergyGridOsg>(econfigSonder, false);
+  powerGridSonder->initDrawables();
+  powerGridSonder->updateColor(
+      osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
+  egridSonder.grid = std::move(powerGridSonder);
+  addEnergyGridToGridSwitch(egridSonder.group);
 
   // TODO:
   //  [ ] set trafo as 3d model or block
@@ -2478,6 +2536,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   heatingGrid.grid = std::make_unique<EnergyGridOsg>(
       EnergyGridConfig{"HEATING",
                        points,
+                       {},
                        {},
                        heatingGrid.group,
                        0.5f,

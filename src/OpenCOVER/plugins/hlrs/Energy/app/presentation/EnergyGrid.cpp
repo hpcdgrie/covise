@@ -163,13 +163,13 @@ void EnergyGrid::initDrawableLines() {
   using namespace core::simulation::grid;
   osg::ref_ptr<osg::Group> lines = new osg::Group;
   lines->setName("Lines");
-  const auto &radius =
+  const auto &sphereRadius =
       m_config.lines[0]->getConnections().begin()->second->getStart()->getRadius();
   grid::Lines overlappingLines;
 
   for (auto line : m_config.lines) {
     // move redundant line below the first one
-    findCorrectHeightForLine(radius, line, overlappingLines);
+    findCorrectHeightForLine(sphereRadius, line, overlappingLines);
     overlappingLines.push_back(line);
     initDrawableGridObject(lines, line);
   }
@@ -187,9 +187,24 @@ std::string EnergyGrid::createDataString(const grid::Data &data) const {
 void EnergyGrid::initDrawablePoints() {
   osg::ref_ptr<osg::Group> points = new osg::Group;
   points->setName("Points");
-  for (auto &point : m_config.points) {
-    initDrawableGridObject(points, point);
+  if (!m_config.points.empty()) {
+    for (auto &point : m_config.points) {
+      initDrawableGridObject(points, point);
+    }
+  } else {
+    for (auto &[id, point] : m_config.pointsMap) {
+      if (point.valid()) {
+        initDrawableGridObject(points, point);
+      }
+    }
   }
+
+  for (auto &[id, point] : m_config.pointsMap) {
+    if (point.valid()) {
+      initDrawableGridObject(points, point);
+    }
+  }
+
   m_config.parent->addChild(points);
 }
 
@@ -238,6 +253,12 @@ void EnergyGrid::updateColor(const osg::Vec4 &color) {
   }
   for (auto &point : m_config.points) {
     utils::color::overrideGeodeColor(point->getGeode(), color);
+  }
+  for (auto &line: m_config.lines) {
+    for (auto &[name, connection] : line->getConnections()) {
+      utils::color::overrideGeodeColor(connection->getGeode(), color);
+    }
+    // utils::color::overrideGeodeColor(line->getGeode(), color);
   }
 }
 

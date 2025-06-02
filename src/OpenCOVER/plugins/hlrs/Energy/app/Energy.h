@@ -100,7 +100,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
   enum Components { Strom, Waerme, Kaelte };
-  enum class EnergyGridType { PowerGrid, HeatingGrid, NUM_ENERGY_TYPES };
+  enum class EnergyGridType {
+    PowerGrid,
+    HeatingGrid,
+    PowerGridSonder,
+    NUM_ENERGY_TYPES
+  };
   // enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid, NUM_ENERGY_GRIDS };
 
   struct ProjTrans {
@@ -253,7 +258,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initCityGMLUI();
   void initCityGMLColorMap();
   void addSolarPanelsToCityGML(const boost::filesystem::path &dirPath);
-//   void enableCityGML(bool on);
+  //   void enableCityGML(bool on);
   void enableCityGML(bool on, bool updateColorMap = true);
   void addCityGMLObjects(osg::ref_ptr<osg::Group> citygmlGroup);
   void addCityGMLObject(const std::string &name,
@@ -301,13 +306,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   auto readStaticCampusData(CSVStream &stream, float &max, float &min, float &sum);
   auto readStaticPowerData(CSVStream &stream, float &max, float &min, float &sum);
-  std::unique_ptr<grid::Points> createPowerGridPoints(CSVStream &stream,
-                                                      size_t &numPoints,
-                                                      const float &sphereRadius,
-                                                      const IDLookupTable &busNames);
+  std::vector<grid::PointsMap> createPowerGridPoints(
+      CSVStream &stream, size_t &numPoints, const float &sphereRadius,
+      const std::vector<IDLookupTable> &busNames);
   osg::ref_ptr<grid::Line> createLine(const std::string &name, int &from,
                                       const std::string &geoBuses, grid::Data &data,
-                                      const grid::Points &points);
+                                      const grid::PointsMap &points);
   void processGeoBuses(grid::Indices &indices, int &from,
                        const std::string &geoBuses,
                        grid::ConnectionDataList &additionalData, grid::Data &data);
@@ -316,10 +320,10 @@ class EnergyPlugin : public opencover::coVRPlugin,
             std::unique_ptr<grid::ConnectionDataList>>
   getPowerGridIndicesAndOptionalData(CSVStream &stream, const size_t &numPoints);
 
-  std::pair<std::unique_ptr<grid::Lines>, std::unique_ptr<grid::ConnectionDataList>>
-  getPowerGridLines(CSVStream &stream, const grid::Points &points);
+  std::pair<std::vector<grid::Lines>, std::vector<grid::ConnectionDataList>>
+  getPowerGridLines(CSVStream &stream, const std::vector<grid::PointsMap> &points);
 
-  std::unique_ptr<IDLookupTable> retrieveBusNameIdMapping(CSVStream &stream);
+  std::vector<IDLookupTable> retrieveBusNameIdMapping(CSVStream &stream);
 
   bool checkBoxSelection_powergrid(const std::string &tableName,
                                    const std::string &paramName);
@@ -329,12 +333,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
       std::string &name, std::map<std::string, uint> &duplicateMap);
   std::unique_ptr<grid::PointDataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
-//   void applyInfluxToCityGML(const std::string &filePath);
-//   void applyStaticDataToCityGML(const std::string &filePath);
-//   void applyStaticDataCampusToCityGML(const std::string &filePath);
   void applyInfluxToCityGML(const std::string &filePath, bool updateColorMap = true);
-  void applyStaticDataToCityGML(const std::string &filePath, bool updateColorMap = true);
-  void applyStaticDataCampusToCityGML(const std::string &filePath, bool updateColorMap = true);
+  void applyStaticDataToCityGML(const std::string &filePath,
+                                bool updateColorMap = true);
+  void applyStaticDataCampusToCityGML(const std::string &filePath,
+                                      bool updateColorMap = true);
   void applySimulationDataToPowerGrid();
   void updatePowerGridSelection(bool on);
   void updatePowerGridConfig(const std::string &tableName, const std::string &name,

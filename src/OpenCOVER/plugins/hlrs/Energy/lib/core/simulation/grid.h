@@ -119,6 +119,7 @@ class Line : public osg::MatrixTransform {
   }
 
   const auto &getConnections() const { return m_connections; }
+  auto &getConnections() { return m_connections; }
   const auto &getAdditionalData() const { return m_additionalData; }
   const auto &getName() const { return m_name; }
   osg::Vec3 getCenter() const;
@@ -141,6 +142,7 @@ class Line : public osg::MatrixTransform {
 // template <typename PointType>
 // using ConnectivityList = std::vector<ConnectionData<PointType>>;
 typedef std::vector<osg::ref_ptr<Point>> Points;
+typedef std::map<int, osg::ref_ptr<Point>> PointsMap;
 typedef std::vector<osg::ref_ptr<Line>> Lines;
 typedef std::vector<std::vector<int>> Indices;
 typedef std::map<int, Data> PointDataList;
