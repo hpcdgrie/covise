@@ -2091,8 +2091,7 @@ void EnergyPlugin::processGeoBuses(grid::Indices &indices, int &from,
 
 osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
     const std::string &name, int &from, const std::string &geoBuses_comma_seperated,
-    // grid::Data &data, const grid::Points &points) {
-    grid::Data &data, const grid::PointsMap &points) {
+    grid::Data &data, const std::vector<grid::PointsMap> &points) {
   std::stringstream ss(geoBuses_comma_seperated);
   std::string bus("");
 
@@ -2102,20 +2101,21 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
   while (std::getline(ss, bus, ',')) {
     auto to_new = std::stoi(bus);
     if (from_last == to_new) continue;
-    auto toIt = points.find(to_new);
-    if (toIt == points.end()) {
-      std::cerr << "Invalid bus ID: " << to_new << std::endl;
+
+    osg::ref_ptr<grid::Point> fromPoint = nullptr;
+    osg::ref_ptr<grid::Point> toPoint = nullptr;
+    for (auto points : points) {
+      auto toIt = points.find(to_new);
+      if (!toPoint && toIt != points.end()) toPoint = toIt->second;
+
+      auto fromIt = points.find(from_last);
+      if (!fromPoint && fromIt != points.end()) fromPoint = fromIt->second;
+    }
+    if (!fromPoint || !toPoint) {
+      std::cerr << "Invalid bus ID: " << from_last << " or " << to_new << std::endl;
       continue;
     }
 
-    auto fromIt = points.find(from_last);
-    if (fromIt == points.end()) {
-      std::cerr << "Invalid bus ID: " << from_last << std::endl;
-      continue;
-    }
-
-    auto fromPoint = fromIt->second;
-    auto toPoint = toIt->second;
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
@@ -2164,9 +2164,11 @@ EnergyPlugin::getPowerGridLines(COVERUtils::read::CSVStream &stream,
       type = "Normalnetz";  // default type if not specified
 
     if (geoBuses.empty()) continue;
-    auto gridPoints =
-        (type == "Sondernetz") ? points[1] : points[0];  // Sondernetz is at index 1
-    auto line = createLine(name, from, geoBuses, data, gridPoints);
+    // auto gridPoints =
+    //     (type == "Sondernetz") ? points[1] : points[0];  // Sondernetz is at index
+    //     1
+    // auto line = createLine(name, from, geoBuses, data, gridPoints);
+    auto line = createLine(name, from, geoBuses, data, points);
     if (type == "Sondernetz") {
       linesSonder.push_back(line);
     } else {

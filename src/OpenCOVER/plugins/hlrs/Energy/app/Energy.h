@@ -311,7 +311,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
       const std::vector<IDLookupTable> &busNames);
   osg::ref_ptr<grid::Line> createLine(const std::string &name, int &from,
                                       const std::string &geoBuses, grid::Data &data,
-                                      const grid::PointsMap &points);
+                                      const std::vector<grid::PointsMap> &points);
   void processGeoBuses(grid::Indices &indices, int &from,
                        const std::string &geoBuses,
                        grid::ConnectionDataList &additionalData, grid::Data &data);
