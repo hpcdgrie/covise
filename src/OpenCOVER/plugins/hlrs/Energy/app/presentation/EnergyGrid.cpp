@@ -58,6 +58,11 @@ void InfoboardSensor::activate() {
     return;
   }
 
+  constexpr float R = 173.0f / 255.0f;
+  constexpr float G = 216.0f / 255.0f;
+  constexpr float B = 230.0f / 255.0f;
+  selectionManager->setSelectionColor(R, G, B);
+
   if (!m_enabled) {
     m_infoBoard->showInfo();
     m_enabled = true;
@@ -254,7 +259,7 @@ void EnergyGrid::updateColor(const osg::Vec4 &color) {
   for (auto &point : m_config.points) {
     utils::color::overrideGeodeColor(point->getGeode(), color);
   }
-  for (auto &line: m_config.lines) {
+  for (auto &line : m_config.lines) {
     for (auto &[name, connection] : line->getConnections()) {
       utils::color::overrideGeodeColor(connection->getGeode(), color);
     }
