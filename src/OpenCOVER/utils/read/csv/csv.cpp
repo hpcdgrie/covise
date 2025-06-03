@@ -42,6 +42,9 @@ void CSVStream::readLine(CSVStream::CSVRow &row) {
 
 std::stringstream CSVStream::getLine() {
   std::getline(m_inputFileStream, m_currentline);
+  // skip comments
+  while (!m_currentline.empty() && m_currentline[0] == '#')
+    std::getline(m_inputFileStream, m_currentline);
   std::stringstream ss(m_currentline);
   return ss;
 }
