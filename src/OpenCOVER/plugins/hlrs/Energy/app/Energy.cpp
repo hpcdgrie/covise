@@ -183,11 +183,9 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_energyGrids({
-          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGridType::PowerGrid},
-          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s",
-                     EnergyGridType::HeatingGrid},
-          EnergyGrid{"PowerGridSonder", "Leistung", "kWh",
-                     EnergyGridType::PowerGridSonder},
+          EnergyGrid{"PowerGrid", EnergyGridType::PowerGrid},
+          EnergyGrid{"HeatingGrid", EnergyGridType::HeatingGrid},
+          EnergyGrid{"PowerGridSonder", EnergyGridType::PowerGridSonder},
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -377,6 +375,7 @@ void EnergyPlugin::setTimestep(int t) {
   for (auto &[_, sensor] : m_cityGMLObjs) sensor->updateTime(t);
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   m_energyGrids[idx].simUI->updateTime(t);
+   m_energyGrids[idx].grid->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
@@ -1481,6 +1480,7 @@ void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
     // heating simulation
     grid.simUI->updateTimestepColors(map);
+    grid.grid->setColorMap(map);
   }
 }
 
@@ -1846,8 +1846,8 @@ void EnergyPlugin::initEnergyGridColorMaps() {
         scalarPropertyNames.push_back(name);
 
       auto menu =
-          new ui::Menu(m_simulationMenu, energyGrid.name + "_" + energyGrid.species +
-                                             " " + std::to_string(idx++));
+          new ui::Menu(m_simulationMenu, energyGrid.name + "_" + scalarProperty.species +
+                                             "_" + std::to_string(idx++));
       menu->setVisible(false);
       auto cms = std::make_unique<opencover::CoverColorBar>(menu);
       cms->setSpecies(scalarProperty.species);
@@ -1891,11 +1891,19 @@ void EnergyPlugin::initEnergyGridColorMaps() {
         }
       }
       updateColorMap(colorMapMenu.selector->colorMap(), energyGrid.type);
+      updateGridData(energyGrid);
     });
     energyGrid.scalarSelector = scalarSelector;
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
     energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
+    updateColorMap(energyGrid.colorMapRegistry[scalarSelector->selectedItem()].selector->colorMap(), energyGrid.type);
+    updateGridData(energyGrid);
   }
+}
+
+void EnergyPlugin::updateGridData(EnergyGrid &energyGrid) {
+
+  energyGrid.grid->setData(*energyGrid.sim, energyGrid.scalarSelector->selectedItem());
 }
 
 void EnergyPlugin::initGrid() {
@@ -2346,6 +2354,27 @@ osg::ref_ptr<grid::Point> EnergyPlugin::searchHeatingGridPointById(
   return *pointIt;  // returns nullptr if not found
 }
 
+// int getId(const std::string &connectionsStrWithCommaDelimiter,
+//     grid::ConnectionDataList &additionalData)
+// {
+//   std::stringstream ss(connectionsStrWithCommaDelimiter);
+//   std::string connection("");
+//   grid::Connections connections;
+//   auto pointName = from->getName();
+//   std::string lineName{pointName};
+//   while (std::getline(ss, connection, ' ')) {
+//     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
+//     grid::Data connectionData{{"name", pointName + "_" + connection}};
+//     additionalData.emplace_back(std::vector{connectionData});
+//     int toID(-1);
+//     try {
+//       toID = std::stoi(connection);
+//     } catch (...) {
+//       continue;
+//     }
+//   }
+// }
+
 osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
     const grid::Points &points, osg::ref_ptr<grid::Point> from,
     const std::string &connectionsStrWithCommaDelimiter,
@@ -2380,7 +2409,7 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
     grid::ConnectionData connData{pointName + "_" + connection, from, to, 0.5f,
                                   nullptr, connectionData};
     grid::DirectedConnection directed(
-        connData, grid::ConnectionType::LineWithColorInterpolation);
+        connData, grid::ConnectionType::LineWithShader);
     gridConnections.push_back(new grid::DirectedConnection(directed));
   }
 

@@ -8,6 +8,7 @@
 #include <osg/Vec3>
 #include <osg/ref_ptr>
 #include <variant>
+#include <PluginUtil/coShaderUtil.h>
 
 #include "../utils/color.h"
 
@@ -55,7 +56,7 @@ struct ConnectionData {
   Data additionalData;
 };
 
-enum class ConnectionType { Line, LineWithColorInterpolation, Arc, Arrow };
+enum class ConnectionType { Line, LineWithColorInterpolation, LineWithShader, Arc, Arrow };
 
 class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
@@ -88,13 +89,19 @@ class DirectedConnection : public osg::MatrixTransform {
   void updateColor(const osg::Vec4 &color) {
     core::utils::color::overrideGeodeColor(m_geode, color);
   }
-
+  void setData(const std::vector<double> &fromData, const std::vector<double> &toData);
+  void setColorMap(const opencover::ColorMap&colorMap);
+  void updateTimestep(int timestep);
  private:
   osg::ref_ptr<osg::Geode> m_geode;
   osg::ref_ptr<Point> m_start;
   osg::ref_ptr<Point> m_end;
+  int m_numNodes = 2;
+
   Data m_additionalData;
   ConnectionType m_type;
+  //to idea who owns the shader
+  opencover::coVRShader *m_shader = nullptr;
 };
 
 // list of directed connections between points
@@ -121,7 +128,6 @@ class Line : public osg::MatrixTransform {
  private:
   void init(const Connections &connections);
   void computeBoundingBox();
-
   std::string m_name;
   osg::BoundingBox m_boundingBox;
   std::map<std::string, osg::ref_ptr<DirectedConnection>> m_connections;

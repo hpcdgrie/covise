@@ -97,13 +97,14 @@ class Simulation {
   auto &getScalarProperties() { return m_scalarProperties; }
 
   virtual void computeParameters() {};
-
- protected:
+  virtual const std::vector<double> *getTimedependentScalar(const std::string &species, const std::string& node) const = 0;
+  
+  protected:
   template <typename T>
   void computeParameter(const ObjectContainer<T> &baseMap) {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
-    for (const auto &[_, base] : baseMap.get()) {
+    for (const auto &[_, base] : baseMap) {
       const auto &data = base.getData();
       for (const auto &[key, values] : data) {
         setUnit(key);
@@ -112,6 +113,24 @@ class Simulation {
         m_scalarProperties[key].species = key;
       }
     }
+  }
+
+  template <typename T>
+  const std::vector<double> *getTimedependentScalar(const ObjectContainer<T> &baseMap,
+                                          const std::string &species,
+                                          const std::string &node) const{
+    static_assert(std::is_base_of_v<Object, T>,
+                  "T must be derived from core::simulation::Object");
+    std::vector<double> result;
+    for (const auto &[name, base] : baseMap) {
+      if (base.getName() == node) {
+        const auto &data = base.getData();
+        if (data.find(species) != data.end()) {
+          return &data.at(species);
+        }
+      }
+    }
+    return nullptr;
   }
 
   virtual void computeMinMax(const std::string &key,

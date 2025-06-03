@@ -170,8 +170,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   struct EnergyGrid {
     const std::string name;
-    const std::string species;
-    const std::string unit;
     const EnergyGridType type;
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
@@ -281,6 +279,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initSimMenu();
   void updateColorMap(const opencover::ColorMap &map, EnergyGridType grid);
   void initColorMap();
+  void updateGridData(EnergyGrid &energyGrid);
   void initGrid();
   void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
 
