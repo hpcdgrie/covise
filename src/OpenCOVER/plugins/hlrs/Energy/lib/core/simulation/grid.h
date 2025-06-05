@@ -37,7 +37,9 @@ class Point : public osg::MatrixTransform {
   void updateColor(const osg::Vec4 &color) {
     core::utils::color::overrideGeodeColor(getGeode(), color);
   }
-
+  bool hasData() const {
+    return m_additionalData.size() > 0; // name is always set
+  }
  private:
   void init(const std::string &name);
 
@@ -49,8 +51,7 @@ class Point : public osg::MatrixTransform {
 
 struct ConnectionData {
   std::string name;
-  osg::ref_ptr<Point> start;
-  osg::ref_ptr<Point> end;
+  std::vector<osg::ref_ptr<Point>> points; // first and last Point must have data
   float radius;
   osg::ref_ptr<osg::TessellationHints> hints;
   Data additionalData;
@@ -59,33 +60,18 @@ struct ConnectionData {
 enum class ConnectionType { Line, LineWithColorInterpolation, LineWithShader, Arc, Arrow };
 
 class DirectedConnection : public osg::MatrixTransform {
-  DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
-                     osg::ref_ptr<Point> end, const float &radius,
-                     osg::ref_ptr<osg::TessellationHints> hints,
-                     const Data &additionalData = Data(),
-                     ConnectionType type = ConnectionType::Line);
-
  public:
   DirectedConnection(const ConnectionData &data,
-                     ConnectionType type = ConnectionType::Line)
-      : DirectedConnection(data.name, data.start, data.end, data.radius, data.hints,
-                           data.additionalData, type) {};
+                     ConnectionType type = ConnectionType::LineWithShader);
 
-  void move(const osg::Vec3 &offset) {
-    setMatrix(osg::Matrix::translate(offset));
-    m_start->move(offset);
-    m_end->move(offset);
-  }
-  osg::Vec3 getDirection() const {
-    return m_end->getPosition() - m_start->getPosition();
-  }
-  osg::Vec3 getCenter() const {
-    return (m_start->getPosition() + m_end->getPosition()) / 2;
-  }
-  osg::ref_ptr<Point> getStart() const { return m_start; }
-  osg::ref_ptr<Point> getEnd() const { return m_end; }
+  void move(const osg::Vec3 &offset); 
+  osg::Vec3 getDirection() const; 
+  osg::Vec3 getCenter() const; 
+
+  osg::ref_ptr<Point> getStart() const { return m_connectionData.points[0]; }
+  osg::ref_ptr<Point> getEnd() const { return m_connectionData.points.back(); }
   osg::ref_ptr<osg::Geode> getGeode() const { return m_geode; }
-  const auto &getAdditionalData() const { return m_additionalData; }
+  const auto &getAdditionalData() const { return m_connectionData.additionalData; }
   void updateColor(const osg::Vec4 &color) {
     core::utils::color::overrideGeodeColor(m_geode, color);
   }
@@ -94,11 +80,7 @@ class DirectedConnection : public osg::MatrixTransform {
   void updateTimestep(int timestep);
  private:
   osg::ref_ptr<osg::Geode> m_geode;
-  osg::ref_ptr<Point> m_start;
-  osg::ref_ptr<Point> m_end;
-  int m_numNodes = 2;
-
-  Data m_additionalData;
+  ConnectionData m_connectionData;
   ConnectionType m_type;
   //to idea who owns the shader
   opencover::coVRShader *m_shader = nullptr;

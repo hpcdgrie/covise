@@ -55,33 +55,28 @@ void Point::init(const std::string &name) {
 
 constexpr int NUM_CIRCLE_POINTS = 20;
 
-DirectedConnection::DirectedConnection(const std::string &name,
-                                       osg::ref_ptr<Point> start,
-                                       osg::ref_ptr<Point> end, const float &radius,
-                                       osg::ref_ptr<osg::TessellationHints> hints,
-                                       const Data &additionalData,
-                                       ConnectionType type)
-    : osg::MatrixTransform(),
-      m_start(start),
-      m_end(end),
-      m_additionalData(additionalData) {
+DirectedConnection::DirectedConnection(const ConnectionData &data, ConnectionType type)
+: osg::MatrixTransform()
+, m_connectionData(data)
+, m_type(type)
+{
   switch (type) {
     case ConnectionType::Line:
       m_geode = utils::osgUtils::createOsgCylinderBetweenPoints(
-          start->getPosition(), end->getPosition(), radius,
-          osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), hints);
+          getStart()->getPosition(), getEnd()->getPosition(), m_connectionData.radius,
+          osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), m_connectionData.hints);
       break;
     case ConnectionType::LineWithColorInterpolation:
       m_geode = utils::osgUtils::createCylinderBetweenPointsColorInterpolation(
-          start->getPosition(), end->getPosition(), radius * 2.0f, radius, NUM_CIRCLE_POINTS, 1,
+          getStart()->getPosition(), getEnd()->getPosition(), m_connectionData.radius * 2.0f, m_connectionData.radius, NUM_CIRCLE_POINTS, 1,
           osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f), osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f),
-          hints);
+          m_connectionData.hints);
       break;
     case ConnectionType::LineWithShader:
     {
       auto geometry = utils::osgUtils::createCylinderBetweenPoints(
-          start->getPosition(), end->getPosition(), radius, NUM_CIRCLE_POINTS, 1,
-           hints);
+          getStart()->getPosition(), getEnd()->getPosition(), m_connectionData.radius, NUM_CIRCLE_POINTS, 1,
+           m_connectionData.hints);
       m_geode = new osg::Geode();
       m_geode->addDrawable(geometry);
 
@@ -89,15 +84,29 @@ DirectedConnection::DirectedConnection(const std::string &name,
     break;
     case ConnectionType::Arc:
       m_geode = utils::osgUtils::createBezierTube(
-          start->getPosition(), end->getPosition(), radius * 2.0f, radius, 50,
+          getStart()->getPosition(), getEnd()->getPosition(), m_connectionData.radius * 2.0f, m_connectionData.radius, 50,
           osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
       break;
     case ConnectionType::Arrow:
       assert(false && "Arrow type not implemented");
   }
   addChild(m_geode);
-  setName(name);
+  setName(m_connectionData.name);
 }
+
+void DirectedConnection::move(const osg::Vec3 &offset) {
+  setMatrix(osg::Matrix::translate(offset));
+  for(auto &point : m_connectionData.points){
+    point->move(offset);
+  }
+}
+
+  osg::Vec3 DirectedConnection::getDirection() const {
+    return getEnd()->getPosition() - getStart()->getPosition();
+  }
+  osg::Vec3 DirectedConnection::getCenter() const {
+    return (getStart()->getPosition() + getEnd()->getPosition()) / 2;
+  }
 
 osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromData, const std::vector<double> &toData)
 {
@@ -166,7 +175,7 @@ void DirectedConnection::setColorMap(const opencover::ColorMap &colorMap)
 {
   auto drawable = m_geode->getDrawable(0);
   m_shader = opencover::applyShader(drawable, colorMap, "EnergyGrid");
-  m_shader->setIntUniform("numNodes", m_numNodes);
+  m_shader->setIntUniform("numNodes", m_connectionData.points.size());
 
   auto state = drawable->getOrCreateStateSet();
   m_shader->apply(state);

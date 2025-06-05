@@ -2128,7 +2128,7 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
-    grid::ConnectionData conData{name, fromPoint, toPoint, radius, nullptr, data};
+    grid::ConnectionData conData{name, {fromPoint, toPoint}, radius, nullptr, data};
     connections.push_back(new grid::DirectedConnection(conData));
     from_last = to_new;
   }
@@ -2376,44 +2376,68 @@ osg::ref_ptr<grid::Point> EnergyPlugin::searchHeatingGridPointById(
 //   }
 // }
 
+bool checkPoints(const std::vector<osg::ref_ptr<grid::Point>> &points) {
+  if(!points[0]->hasData() || !points.back()->hasData())
+    return false;
+  for (size_t i = 1; i < points.size() - 1; i++)
+  {
+    if(points[i]->hasData())
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
 osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
-    const grid::Points &points, osg::ref_ptr<grid::Point> from,
+    const grid::Points &allPoints, osg::ref_ptr<grid::Point> from,
     const std::string &connectionsStrWithCommaDelimiter,
     grid::ConnectionDataList &additionalData) {
-  std::string connection("");
-  grid::Connections gridConnections;
   auto pointName = from->getName();
   std::string lineName{pointName};
   auto connections = split(connectionsStrWithCommaDelimiter, ' ');
-  for(const auto & connection : connections)
+
+  std::vector<osg::ref_ptr<grid::Point>> points{from};  
+  grid::Data connectionData{{"name", pointName + "_" + connections[0]}};
+  additionalData.emplace_back(std::vector{connectionData});
+
+  for (size_t i = connections.size() -1; i <= 0; --i)
   {
+    auto connection = connections[i];
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
-    grid::Data connectionData{{"name", pointName + "_" + connection}};
-    additionalData.emplace_back(std::vector{connectionData});
     int toID(-1);
     try {
       toID = std::stoi(connection);
     } catch (...) {
       continue;
     }
-    lineName +=
-        std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " " + connection;
-
+    
     // TODO: Really bad solution to find the point by id, but the id is not
     // necessarily the index in the points vector, so we need to find it by name =>
     // refactor the Points structure to use std::map later
-    auto to = searchHeatingGridPointById(points, toID);
+    auto to = searchHeatingGridPointById(allPoints, toID);
     if (to == nullptr) {
       std::cerr << "Point with id " << toID << " not found in points." << std::endl;
       continue;
     }
-    grid::ConnectionData connData{pointName + "_" + connection, from, to, 0.5f,
-                                  nullptr, connectionData};
-    grid::DirectedConnection directed(
-        connData, grid::ConnectionType::LineWithShader);
-    gridConnections.push_back(new grid::DirectedConnection(directed));
+    points.push_back(to);
+    lineName +=
+        std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " " + connection;
   }
+  if(!checkPoints(points))
+  {
+    std::cerr << "Invalid points for line: " << pointName << std::endl;
+    return nullptr;
+  }
+  
 
+  
+  grid::ConnectionData connData{pointName + "_" + connections[0], points, 0.5f,
+                                nullptr, connectionData};
+  grid::DirectedConnection directed(
+      connData, grid::ConnectionType::LineWithShader);
+  grid::Connections gridConnections;
+  gridConnections.push_back(new grid::DirectedConnection(directed));
   return new grid::Line(lineName, gridConnections);
 }
 

@@ -128,7 +128,7 @@ void EnergyGrid::initConnectionsByIndex(
         if (additionalConnectionData.size() > i)
           if (additionalConnectionData[i].size() > j)
             additionalData = additionalConnectionData[i][j];
-      grid::ConnectionData data{name, from, to, radius, nullptr,
+      grid::ConnectionData data{name, {from, to}, radius, nullptr,
                                                     additionalData};
       m_connections.push_back(new grid::DirectedConnection(data));
     }
