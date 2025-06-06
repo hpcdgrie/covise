@@ -79,6 +79,11 @@ void AnimatedAvatarPlugin::addPartner()
             continue;
         }
         std::string modelFilename = partner->userInfo().avatar;
+        if(modelFilename.empty())
+        {
+            // Kein Avatar-Modell angegeben, überspringen
+            continue;
+        }
         // Avatar erstellen und in m_avatars einfügen
         m_avatars[partnerId] = std::make_unique<AnimatedAvatar>(modelFilename, partnerId);
     }
