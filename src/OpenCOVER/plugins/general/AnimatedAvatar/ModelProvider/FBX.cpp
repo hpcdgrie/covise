@@ -3,17 +3,27 @@
 
 #ifdef HAVE_FBX
 #include "FBX.h"
-
-#include <osgDB/ReadFile>
-#include <array>
+#include "RigTransformHardware.h"
 
 #include <cover/ui/Menu.h>
 #include <cover/ui/Slider.h>
 #include <cover/ui/Action.h>
 #include <cover/coVRPluginSupport.h>
+
+#include <array>
+#include <cassert>
+#ifdef _WIN32
+//wingdi.h defines RELATIVE, which conflicts with osgAnimation::MorphGeometry::RELATIVE
+#undef RELATIVE
+#endif
+#include <osgDB/ReadFile>
 #include <osgAnimation/Skeleton>
 #include <osgAnimation/RigGeometry>
+#include <osgAnimation/RigTransformHardware>
+#include <osgAnimation/MorphGeometry>
+#include <osgAnimation/MorphTransformHardware>
 #include <osgAnimation/UpdateBone>
+
 
 using namespace opencover;
 
@@ -61,8 +71,15 @@ void BoneFinder::apply(osg::Node& node) {
         std::cerr << " is a skeleton";
     if(dynamic_cast<osgAnimation::Bone*>(&node))
         std::cerr << " is a Bone";
-    if(dynamic_cast<osgAnimation::RigGeometry*>(&node))
-        std::cerr << " is a RigGeometry";
+    if(auto *rig = dynamic_cast<osgAnimation::RigGeometry*>(&node))
+    {
+        //enable gpu skinning
+        //make sure skinning.vert is found, for now by placing it in the working directory
+        rig->setRigTransformImplementation(new coVRRigTransformHardware);
+        osgAnimation::MorphGeometry *morph=dynamic_cast<osgAnimation::MorphGeometry*>(rig->getSourceGeometry());
+        if(morph)morph->setMorphTransformImplementation(new osgAnimation::MorphTransformHardware);
+    }
+
     std::cerr << std::endl;
     if(node.getName() == m_nodeName)
     {
