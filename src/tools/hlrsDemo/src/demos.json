@@ -1,0 +1,209 @@
+[
+      {
+        "headline": "Calc",
+        "tags": [
+            "simulation",
+            "timeseries"
+        ],
+        "description": "Whetever this is",
+        "image": "Calc.png",
+        "launch": [
+            {
+                "program": "COVISE",
+                "args": [
+                    "-e",
+                    "C:/Users/Dennis/Apps/covise/net/examples/Calc.net"
+                ]
+            }
+        ]
+    },
+    {
+        "headline": "Shelby",
+        "tags": [
+            "automotive",
+            "car"
+        ],
+        "description": "A 3D model of a Shelby car",
+        "image": "Shelby.png",
+        "launch": [
+            {
+                "program": "opencover",
+                "args": [
+                    "C:/Users/Dennis/Data/Modelle/Shelby.3ds"
+                ]
+            }
+        ]
+    },
+    {
+    "headline": "HKW2 Altbach",
+    "tags": ["cfd", "noise", "cfd", "machinery", "RECOM"],
+    "description": "Combustion chamber in a cole power plant",
+    "image": "HKW2Altbach.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["data/recom/SWB/Praesentation/Cavepraesentation-SWBremen.wrl"] }
+    ]
+  },
+  {
+    "headline": "Bremer Kessel",
+    "tags": ["cfd", "noise", "cfd", "machinery", "RECOM"],
+    "description": "Combustion chamber in a cole power plant",
+    "image": "BremerKessel.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/mnt/raid/home/recberr/StadtwerkeAugsburg/2017/Praesentation/Cavepraesentation-SWA.wrl"] }
+    ]
+  },
+  {
+    "headline": "SWA Augsburg",
+    "tags": ["cfd", "noise", "cfd", "machinery", "RECOM"],
+    "description": "Combustion chamber in a cole power plant",
+    "image": "SWAAugsburg.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/mnt/raid/home/recberr/StadtwerkeAugsburg/2017/CaveBilderMessestand/Cavepraesentation-SWA.wrl"] }
+    ]
+  },
+  {
+    "headline": "Audi",
+    "tags": ["automotive", "cfd"],
+    "description": "Airflow around an old Audi, perfect to showcase interaction with simulation data in COVISE",
+    "image": "AudiCovise.png",
+    "launch": [
+      { "program": "COVISE", "args": ["-e", "/data/covise_net/2009/Audi_Bilder.net"] }
+    ]
+  },
+  {
+    "headline": "Forbach",
+    "tags": ["urban planning", "noise", "cfd", "machinery", "boreholes"],
+    "description": "With the topographical conditions of the traditional power plant and the strong support of the local community, Forbach offers ideal framework conditions for expanding the site. The project is intended to exemplify sustainable action in every respect. The underground construction method minimizes the impact on nature and the population during the construction phase. To compensate for the few remaining effects, extensive measures have already been implemented, such as relocating native lizards for species conservation. From planning to operation, the project is accompanied by environmental planning offices and nature conservation experts. The project includes the realization of an underground cavern storage facility and a cavern power plant. The existing machinery, some of which is up to 100 years old, will be decommissioned and replaced with new, more efficient units. Together with the existing equalization basin, these components will form the new lower stage. The Schwarzenbach Dam serves as the upper reservoir.",
+    "image": "Forbach.png",
+    "launch": [
+      { "program": "COVISE", "args": ["-e", "/data/enbw/2015/out/LaermFinal.net"] }
+    ]
+  },
+  {
+    "headline": "Forbach Dammbruch",
+    "tags": ["urban planning", "noise", "cfd", "machinery", "boreholes", "flooding"],
+    "description": "Variant of Forbach including a dam break scenario",
+    "image": "ForbachDambruch.png",
+    "launch": [
+      { "program": "COVISE", "args": ["-e", "/data/enbw/2015/out/LaermFinalDambreak.net"] }
+    ]
+  },
+  {
+    "headline": "Axialzyklon",
+    "tags": ["cfd", "machinery" ],
+    "description": "",
+    "image": "Axialzyklon.png",
+    "launch": [
+      { "program": "COVISE", "args": ["-e", "/data/IET/AXIALZYKLON/130424_ML_Axialcyclone_Steady.net"] }
+    ]
+  },
+  {
+    "headline": "Cyclist",
+    "tags": ["cfd", "bike" ],
+    "description": "Airflow around a cyclist",
+    "image": "biker.png",
+    "launch": [
+      { "program": "COVISE", "args": ["-e", "/data/covise_net/2016/Radfahrer.net"] }
+    ]
+  },
+  {
+    "headline": "Wasserflugzeug",
+    "tags": ["cfd", "airplain", "aero" ],
+    "description": "Airflow around a water aircraft",
+    "image": "Wasserflugzeug.png",
+    "launch": [
+      { "program": "COVISE", "args": ["-e", "/data/covise_net/2017/cowling_evaluate_05k4.net"] }
+    ]
+  },
+  {
+    "headline": "Octagon",
+    "tags": ["archeology", "pointcloud", "greek", "architecture" ],
+    "description": "3D reconstruction of ancient greek octagon temple",
+    "image": "octagon.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/data/wien/srl/Kurs/rk/octagon/praesentation_04.wrl"] }
+    ]
+  },
+  {
+    "headline": "Paulusgrotte",
+    "tags": ["archeology", "3d scan", "greek", "architecture" ],
+    "description": "3D scan of  Paulus grotto in Ephesos",
+    "image": "Paulusgrotte.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/data/wien/efes.wrl"] }
+    ]
+  },
+  {
+    "headline": "Pazmanitengasse",
+    "tags": ["architecture" ],
+    "description": "",
+    "image": "Pazmanitengasse.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/data/wien/srl/Kurs/bob/PAZmanitengasse.wrl"] }
+    ]
+  },
+  {
+    "headline": "Stuttgarter Autohaus",
+    "tags": ["architecture", "broken" ],
+    "description": "Daimler car dealership next to the Mercedes Benz museum. The cars are way to big.",
+    "image": "./StuttgarterAutohaus.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/data/architekten/Stuttgart/Arbeitsstand_20050816/praesentation.wrl"] }
+    ]
+  },
+  {
+    "headline": "HLRS & Campus",
+    "tags": ["architecture" ],
+    "description": "Model for the extention building of HLRS",
+    "image": "./HLRSCampus.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/data/NeubauII/HLRS_Alles0303.wrl"] }
+    ]
+  },
+  {
+    "headline": "DC Filiale",
+    "tags": ["architecture", "automotive", "broken" ],
+    "description": "Model of a Daimler car dealership. umgebung_menschen is too big",
+    "image": "./DCFiliale.png",
+    "launch": [
+      { "program": "OpenCOVER", "args": ["/data/dc/desire/arbeitsstand_20050301/praesentation.wrl"] }
+    ]
+  },
+  {
+  "headline": "Adidas WOS",
+  "tags": ["architecture"],
+  "description": "adidas World of Sports arena in Herzogenaurach. The office and reception building with around 2000 workplaces will serve as main entrance for visitors and guests of the adidas World of Sports. ",
+  "image": "./AdidasWOS.png",
+  "launch": [
+    { "program": "OpenCOVER", "args": ["/data/strabag/Adidas/04-vrml/praesentation.wrl"] }
+  ]
+},
+{
+  "headline": "Hildesheim",
+  "tags": ["architecture"],
+  "description": "",
+  "image": "./Hildesheim.png",
+  "launch": [
+    { "program": "OpenCOVER", "args": ["/data/hildesheim/33-VR/out/praesentation.wrl"] }
+  ]
+},
+{
+  "headline": "Stuttgart with Sumo",
+  "tags": ["urban planning", "cfd", "weather", "traffic", "sumo", "air pollution"],
+  "description": "",
+  "image": "./StuttgartwithSumo.png",
+  "launch": [
+    { "program": "Vistle", "args": ["-e", "/data/StuttgartForecast/feinstaub_stadtmodell_LGL_tracerNewVistle.vsl"] },
+    { "program": "sumo", "args": ["-c", "/data/campus/Sumo/CampusReduced/osm.sumocfg",  "--remote-port",  "1337"] }
+  ]
+},
+{
+  "headline": "Spielplatz Stuttgart West",
+  "tags": ["urban planning"],
+  "description": "",
+  "image": "./SpielplatzStuttgartWest.png",
+  "launch": [
+    { "program": "COVISE", "args": ["-e", "/data/covise_net/2017/Spielplatz.net"] }
+  ]
+}
+]
