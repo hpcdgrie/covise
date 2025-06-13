@@ -27,6 +27,10 @@
 #include <QStandardPaths>
 #include <QDir>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 using json = nlohmann::json;
 
 // Helper function to read demos.json using nlohmann::json
@@ -49,6 +53,15 @@ QString autoLinkUrls(const QString &text)
     return html;
 }
 
+void highlightDemo(QWidget *cellWidget, bool highlight)
+{
+    if (!cellWidget)
+        return;
+    cellWidget->setStyleSheet(highlight
+                                  ? "QWidget { border: 2px solid #3399ff; border-radius: 8px; background: #e0f0ff; }"
+                                  : "");
+}
+
 // Normalize path for cross-platform compatibility
 const QString COVISE_PATH = QDir::cleanPath(getenv("COVISE_PATH") ? getenv("COVISE_PATH") : "");
 const QString HLRS_DEMO_PATH = COVISE_PATH + "/src/tools/hlrsDemo";
@@ -61,7 +74,7 @@ public:
     {
         QVBoxLayout *mainLayout = new QVBoxLayout(this);
         // Set minimum size so only one demo cell fits in a row
-        setMinimumWidth(200); // Adjust to your cell width + margins
+        setMinimumWidth(200);  // Adjust to your cell width + margins
         setMinimumHeight(300); // Reasonable minimum height
 
         // Search field
@@ -98,7 +111,8 @@ private:
     FlowLayout *flowLayout;
     std::vector<QWidget *> cellWidgets;
     QLineEdit *searchEdit;
-
+    std::map<qint64, QProcess *> runningProcesses; // Track running processes and their PIDs
+    std::map<QWidget *, std::vector<qint64>> cellWidgetToPids;   // Map cell widget to running PIDs
     // Helper: returns lowercase version of a QString
     static QString lower(const QString &s) { return s.toLower(); }
 
@@ -346,19 +360,93 @@ private:
                 { descEdit->setVisible(!descEdit->isVisible()); });
 
         // Launch application on image click
-        connect(btn, &QPushButton::clicked, [programs]()
+        connect(btn, &QPushButton::clicked, [btn, programs, this, cellWidget]()
                 {
-            for (const auto &[program, args] : programs)
-            {
-                if (program.isEmpty()) {
-                    QMessageBox::warning(nullptr, "Error", "No program specified for this demo.");
-                    return;
+    // Check if any demo is running
+    bool anyRunning = !cellWidgetToPids.empty();
+
+    // If this demo is running, offer to terminate it
+    if (cellWidgetToPids.find(cellWidget) != cellWidgetToPids.end()) {
+        auto pids = cellWidgetToPids[cellWidget];
+        for(auto pid : pids)
+        {
+            auto procIt = runningProcesses.find(pid);
+            if (procIt != runningProcesses.end() && procIt->second) {
+                auto reply = QMessageBox::question(this, "Terminate Demo",
+                    "This demo is running. Do you really want to terminate it?",
+                    QMessageBox::Yes | QMessageBox::No);
+                if (reply == QMessageBox::Yes) {
+                    QProcess *proc = procIt->second;
+    #ifdef _WIN32
+                    HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid));
+                    if (hProcess) {
+                        TerminateProcess(hProcess, 0);
+                        CloseHandle(hProcess);
+                    }
+    #else
+                    ::kill(pid, SIGTERM);
+    #endif
+                    highlightDemo(cellWidget, false);
+                    runningProcesses.erase(procIt);
+                    cellWidgetToPids.erase(cellWidget);
                 }
-                bool started = QProcess::startDetached(program, args);
-                if (!started) {
-                    QMessageBox::critical(nullptr, "Error", "Failed to start: " + program);
+            }
+        }
+        return;
+    }
+
+    // If another demo is running, ask if it should be terminated
+    if (anyRunning) {
+        auto reply = QMessageBox::question(this, "Terminate Running Demo",
+            "Another demo is currently running. Do you want to terminate it and start this one?",
+            QMessageBox::Yes | QMessageBox::No);
+        if (reply == QMessageBox::No)
+            return;
+
+        // Terminate all running demos
+        for(auto &[demo, pids] : cellWidgetToPids) {
+            highlightDemo(demo, false);
+            for(auto pid : pids) {
+                auto procIt = runningProcesses.find(pid);
+                if (procIt != runningProcesses.end() && procIt->second) {
+    #ifdef _WIN32
+                    HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid));
+                    if (hProcess) {
+                        TerminateProcess(hProcess, 0);
+                        CloseHandle(hProcess);
+                    }
+    #else
+                    ::kill(pid, SIGTERM);
+    #endif
+                    runningProcesses.erase(procIt);
                 } 
-            } });
+            }
+        }
+        runningProcesses.clear();
+    }
+
+    // Launch the new demo
+    for (const auto &[program, args] : programs)
+    {
+        if (program.isEmpty()) {
+            QMessageBox::warning(nullptr, "Error", "No program specified for this demo.");
+            return;
+        }
+        QProcess *proc = new QProcess(this);
+        proc->setProgram(program);
+        proc->setArguments(args);
+        proc->start();
+        qint64 pid = proc->processId();
+        if (pid > 0) {
+            runningProcesses[pid] = proc;
+            cellWidgetToPids[cellWidget].push_back(pid);
+            highlightDemo(cellWidget, true);
+        } else {
+            delete proc;
+            QMessageBox::critical(nullptr, "Error", "Failed to start: " + program);
+        }
+    } });
+
         return cellWidget;
     }
 };
