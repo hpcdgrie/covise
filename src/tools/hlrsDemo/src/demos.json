@@ -190,7 +190,7 @@
 {
   "headline": "Stuttgart with Sumo",
   "tags": ["urban planning", "cfd", "weather", "traffic", "sumo", "air pollution"],
-  "description": "",
+  "description": "<a href=\"https://www.hlrs.de\">https://www.hlrs.de</a>",
   "image": "./StuttgartwithSumo.png",
   "launch": [
     { "program": "Vistle", "args": ["-e", "/data/StuttgartForecast/feinstaub_stadtmodell_LGL_tracerNewVistle.vsl"] },
