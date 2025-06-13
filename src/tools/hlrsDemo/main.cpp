@@ -60,17 +60,24 @@ public:
         : QWidget(parent), demos_(demos)
     {
         QVBoxLayout *mainLayout = new QVBoxLayout(this);
+        // Set minimum size so only one demo cell fits in a row
+        setMinimumWidth(200); // Adjust to your cell width + margins
+        setMinimumHeight(300); // Reasonable minimum height
 
         // Search field
         searchEdit = new QLineEdit(this);
         searchEdit->setPlaceholderText("Search...");
         mainLayout->addWidget(searchEdit);
+        // Make the demo area scrollable if not all fit vertically
+        QScrollArea *scrollArea = new QScrollArea(this);
+        scrollArea->setWidgetResizable(true);
 
-        // Flow layout in a child widget
         QWidget *flowWidget = new QWidget(this);
         flowLayout = new FlowLayout(flowWidget, 10, 10, 10);
         flowWidget->setLayout(flowLayout);
-        mainLayout->addWidget(flowWidget);
+
+        scrollArea->setWidget(flowWidget);
+        mainLayout->addWidget(scrollArea);
 
         setLayout(mainLayout);
 
