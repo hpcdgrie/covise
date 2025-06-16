@@ -20,11 +20,15 @@ endif()
 
 set(SOURCES
     main.cpp
+    demowindow.cpp
     flowlayout.cpp
+    verticallabel.cpp
 )
 
 set(HEADERS
+    demowindow.h
     flowlayout.h
+    verticallabel.h
 )
 
 SET(VRB_MOC_SRCS
