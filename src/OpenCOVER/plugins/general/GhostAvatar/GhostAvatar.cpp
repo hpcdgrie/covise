@@ -4,7 +4,7 @@
    version 2.1 or later, see lgpl-2.1.txt.
 
  * License: LGPL 2+ */
-
+#include "Bone.h"
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/FileBrowser.h>
 #include <cover/ui/Owner.h>
@@ -47,7 +47,7 @@ struct AnimationManagerFinder : public osg::NodeVisitor
     }
 };
 
-class OsgAnimation : public coVRPlugin, public ui::Owner
+class GhostAvatar : public coVRPlugin, public ui::Owner
 {
 public:
     void loadAnimations()
@@ -60,6 +60,7 @@ public:
         else
         {
             std::cerr << "No AnimationManager found" << std::endl;
+            return;
         }
         for(const auto & anim : m_amFinder.m_am->getAnimationList())
         {
@@ -72,10 +73,10 @@ public:
 
         }
     }
-    OsgAnimation()
+    GhostAvatar()
     :coVRPlugin(COVER_PLUGIN_NAME)
     , Owner(COVER_PLUGIN_NAME, cover->ui)
-    , m_menu(new ui::Menu("OsgAnimation", this))
+    , m_menu(new ui::Menu("GhostAvatar", this))
     {
         auto reloadButton = new ui::Action(m_menu, "Reload Animations");
         reloadButton->setCallback([this]() {
@@ -86,9 +87,21 @@ public:
         });
 
         loadAnimations();
+
+
+
     }
 
-
+bool update() override{
+    static bool first = true;
+    if (first)
+    {
+        first = false;
+        BoneParser parser;
+        cover->getObjectsRoot()->accept(parser);
+    }
+    return true;
+}
 private:
 
     AnimationManagerFinder m_amFinder;
@@ -96,4 +109,4 @@ private:
     ui::Menu *m_menu = nullptr;
 };
 
-COVERPLUGIN(OsgAnimation)
+COVERPLUGIN(GhostAvatar)
