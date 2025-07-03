@@ -403,12 +403,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
       const std::string &connectionsStrWithCommaDelimiter,
       grid::ConnectionDataList &additionalData);
   std::pair<grid::Points, grid::Data> createHeatingGridPointsAndData(
-      COVERUtils::read::CSVStream &heatingStream,
-      std::map<int, std::string> &connectionStrings);
+    COVERUtils::read::CSVStream &heatingStream,
+    std::vector<std::vector<int>> &connectivityList);
   grid::Lines createHeatingGridLines(
-      const grid::Points &points,
-      const std::map<int, std::string> &connectionStrings,
-      grid::ConnectionDataList &additionalData);
+    const grid::Points &points, const std::vector<std::vector<int>> &connectivityList,
+    grid::ConnectionDataList &additionalData);
   osg::ref_ptr<grid::Point> searchHeatingGridPointById(const grid::Points &points,
                                                        int id);
   /* #endregion */

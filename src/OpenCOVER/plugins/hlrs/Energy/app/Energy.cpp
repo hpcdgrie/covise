@@ -2400,8 +2400,13 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
   std::vector<osg::ref_ptr<grid::Point>> points{from};  
   grid::Data connectionData{{"name", pointName + "_" + connections[0]}};
   additionalData.emplace_back(std::vector{connectionData});
+  if(connections.size() > 1)
+  {
+    std::cerr << "found point with multiple connections from " << pointName << "to " << connectionsStrWithCommaDelimiter << std::endl;
+  }
 
-  for (size_t i = connections.size() -1; i <= 0; --i)
+  // for (size_t i = connections.size(); i-- > 0; )
+  for (size_t i = 0; i < connections.size(); i++)
   {
     auto connection = connections[i];
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
@@ -2424,13 +2429,21 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
     lineName +=
         std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " " + connection;
   }
-  if(!checkPoints(points))
-  {
-    std::cerr << "Invalid points for line: " << pointName << std::endl;
-    return nullptr;
-  }
+  // if(!checkPoints(points))
+  // {
+  //   std::cerr << "Invalid points for line: " << pointName << std::endl;
+  //   return nullptr;
+  // }
   
-
+  if(points.size() > 2) {
+    std::cerr << "creating multi point line: ";
+    for (const auto & p : points)
+    {
+      std::cerr << p->getName() << " ";
+    }
+    std::cerr << std::endl;
+    
+  }
   
   grid::ConnectionData connData{pointName + "_" + connections[0], points, 0.5f,
                                 nullptr, connectionData};
@@ -2495,35 +2508,110 @@ void EnergyPlugin::applySimulationDataToHeatingGrid() {
 }
 
 grid::Lines EnergyPlugin::createHeatingGridLines(
-    const grid::Points &points, const std::map<int, std::string> &connectionStrings,
+    const grid::Points &points, const std::vector<std::vector<int>> &connectivityList,
     grid::ConnectionDataList &additionalData) {
   grid::Lines lines;
-  for (auto it = connectionStrings.begin(); it != connectionStrings.end(); ++it) {
-    int id = it->first;
-    const std::string &connectionsStr = it->second;
-    if (connectionsStr.empty() || connectionsStr == INVALID_CELL_VALUE) continue;
+  std::string firstPointName = "";
+  for(const auto lineVec : connectivityList) {
+    std::vector<osg::ref_ptr<grid::Point>> points;
+    std::string lineName;
+    for( auto id : lineVec) {
     // TODO: Really bad solution to find the point by id, but the id is not
     // necessarily the index in the points vector, so we need to find it by name =>
     // refactor the Points structure to use std::map later
-    auto from = searchHeatingGridPointById(points, id);
-    if (from == nullptr) {
+    auto point = searchHeatingGridPointById(points, id);
+    if(firstPointName.empty()) {
+      firstPointName = point->getName();
+    }
+    if (!point) {
       std::cerr << "Point with id " << id << " not found in points." << std::endl;
       continue;
     }
-    auto line = createHeatingGridLine(points, from, connectionsStr, additionalData);
-    if (line == nullptr) {
-      std::cerr << "Failed to create line for point: " << from->getName()
-                << std::endl;
-      continue;
-    }
-    lines.push_back(line);
+    
+    points.push_back(point);
+    lineName+= std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " " + std::to_string(id); ;
+  }
+  
+  grid::Data connectionData{{"name", firstPointName + "_" + std::to_string(lineVec[0])}};
+  grid::ConnectionData connData{firstPointName + "_" + std::to_string(lineVec[0]), points, 0.5f,
+                                nullptr, connectionData};
+  grid::DirectedConnection directed(
+      connData, grid::ConnectionType::LineWithShader);
+  grid::Connections gridConnections;
+  gridConnections.push_back(new grid::DirectedConnection(directed));
+  lines.push_back(new grid::Line{lineName, gridConnections});
   }
   return lines;
 }
 
+
+std::vector<int> parseConnections(const std::string & connections)
+{
+  std::vector<int> retval;
+  std::stringstream ss(connections);
+  std::string connection;
+  while(std::getline(ss, connection, ' '))
+  {
+    if(connection.empty() || connection == INVALID_CELL_VALUE) continue;
+    try {
+      retval.push_back(std::stoi(connection));
+    } catch (const std::invalid_argument &e) {
+      std::cerr << "Invalid connection: " << connection << " - " << e.what() << std::endl;
+    }
+  }
+}
+
+struct PontData
+{
+  int id;
+  std::vector<int> connections;
+  bool datapoint = false;
+};
+
+std::vector<std::vector<int>> findChainsBetweenDataPoints(
+    const std::vector<PontData>& points)
+{
+    std::unordered_map<int, const PontData*> idToPoint;
+    for (const auto& p : points)
+        idToPoint[p.id] = &p;
+
+    std::vector<std::vector<int>> allChains;
+    for (const auto& start : points)
+    {
+        if (!start.datapoint)
+            continue;
+        std::stack<std::pair<int, std::vector<int>>> stack;
+        stack.push({start.id, {start.id}});
+        while (!stack.empty())
+        {
+            auto [current, path] = stack.top();
+            stack.pop();
+            const auto* curPoint = idToPoint[current];
+            for (int next : curPoint->connections) #crasht weil curPoint->connections mit scheiße gefüllt ist
+            {
+                if (std::find(path.begin(), path.end(), next) != path.end())
+                    continue; // avoid cycles
+                auto* nextPoint = idToPoint[next];
+                if (nextPoint->datapoint)
+                {
+                    if (path.front() != next)
+                        allChains.push_back(path); // Only add if not a self-loop
+                }
+                else
+                {
+                    auto newPath = path;
+                    newPath.push_back(next);
+                    stack.push({next, newPath});
+                }
+            }
+        }
+    }
+    return allChains;
+}
+
 std::pair<grid::Points, grid::Data> EnergyPlugin::createHeatingGridPointsAndData(
     COVERUtils::read::CSVStream &heatingStream,
-    std::map<int, std::string> &connectionStrings) {
+    std::vector<std::vector<int>> &connectivityList) {
   grid::Points points{};
   grid::Data pointData{};
   CSVStream::CSVRow row;
@@ -2538,6 +2626,8 @@ std::pair<grid::Points, grid::Data> EnergyPlugin::createHeatingGridPointsAndData
                                                 const std::string &value) {
     if (!checkForInvalidValue(value)) pointData[key] = value;
   };
+
+  std::vector<PontData> pointDataList;
   while (heatingStream >> row) {
     ACCESS_CSV_ROW(row, "connections", connections);
     ACCESS_CSV_ROW(row, "id", name);
@@ -2553,7 +2643,8 @@ std::pair<grid::Points, grid::Data> EnergyPlugin::createHeatingGridPointsAndData
     projTransLatLon(lat, lon);
 
     int strangeId = std::stoi(name);
-
+    
+    pointDataList.push_back(PontData{strangeId, parseConnections(connections), !label.empty()});
     // create a point
     osg::ref_ptr<grid::Point> point =
         new grid::Point(name, lon, lat, m_offset[2], 1.0f, pointData);
@@ -2567,9 +2658,9 @@ std::pair<grid::Points, grid::Data> EnergyPlugin::createHeatingGridPointsAndData
       std::cerr << "No connections for point: " << name << std::endl;
       continue;
     }
-    connectionStrings[strangeId] = connections;
   }
-
+  connectivityList = findChainsBetweenDataPoints(pointDataList);
+  
   return std::make_pair(points, pointData);
 }
 
@@ -2582,11 +2673,11 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
 
-  std::map<int, std::string> connectionStrings;
+  std::vector<std::vector<int>> connectivityList;
   auto [points, pointData] =
-      createHeatingGridPointsAndData(heatingStream, connectionStrings);
+      createHeatingGridPointsAndData(heatingStream, connectivityList);
   auto lines =
-      createHeatingGridLines(points, connectionStrings, additionalConnectionData);
+      createHeatingGridLines(points, connectivityList, additionalConnectionData);
 
   auto &heatingGrid = m_energyGrids[egridIdx];
   heatingGrid.group->setName(heatingGrid.name);
@@ -2617,7 +2708,8 @@ void EnergyPlugin::buildHeatingGrid() {
   if (m_heatingGridStreams.empty()) return;
 
   // find correct csv
-  auto heatingIt = m_heatingGridStreams.find("heating_network_2");
+  auto heatingIt = m_heatingGridStreams.find("heating_network_simple");
+  // auto heatingIt = m_heatingGridStreams.find("heating_network_2");
   if (heatingIt == m_heatingGridStreams.end()) return;
 
   auto &[_, heatingStream] = *heatingIt;
