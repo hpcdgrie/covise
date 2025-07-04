@@ -198,7 +198,7 @@ public:
     }
     void loadAvatar()
     {
-        auto model = osgDB::readNodeFile("C:/Users/Dennis/Data/Starts/ghost_noCloth.fbx");
+        auto model = osgDB::readNodeFile("/data/STARTS-ECHO/Avatars/ghost_noCloth.fbx");
         m_avatarTrans = new osg::MatrixTransform();
         m_avatarTrans->setName("AvatarTrans");
         m_avatarTrans->addChild(model);
