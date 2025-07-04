@@ -19,6 +19,7 @@
 
 #include <osg/ShapeDrawable>
 #include <osg/Geode>
+#include <osg/LineWidth>
 #include <osgAnimation/BasicAnimationManager>
 #include <osgAnimation/RigTransformHardware>
 #include <osgAnimation/Animation>
@@ -177,16 +178,37 @@ public:
                 osg::Vec3 boneWorldPos = boneBindPos * parentWorld;
                 auto boneWorldMat = osg::Matrix::translate(boneBindPos) * parentWorld;
 
-                auto targetLocal = m_interactorHand->getMatrix() * osg::Matrix::inverse(boneWorldMat);
-                osg::Vec3 defaultDir(0, 1, 0);
-
-                osg::Vec3 targetDir = targetLocal.getTrans();
+                auto targetWorldPos = m_interactorHand->getMatrix().getTrans();
+                osg::Vec3 targetDir = targetWorldPos * osg::Matrix::inverse(boneWorldMat);
                 targetDir.normalize();
 
                 osg::Quat rot;
+                osg::Vec3 defaultDir(0, 1, 0);
                 rot.makeRotate(defaultDir, targetDir);
 
                 bone.rot->setQuaternion(rot);
+
+                // ----- DEBUGGING -----
+                if (m_debugLine.valid())
+                    m_avatarTrans->removeChild(m_debugLine);
+                osg::ref_ptr<osg::Geode> lineGeode = new osg::Geode();
+                osg::ref_ptr<osg::Geometry> lineGeom = new osg::Geometry();
+                osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
+                verts->push_back(boneWorldPos);
+                verts->push_back(targetWorldPos);
+                lineGeom->setVertexArray(verts);
+                lineGeom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2));
+                osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+                colors->push_back(osg::Vec4(1, 0, 0, 1)); // Red
+                lineGeom->setColorArray(colors, osg::Array::BIND_OVERALL);
+                lineGeode->addDrawable(lineGeom);
+                // Set line width for better visibility
+                osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(8.0f);
+                lineGeode->getOrCreateStateSet()->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
+                m_debugLine = new osg::MatrixTransform();
+                m_debugLine->addChild(lineGeode);
+                m_avatarTrans->addChild(m_debugLine);
+                // ----- DEBUGGING -----
 
                 // Set the sphere's position to the bone's world position
                 osg::Matrix sphereMat;
@@ -226,7 +248,8 @@ public:
 private:
     AnimationManagerFinder m_amFinder;
     osg::MatrixTransform *m_avatarTrans = nullptr;
-    osg::ref_ptr<osg::MatrixTransform> m_handSphere, m_bar;
+    osg::ref_ptr<osg::MatrixTransform> m_handSphere, m_bar, m_debugLine;
+    ;
     BoneParser m_parser;
     std::vector<ui::Slider *> m_sliders;
     ui::Menu *m_menu = nullptr;
