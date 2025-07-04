@@ -1,12 +1,16 @@
-#include "Bone.h"
+#include <algorithm>
+#include <array>
+
 #include <osgAnimation/UpdateBone>
 #include <osgAnimation/Bone>
 #include <osgAnimation/StackedRotateAxisElement>
 #include <osgAnimation/StackedMatrixElement>
 #include <osgAnimation/StackedScaleElement>
-#include <array>
 #include <osg/Geode>
 #include <osg/ShapeDrawable>
+
+#include "Bone.h"
+
 BoneParser::BoneParser()
     : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
 {
