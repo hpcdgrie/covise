@@ -121,6 +121,18 @@ public:
         m_defaultDirList->select(2); // Default to Y+ (confirmed in blender)
         m_defaultDirList->setCallback([this](int idx)
                                       { m_defaultDirIndex = idx; });
+
+        // Add sliders for Euler angles
+        const char *names[3] = {"Pitch", "Yaw", "Roll"};
+        for (int i = 0; i < 3; ++i)
+        {
+            auto slider = new ui::Slider(m_menu, names[i]);
+            slider->setBounds(-180, 180);
+            slider->setValue(0);
+            slider->setCallback([this, i](double val, bool)
+                                { m_eulerAngles[i] = val; });
+            m_eulerSliders.push_back(slider);
+        }
     }
 
     bool update() override
@@ -166,7 +178,6 @@ public:
 
         auto rightArm = m_parser.findNode("RightArm");
 
-        const osgAnimation::Bone *osgBone = dynamic_cast<const osgAnimation::Bone *>(rightArm->first);
         if (rightArm != m_parser.nodeToIk.end())
         {
             auto &bone = rightArm->second;
@@ -183,10 +194,36 @@ public:
                 targetDir.normalize();
 
                 osg::Quat rot;
-                osg::Vec3 defaultDir(0, 1, 0);
-                rot.makeRotate(defaultDir, targetDir);
-
+                // Extract rest direction from bone's local matrix (bind pose)
+                const osgAnimation::Bone *osgBone = dynamic_cast<const osgAnimation::Bone *>(rightArm->first);
+                osg::Matrix localMat = osgBone->getMatrixInBoneSpace();
+                osg::Vec3 restDir = osg::Vec3(1, 0, 0) * localMat; // Use X+ if arm points down in rest pose
+                restDir.normalize();
+                rot.makeRotate(restDir, targetDir);
                 bone.rot->setQuaternion(rot);
+
+                // Print rot as Euler angles (degrees) with identity = (0,0,0)
+                double pitch, yaw, roll;
+                pitch = std::atan2(2.0 * (rot.w() * rot.x() + rot.y() * rot.z()), 1.0 - 2.0 * (rot.x() * rot.x() + rot.y() * rot.y()));
+                yaw   = std::asin(2.0 * (rot.w() * rot.y() - rot.z() * rot.x()));
+                roll  = std::atan2(2.0 * (rot.w() * rot.z() + rot.x() * rot.y()), 1.0 - 2.0 * (rot.y() * rot.y() + rot.z() * rot.z()));
+                pitch = osg::RadiansToDegrees(pitch);
+                yaw   = osg::RadiansToDegrees(yaw);
+                roll  = osg::RadiansToDegrees(roll);
+                std::cerr << "rot Euler angles (deg): pitch=" << pitch << " yaw=" << yaw << " roll=" << roll << std::endl;
+
+                /*
+                //  Convert Euler angles (degrees) to radians
+                double pitchRad = osg::DegreesToRadians(m_eulerAngles[0]);
+                double yawRad = osg::DegreesToRadians(m_eulerAngles[1]);
+                double rollRad = osg::DegreesToRadians(m_eulerAngles[2]);
+                // Create quaternion from Euler angles (ZYX order: roll, yaw, pitch)
+                osg::Quat qPitch(pitchRad, osg::Vec3(1, 0, 0));
+                osg::Quat qYaw(yawRad, osg::Vec3(0, 1, 0));
+                osg::Quat qRoll(rollRad, osg::Vec3(0, 0, 1));
+                osg::Quat quat = qRoll * qYaw * qPitch;
+                bone.rot->setQuaternion(quat);
+                */
 
                 // ----- DEBUGGING -----
                 if (m_debugLine.valid())
@@ -256,6 +293,8 @@ private:
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
     ui::SelectionList *m_defaultDirList = nullptr;
     int m_defaultDirIndex = 0;
+    std::vector<ui::Slider *> m_eulerSliders;
+    float m_eulerAngles[3] = {0, 0, 0}; // pitch, yaw, roll
     void createInteractors()
     {
         osg::Matrix m;
