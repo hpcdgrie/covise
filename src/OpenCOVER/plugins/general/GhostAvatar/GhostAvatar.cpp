@@ -202,49 +202,10 @@ public:
                 rot.makeRotate(restDir, targetDir);
                 bone.rot->setQuaternion(rot);
 
-                // Print rot as Euler angles (degrees) with identity = (0,0,0)
-                double pitch, yaw, roll;
-                pitch = std::atan2(2.0 * (rot.w() * rot.x() + rot.y() * rot.z()), 1.0 - 2.0 * (rot.x() * rot.x() + rot.y() * rot.y()));
-                yaw   = std::asin(2.0 * (rot.w() * rot.y() - rot.z() * rot.x()));
-                roll  = std::atan2(2.0 * (rot.w() * rot.z() + rot.x() * rot.y()), 1.0 - 2.0 * (rot.y() * rot.y() + rot.z() * rot.z()));
-                pitch = osg::RadiansToDegrees(pitch);
-                yaw   = osg::RadiansToDegrees(yaw);
-                roll  = osg::RadiansToDegrees(roll);
-                std::cerr << "rot Euler angles (deg): pitch=" << pitch << " yaw=" << yaw << " roll=" << roll << std::endl;
-
-                /*
-                //  Convert Euler angles (degrees) to radians
-                double pitchRad = osg::DegreesToRadians(m_eulerAngles[0]);
-                double yawRad = osg::DegreesToRadians(m_eulerAngles[1]);
-                double rollRad = osg::DegreesToRadians(m_eulerAngles[2]);
-                // Create quaternion from Euler angles (ZYX order: roll, yaw, pitch)
-                osg::Quat qPitch(pitchRad, osg::Vec3(1, 0, 0));
-                osg::Quat qYaw(yawRad, osg::Vec3(0, 1, 0));
-                osg::Quat qRoll(rollRad, osg::Vec3(0, 0, 1));
-                osg::Quat quat = qRoll * qYaw * qPitch;
-                bone.rot->setQuaternion(quat);
-                */
-
-                // ----- DEBUGGING -----
-                if (m_debugLine.valid())
-                    m_avatarTrans->removeChild(m_debugLine);
-                osg::ref_ptr<osg::Geode> lineGeode = new osg::Geode();
-                osg::ref_ptr<osg::Geometry> lineGeom = new osg::Geometry();
-                osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
-                verts->push_back(boneWorldPos);
-                verts->push_back(targetWorldPos);
-                lineGeom->setVertexArray(verts);
-                lineGeom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2));
-                osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-                colors->push_back(osg::Vec4(1, 0, 0, 1)); // Red
-                lineGeom->setColorArray(colors, osg::Array::BIND_OVERALL);
-                lineGeode->addDrawable(lineGeom);
-                // Set line width for better visibility
-                osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(8.0f);
-                lineGeode->getOrCreateStateSet()->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
-                m_debugLine = new osg::MatrixTransform();
-                m_debugLine->addChild(lineGeode);
-                m_avatarTrans->addChild(m_debugLine);
+                // ----- DEBUGGING (delete methods if not needed anymore) -----
+                printRotationEuler(rot);               
+                drawDebugLine(boneWorldPos, targetWorldPos);
+                //bone.rot->setQuaternion(getQuaternionFromEulerSliders()); 
                 // ----- DEBUGGING -----
 
                 // Set the sphere's position to the bone's world position
@@ -308,6 +269,54 @@ private:
         m_interactorHand.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
         m_interactorHand->enableIntersection();
         m_interactorHand->show();
+    }
+
+    void drawDebugLine(const osg::Vec3 &start, const osg::Vec3 &end)
+    {
+        if (m_debugLine.valid())
+            m_avatarTrans->removeChild(m_debugLine);
+        osg::ref_ptr<osg::Geode> lineGeode = new osg::Geode();
+        osg::ref_ptr<osg::Geometry> lineGeom = new osg::Geometry();
+        osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
+        verts->push_back(start);
+        verts->push_back(end);
+        lineGeom->setVertexArray(verts);
+        lineGeom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2));
+        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+        colors->push_back(osg::Vec4(1, 0, 0, 1)); // Red
+        lineGeom->setColorArray(colors, osg::Array::BIND_OVERALL);
+        lineGeode->addDrawable(lineGeom);
+        // Set line width for better visibility
+        osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(8.0f);
+        lineGeode->getOrCreateStateSet()->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
+        m_debugLine = new osg::MatrixTransform();
+        m_debugLine->addChild(lineGeode);
+        m_avatarTrans->addChild(m_debugLine);
+    }
+
+    void printRotationEuler(const osg::Quat &rot)
+    {
+        double pitch, yaw, roll;
+        pitch = std::atan2(2.0 * (rot.w() * rot.x() + rot.y() * rot.z()), 1.0 - 2.0 * (rot.x() * rot.x() + rot.y() * rot.y()));
+        yaw = std::asin(2.0 * (rot.w() * rot.y() - rot.z() * rot.x()));
+        roll = std::atan2(2.0 * (rot.w() * rot.z() + rot.x() * rot.y()), 1.0 - 2.0 * (rot.y() * rot.y() + rot.z() * rot.z()));
+        pitch = osg::RadiansToDegrees(pitch);
+        yaw = osg::RadiansToDegrees(yaw);
+        roll = osg::RadiansToDegrees(roll);
+        std::cerr << "rot Euler angles (deg): pitch=" << pitch << " yaw=" << yaw << " roll=" << roll << std::endl;
+    }
+
+    osg::Quat getQuaternionFromEulerSliders()
+    {
+        //  Convert Euler angles (degrees) to radians
+        double pitchRad = osg::DegreesToRadians(m_eulerAngles[0]);
+        double yawRad = osg::DegreesToRadians(m_eulerAngles[1]);
+        double rollRad = osg::DegreesToRadians(m_eulerAngles[2]);
+        // Create quaternion from Euler angles (ZYX order: roll, yaw, pitch)
+        osg::Quat qPitch(pitchRad, osg::Vec3(1, 0, 0));
+        osg::Quat qYaw(yawRad, osg::Vec3(0, 1, 0));
+        osg::Quat qRoll(rollRad, osg::Vec3(0, 0, 1));
+        return qRoll * qYaw * qPitch;
     }
 };
 
