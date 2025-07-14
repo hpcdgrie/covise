@@ -125,13 +125,11 @@ public:
             m_avatarTrans->accept(m_parser);
             createInteractors();
             loadAnimations();
-            auto rightArm = m_parser.findNode("RightArm");
         }
 
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
 
         auto rightArm = m_parser.findNode("RightArm");
-
         if (rightArm != m_parser.nodeToIk.end())
         {
             auto &bone = rightArm->second;
@@ -148,10 +146,10 @@ public:
                 targetDir.normalize();
 
                 osg::Quat rot;
-                // Extract rest direction from bone's local matrix (bind pose)
-                const osgAnimation::Bone *osgBone = dynamic_cast<const osgAnimation::Bone *>(rightArm->first);
-                osg::Matrix localMat = osgBone->getMatrixInBoneSpace();
-                osg::Vec3 restDir = osg::Vec3(0, 1, 0) * localMat;
+                // Use fixed T-pose direction as rest direction
+                // This is the print output of (targetWorldPos - boneWorldPos).normalized() 
+                // when the avatar is in T-pose
+                osg::Vec3 restDir(-0.152421, -0.0302438, 0.987853); // T-pose direction
                 restDir.normalize();
                 rot.makeRotate(restDir, targetDir);
                 bone.rot->setQuaternion(rot);
@@ -160,6 +158,10 @@ public:
                 //printRotationEuler(rot);               
                 drawDebugLine(boneWorldPos, targetWorldPos);
                 //bone.rot->setQuaternion(getQuaternionFromEulerSliders()); 
+                
+                // osg::Vec3 tPoseDir = targetWorldPos - boneWorldPos;
+                // tPoseDir.normalize();
+                // std::cerr << "tPoseDir: " << tPoseDir.x() << ", " << tPoseDir.y() << ", " << tPoseDir.z() << std::endl;
                 // ----- DEBUGGING -----
             }
         }
