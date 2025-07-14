@@ -47,18 +47,6 @@ void printMatrix(const osg::Matrix &m)
     std::cerr << "------------------------" << std::endl;
 }
 
-osg::Matrix fromWorldToNode(const osg::Matrix &sourceInWorld, const osg::Node *node)
-{
-    auto nodeToWorld = node->getWorldMatrices(cover->getObjectsRoot())[0];
-    auto worldToNode = osg::Matrix::inverse(nodeToWorld);
-    return sourceInWorld * worldToNode;
-}
-
-osg::Matrix fromWorldToNode(const osg::Matrix &sourceInWorld, const osg::Matrix &nodeToWorld)
-{
-    auto worldToNode = osg::Matrix::inverse(nodeToWorld);
-    return sourceInWorld * worldToNode;
-}
 struct AnimationManagerFinder : public osg::NodeVisitor
 {
     osg::ref_ptr<osgAnimation::BasicAnimationManager> m_am;
@@ -114,15 +102,7 @@ public:
             m_sliders.clear();
             loadAnimations(); });
 
-        // Add selection list for default direction
-        m_defaultDirList = new ui::SelectionList(m_menu, "Default Arm Direction");
-        std::vector<std::string> defaultDirs = {"X+", "X-", "Y+", "Y-", "Z+", "Z-"};
-        m_defaultDirList->setList(defaultDirs);
-        m_defaultDirList->select(2); // Default to Y+ (confirmed in blender)
-        m_defaultDirList->setCallback([this](int idx)
-                                      { m_defaultDirIndex = idx; });
-
-        // Add sliders for Euler angles
+        // add sliders to control arm manually with Euler angles (for debugging)
         const char *names[3] = {"Pitch", "Yaw", "Roll"};
         for (int i = 0; i < 3; ++i)
         {
@@ -146,34 +126,8 @@ public:
             createInteractors();
             loadAnimations();
             auto rightArm = m_parser.findNode("RightArm");
-            // dynamic_cast<osg::MatrixTransform*>(rightArm->second.osgNode)->addChild(m_bar);
         }
-        m_bar->setMatrix(m_interactorFloor->getMatrix());
 
-        // Get bar's current position (origin)
-        osg::Vec3 barPos = m_bar->getMatrix().getTrans();
-        // Get hand position
-        osg::Vec3 handPos = m_interactorHand->getMatrix().getTrans();
-        // Direction from bar to hand
-        osg::Vec3 dir = handPos - barPos;
-        float length = dir.length();
-        if (length > 1e-6)
-        {
-            dir.normalize();
-            // Default cylinder axis in OSG is +Z
-            osg::Vec3 defaultAxis(0, 0, 1);
-            osg::Quat rot;
-            rot.makeRotate(defaultAxis, dir);
-
-            // Set matrix: translate to barPos, rotate, scale to match length
-            osg::Matrix mat;
-            mat.makeRotate(rot);
-            mat.setTrans(barPos);
-            // Optionally scale the cylinder to reach the hand
-            // mat.preMultScale(osg::Vec3(1, 1, length)); // if you want to stretch the bar
-
-            m_bar->setMatrix(mat);
-        }
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
 
         auto rightArm = m_parser.findNode("RightArm");
@@ -203,7 +157,7 @@ public:
                 bone.rot->setQuaternion(rot);
 
                 // ----- DEBUGGING (delete methods if not needed anymore) -----
-                printRotationEuler(rot);               
+                //printRotationEuler(rot);               
                 drawDebugLine(boneWorldPos, targetWorldPos);
                 //bone.rot->setQuaternion(getQuaternionFromEulerSliders()); 
                 // ----- DEBUGGING -----
@@ -211,7 +165,6 @@ public:
                 // Set the sphere's position to the bone's world position
                 osg::Matrix sphereMat;
                 sphereMat.makeTranslate(boneWorldPos);
-                m_handSphere->setMatrix(sphereMat);
             }
         }
         return true;
@@ -223,37 +176,17 @@ public:
         m_avatarTrans->setName("AvatarTrans");
         m_avatarTrans->addChild(model);
         cover->getObjectsRoot()->addChild(m_avatarTrans);
-
-        // Create the sphere
-        m_handSphere = new osg::MatrixTransform();
-        osg::ref_ptr<osg::Geode> geode = new osg::Geode();
-        geode->setName("HandSphereGeode");
-        osg::ref_ptr<osg::ShapeDrawable> sphere = new osg::ShapeDrawable(new osg::Sphere(osg::Vec3(0, 0, 0), 0.2));
-        geode->addDrawable(sphere);
-        m_handSphere->addChild(geode);
-
-        cover->getObjectsRoot()->addChild(m_handSphere);
-
-        m_bar = new osg::MatrixTransform();
-        osg::ref_ptr<osg::Geode> barGeode = new osg::Geode();
-        barGeode->setName("BarGeode");
-        osg::ref_ptr<osg::ShapeDrawable> cylinder = new osg::ShapeDrawable(
-            new osg::Cylinder(osg::Vec3(0, 0, 0), 1.0, 100.0)); // radius 0.1, height 1.0
-        barGeode->addDrawable(cylinder);
-        m_bar->addChild(barGeode);
     }
 
 private:
     AnimationManagerFinder m_amFinder;
     osg::MatrixTransform *m_avatarTrans = nullptr;
-    osg::ref_ptr<osg::MatrixTransform> m_handSphere, m_bar, m_debugLine;
+    osg::ref_ptr<osg::MatrixTransform> m_debugLine;
     ;
     BoneParser m_parser;
     std::vector<ui::Slider *> m_sliders;
     ui::Menu *m_menu = nullptr;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
-    ui::SelectionList *m_defaultDirList = nullptr;
-    int m_defaultDirIndex = 0;
     std::vector<ui::Slider *> m_eulerSliders;
     float m_eulerAngles[3] = {0, 0, 0}; // pitch, yaw, roll
     void createInteractors()
