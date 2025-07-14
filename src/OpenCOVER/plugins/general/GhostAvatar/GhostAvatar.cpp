@@ -88,7 +88,7 @@ public:
             slider->setBounds(0, 1);
             slider->setCallback([this, &anim](double val, bool x)
                                 { m_amFinder.m_am->playAnimation(anim, 1, val); });
-            m_sliders.push_back(slider);
+            m_animationSliders.push_back(slider);
         }
     }
     GhostAvatar()
@@ -97,9 +97,9 @@ public:
         auto reloadButton = new ui::Action(m_menu, "Reload Animations");
         reloadButton->setCallback([this]()
                                   {
-            for (auto slider : m_sliders)
+            for (auto slider : m_animationSliders)
                 delete slider;
-            m_sliders.clear();
+            m_animationSliders.clear();
             loadAnimations(); });
 
         // add sliders to control arm manually with Euler angles (for debugging)
@@ -161,10 +161,6 @@ public:
                 drawDebugLine(boneWorldPos, targetWorldPos);
                 //bone.rot->setQuaternion(getQuaternionFromEulerSliders()); 
                 // ----- DEBUGGING -----
-
-                // Set the sphere's position to the bone's world position
-                osg::Matrix sphereMat;
-                sphereMat.makeTranslate(boneWorldPos);
             }
         }
         return true;
@@ -182,12 +178,10 @@ private:
     AnimationManagerFinder m_amFinder;
     osg::MatrixTransform *m_avatarTrans = nullptr;
     osg::ref_ptr<osg::MatrixTransform> m_debugLine;
-    ;
     BoneParser m_parser;
-    std::vector<ui::Slider *> m_sliders;
+    std::vector<ui::Slider *> m_animationSliders, m_eulerSliders;
     ui::Menu *m_menu = nullptr;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
-    std::vector<ui::Slider *> m_eulerSliders;
     float m_eulerAngles[3] = {0, 0, 0}; // pitch, yaw, roll
     void createInteractors()
     {
@@ -245,6 +239,7 @@ private:
         double pitchRad = osg::DegreesToRadians(m_eulerAngles[0]);
         double yawRad = osg::DegreesToRadians(m_eulerAngles[1]);
         double rollRad = osg::DegreesToRadians(m_eulerAngles[2]);
+
         // Create quaternion from Euler angles (ZYX order: roll, yaw, pitch)
         osg::Quat qPitch(pitchRad, osg::Vec3(1, 0, 0));
         osg::Quat qYaw(yawRad, osg::Vec3(0, 1, 0));
