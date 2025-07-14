@@ -15,42 +15,6 @@ BoneParser::BoneParser()
     : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
 {
 }
-osg::MatrixTransform *createSphere(int id)
-{
-    auto m_handSphere = new osg::MatrixTransform();
-    osg::ref_ptr<osg::Geode> geode = new osg::Geode();
-    geode->setName("HandSphereGeode");
-    osg::ref_ptr<osg::ShapeDrawable> sphere = new osg::ShapeDrawable(new osg::Sphere(osg::Vec3(0, 0, 0), 0.2));
-    // Set color based on id
-    osg::Vec4 color(1, 1, 5, 1); // default white
-    switch (id % 6)
-    {
-    case 0:
-        color.set(1, 0, 0, 1);
-        break; // red
-    case 1:
-        color.set(0, 1, 0, 1);
-        break; // green
-    case 2:
-        color.set(0, 0, 1, 1);
-        break; // blue
-    case 3:
-        color.set(1, 1, 0, 1);
-        break; // yellow
-    case 4:
-        color.set(1, 0, 1, 1);
-        break; // magenta
-    case 5:
-        color.set(0, 1, 1, 1);
-        break; // cyan
-    }
-    sphere->setColor(color);
-    geode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-
-    geode->addDrawable(sphere);
-    m_handSphere->addChild(geode);
-    return m_handSphere;
-}
 
 void BoneParser::apply(osg::Node &node)
 {
@@ -93,8 +57,6 @@ void BoneParser::apply(osg::Node &node)
                 std::cerr << "angle: " << translate->getAngle() << std::endl;
             }
         }
-        // auto sphere = createSphere(ikId++);
-        // bone->addChild(sphere);
         auto sqe = new osgAnimation::StackedQuaternionElement;
         Bone &ikBone = nodeToIk.emplace(std::make_pair(&node, Bone{sqe, basePos, parent, &node})).first->second;
         stacked.push_back(sqe);
