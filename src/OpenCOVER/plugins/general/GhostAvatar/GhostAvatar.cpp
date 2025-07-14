@@ -197,7 +197,7 @@ public:
                 // Extract rest direction from bone's local matrix (bind pose)
                 const osgAnimation::Bone *osgBone = dynamic_cast<const osgAnimation::Bone *>(rightArm->first);
                 osg::Matrix localMat = osgBone->getMatrixInBoneSpace();
-                osg::Vec3 restDir = osg::Vec3(1, 0, 0) * localMat; // Use X+ if arm points down in rest pose
+                osg::Vec3 restDir = osg::Vec3(0, 1, 0) * localMat;
                 restDir.normalize();
                 rot.makeRotate(restDir, targetDir);
                 bone.rot->setQuaternion(rot);
