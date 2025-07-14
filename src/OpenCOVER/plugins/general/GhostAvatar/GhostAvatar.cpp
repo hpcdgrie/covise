@@ -304,7 +304,7 @@ private:
         m_interactorFloor->enableIntersection();
         m_interactorFloor->show();
 
-        m.setTrans(0, 11, 1.5);
+        m.setTrans(-45, 165, 265);
         m_interactorHand.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
         m_interactorHand->enableIntersection();
         m_interactorHand->show();
