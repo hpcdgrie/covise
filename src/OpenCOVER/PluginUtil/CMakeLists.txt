@@ -46,6 +46,7 @@ SET(PLUGINUTIL_HEADERS
   coVR3DTransGizmo.h
   coVR3DTransInteractor.h
   coVR3DTransRotInteractor.h
+  coVR3DTransRotScaleInteractor.h
   CudaGraphicsResource.h
   CudaTextureRectangle.h
   FeedbackManager.h
@@ -88,6 +89,7 @@ SET(SOURCES
   coVR3DTransGizmo.cpp
   coVR3DTransInteractor.cpp
   coVR3DTransRotInteractor.cpp
+  coVR3DTransRotScaleInteractor.cpp
   CudaGraphicsResource.cpp
   CudaTextureRectangle.cpp
   FeedbackManager.cpp
