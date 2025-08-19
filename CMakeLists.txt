@@ -378,6 +378,18 @@ if (APPLE)
 endif()
 if(MSVC)
     add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE)
+    #Force embedded debug info (/Z7) for Debug and RelWithDebInfo on MSVC to enable sccache
+    foreach(cfg Debug RelWithDebInfo)
+      foreach(lang C CXX)
+        if(DEFINED CMAKE_${lang}_FLAGS_${cfg})
+          string(REPLACE "/Zi" "" CMAKE_${lang}_FLAGS_${cfg} "${CMAKE_${lang}_FLAGS_${cfg}}")
+          string(REPLACE "/ZI" "" CMAKE_${lang}_FLAGS_${cfg} "${CMAKE_${lang}_FLAGS_${cfg}}")
+          set(CMAKE_${lang}_FLAGS_${cfg} "${CMAKE_${lang}_FLAGS_${cfg}}" CACHE STRING "" FORCE)
+        endif()
+      endforeach()
+    endforeach()
+    # Force embedded debug info; avoid PDB contention
+    add_compile_options("$<$<CONFIG:Debug,RelWithDebInfo>:/Z7>")
 endif()
 
 OPTION(COVISE_BUILD_TESTS "compile the tests" OFF)
