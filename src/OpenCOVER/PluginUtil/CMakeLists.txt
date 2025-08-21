@@ -43,10 +43,10 @@ SET(PLUGINUTIL_HEADERS
   coVR3DRotGizmo.h
   coVR3DRotInteractor.h
   coVR3DScaleGizmo.h
+  coVR3DTransformInteractor.h
   coVR3DTransGizmo.h
   coVR3DTransInteractor.h
   coVR3DTransRotInteractor.h
-  coVR3DTransRotScaleInteractor.h
   CudaGraphicsResource.h
   CudaTextureRectangle.h
   FeedbackManager.h
@@ -66,14 +66,14 @@ SET(SOURCES
   BoxSelection.cpp
   BoxSelectionInteractor.cpp
   coArrow.cpp
+  coInstanceRenderer.cpp
+  coLine.cpp
+  coLOD.cpp
   colors/coColorBar.cpp
   colors/coColorHUD.cpp
   colors/coColorMap.cpp
   colors/ColorBar.cpp
   colors/ColorMaterials.cpp
-  coInstanceRenderer.cpp
-  coLine.cpp
-  coLOD.cpp
   coPlane.cpp
   coSensor.cpp
   coShaderUtil.cpp
@@ -86,10 +86,10 @@ SET(SOURCES
   coVR3DRotGizmo.cpp
   coVR3DRotInteractor.cpp
   coVR3DScaleGizmo.cpp
+  coVR3DTransformInteractor.cpp
   coVR3DTransGizmo.cpp
   coVR3DTransInteractor.cpp
   coVR3DTransRotInteractor.cpp
-  coVR3DTransRotScaleInteractor.cpp
   CudaGraphicsResource.cpp
   CudaTextureRectangle.cpp
   FeedbackManager.cpp

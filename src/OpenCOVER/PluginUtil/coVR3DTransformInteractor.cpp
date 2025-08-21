@@ -5,7 +5,7 @@
 
  * License: LGPL 2+ */
 
-#include "coVR3DTransRotScaleInteractor.h"
+#include "coVR3DTransformInteractor.h"
 #include <cover/coVRPluginSupport.h>
 #include <osg/ShapeDrawable>
 #include <osg/Geometry>
@@ -107,19 +107,19 @@ std::pair<osg::Vec3, osg::Vec3> getPerpendicularPlane(const osg::Vec3 &axis)
     return {u, v};
 }
 
-coVR3DTransRotScaleInteractor::coVR3DTransRotScaleInteractor(float size, coInteraction::InteractionType type, const char *iconName, const char *interactorName, coInteraction::InteractionPriority priority)
+coVR3DTransformInteractor::coVR3DTransformInteractor(float size, coInteraction::InteractionType type, const char *iconName, const char *interactorName, coInteraction::InteractionPriority priority)
     : coVRIntersectionInteractor(size, type, iconName, interactorName, priority, false)
     , m_currentMode(TRANSLATE)
 {
     createGeometry();
     _standardHL = true;
 }
-coVR3DTransRotScaleInteractor::~coVR3DTransRotScaleInteractor()
+coVR3DTransformInteractor::~coVR3DTransformInteractor()
 {
     hide();
 }
 
-void coVR3DTransRotScaleInteractor::createGeometry()
+void coVR3DTransformInteractor::createGeometry()
 {
     // Create root node for all gizmos
     m_root = new osg::MatrixTransform;
@@ -242,7 +242,7 @@ detail::Arrow createArrow(const osg::Vec3 &direction, const osg::Vec4 &color, fl
     return arrow;
 }
 
-void coVR3DTransRotScaleInteractor::createArrows()
+void coVR3DTransformInteractor::createArrows()
 {
     // Create arrows for each axis
     m_xArrow = createArrow(osg::Vec3(1, 0, 0), xColor, _interSize);
@@ -271,7 +271,7 @@ void coVR3DTransRotScaleInteractor::createArrows()
     
 }
 
-void coVR3DTransRotScaleInteractor::CreateRotationTori()
+void coVR3DTransformInteractor::CreateRotationTori()
 {
     // Create rotation rings for each axis
     m_xRotRing = createRotationRing(osg::Vec3(1, 0, 0), xColor);
@@ -284,7 +284,7 @@ void coVR3DTransRotScaleInteractor::CreateRotationTori()
     
 }
 
-osg::Geode* coVR3DTransRotScaleInteractor::createPlane(const osg::Vec3 &normal, const osg::Vec4 &color)
+osg::Geode* coVR3DTransformInteractor::createPlane(const osg::Vec3 &normal, const osg::Vec4 &color)
 {
     osg::Geode* geode = new osg::Geode;
     
@@ -312,7 +312,7 @@ osg::Geode* coVR3DTransRotScaleInteractor::createPlane(const osg::Vec3 &normal, 
     return geode;
 }
 
-osg::Geode* coVR3DTransRotScaleInteractor::createRotationRing(const osg::Vec3 &axis, const osg::Vec4 &color)
+osg::Geode* coVR3DTransformInteractor::createRotationRing(const osg::Vec3 &axis, const osg::Vec4 &color)
 {
     osg::Geode* geode = new osg::Geode;
     
@@ -410,7 +410,7 @@ osg::Geode* coVR3DTransRotScaleInteractor::createRotationRing(const osg::Vec3 &a
     return geode;
 }
 
-osg::Geode* coVR3DTransRotScaleInteractor::createSphere(float radius, const osg::Vec4 &color)
+osg::Geode* coVR3DTransformInteractor::createSphere(float radius, const osg::Vec4 &color)
 {
     osg::Geode* geode = new osg::Geode;
     
@@ -423,7 +423,7 @@ osg::Geode* coVR3DTransRotScaleInteractor::createSphere(float radius, const osg:
     return geode;
 }
 
-void coVR3DTransRotScaleInteractor::highlightComponent(ComponentColor component, HighlightType type)
+void coVR3DTransformInteractor::highlightComponent(ComponentColor component, HighlightType type)
 {
     if (!component.node || !component.color) return;
     
@@ -453,7 +453,7 @@ void coVR3DTransRotScaleInteractor::highlightComponent(ComponentColor component,
     setMaterial(component.node, color);
 }
 
-coVR3DTransRotScaleInteractor::ComponentColor coVR3DTransRotScaleInteractor::getComponentFromNode(osg::Node* node)
+coVR3DTransformInteractor::ComponentColor coVR3DTransformInteractor::getComponentFromNode(osg::Node* node)
 {
     // Check which component was hit
     if (node == m_xArrow.shaft.get()) return {m_xArrow.shaft.get(), &xColor};
@@ -474,7 +474,7 @@ coVR3DTransRotScaleInteractor::ComponentColor coVR3DTransRotScaleInteractor::get
     return {nullptr, nullptr};
 }
 
-coVR3DTransRotScaleInteractor::TransformMode coVR3DTransRotScaleInteractor::determineActiveMode(osg::Node* hitNode)
+coVR3DTransformInteractor::TransformMode coVR3DTransformInteractor::determineActiveMode(osg::Node* hitNode)
 {
     if (hitNode == m_xRotRing.get() || hitNode == m_yRotRing.get() || hitNode == m_zRotRing.get())
     {
@@ -488,7 +488,7 @@ coVR3DTransRotScaleInteractor::TransformMode coVR3DTransRotScaleInteractor::dete
     return TRANSLATE; // Default to translate mode (shaft hit)
 }
 
-osg::Vec3 coVR3DTransRotScaleInteractor::determineActiveAxis(osg::Node* hitNode)
+osg::Vec3 coVR3DTransformInteractor::determineActiveAxis(osg::Node* hitNode)
 {
     // Check which component was hit
     if (hitNode == m_xArrow.shaft.get()) return osg::X_AXIS;
@@ -509,17 +509,17 @@ osg::Vec3 coVR3DTransRotScaleInteractor::determineActiveAxis(osg::Node* hitNode)
     return osg::X_AXIS + osg::Y_AXIS + osg::Z_AXIS; // Default to free movement
 }
 
-void coVR3DTransRotScaleInteractor::updateTransform(const osg::Matrix &matrix)
+void coVR3DTransformInteractor::updateTransform(const osg::Matrix &matrix)
 {
     moveTransform->setMatrix(matrix);
 }
 
-void coVR3DTransRotScaleInteractor::updateScale(const osg::Vec3 &scale)
+void coVR3DTransformInteractor::updateScale(const osg::Vec3 &scale)
 {
     m_scaleVector = scale;
 }
 
-float coVR3DTransRotScaleInteractor::calculateCurrentRotationAngle()
+float coVR3DTransformInteractor::calculateCurrentRotationAngle()
 {
     // Get the current rotation of the object
     osg::Quat currentRotation = m_oldInteractorXformMat_o.getRotate();
@@ -545,7 +545,7 @@ static inline float wrapAngle0to2Pi(float a)
     return a;
 }
 
-void coVR3DTransRotScaleInteractor::startInteraction()
+void coVR3DTransformInteractor::startInteraction()
 {
     // Record interaction start time for toggle detection
     m_interactionStartTime = std::chrono::steady_clock::now();
@@ -644,7 +644,7 @@ void coVR3DTransRotScaleInteractor::startInteraction()
     }
 }
 
-void coVR3DTransRotScaleInteractor::doInteraction()
+void coVR3DTransformInteractor::doInteraction()
 {
 
     osg::Matrix currHandMat = getPointerMat();
@@ -665,7 +665,7 @@ void coVR3DTransRotScaleInteractor::doInteraction()
     }
 }
 
-void coVR3DTransRotScaleInteractor::stopInteraction()
+void coVR3DTransformInteractor::stopInteraction()
 {
     // Check for toggle if we were in scale mode
     if (m_currentMode == SCALE)
@@ -718,7 +718,7 @@ void coVR3DTransRotScaleInteractor::stopInteraction()
         fprintf(stderr, "TransformInteractor::stopInteraction\n");
 }
 
-int coVR3DTransRotScaleInteractor::hit(vrui::vruiHit *hit)
+int coVR3DTransformInteractor::hit(vrui::vruiHit *hit)
 {
     int result = coVRIntersectionInteractor::hit(hit);
     if (result && !isRunning()) // Only do hover effects when not actively interacting
@@ -745,7 +745,7 @@ int coVR3DTransRotScaleInteractor::hit(vrui::vruiHit *hit)
     return result;
 }
 
-void coVR3DTransRotScaleInteractor::miss()
+void coVR3DTransformInteractor::miss()
 {
     coVRIntersectionInteractor::miss();
     
@@ -774,7 +774,7 @@ osg::Vec3 pointerDirection_o(const osg::Matrix &currHandMat_o)
     return rayDirection;
 }
 
-osg::Vec3 coVR3DTransRotScaleInteractor::handPosOnCurrentAxis_o(const osg::Matrix &currHandMat_o)
+osg::Vec3 coVR3DTransformInteractor::handPosOnCurrentAxis_o(const osg::Matrix &currHandMat_o)
 {
     auto pointerDir_o = pointerDirection_o(currHandMat_o);
     
@@ -791,7 +791,7 @@ osg::Vec3 coVR3DTransRotScaleInteractor::handPosOnCurrentAxis_o(const osg::Matri
     return projectToAxis(localDelta, m_activeAxis);
 }
 
-void coVR3DTransRotScaleInteractor::handleTranslation(const osg::Matrix &currHandMat_o)
+void coVR3DTransformInteractor::handleTranslation(const osg::Matrix &currHandMat_o)
 {
 
     osg::Vec3 newPos_o = handPosOnCurrentAxis_o(currHandMat_o);
@@ -833,7 +833,7 @@ osg::Vec3 findClosestPointOnLine1ToLine2(
     return closestPoint;
 }
 
-void coVR3DTransRotScaleInteractor::handleScale(const osg::Matrix &currHandMat_o)
+void coVR3DTransformInteractor::handleScale(const osg::Matrix &currHandMat_o)
 {
     // Extract ray from current hand matrix
     osg::Vec3 rayOrigin = currHandMat_o.getTrans();
@@ -863,7 +863,7 @@ void coVR3DTransRotScaleInteractor::handleScale(const osg::Matrix &currHandMat_o
     }
 }
 
-void coVR3DTransRotScaleInteractor::handleRotation(const osg::Matrix &currHandMat_o)
+void coVR3DTransformInteractor::handleRotation(const osg::Matrix &currHandMat_o)
 {
     // Get the center of rotation
     osg::Vec3 rotCenter_o = m_oldInteractorXformMat_o.getTrans();
@@ -989,13 +989,13 @@ void coVR3DTransRotScaleInteractor::handleRotation(const osg::Matrix &currHandMa
 
 }
 
-void coVR3DTransRotScaleInteractor::toggleScaleMode()
+void coVR3DTransformInteractor::toggleScaleMode()
 {
     m_scaleMode = (m_scaleMode == SCALE_PER_AXIS) ? SCALE_UNIFORM : SCALE_PER_AXIS;
     updateArrowColors();
 }
 
-void coVR3DTransRotScaleInteractor::updateArrowColors()
+void coVR3DTransformInteractor::updateArrowColors()
 {
     if (m_scaleMode == SCALE_UNIFORM)
     {
@@ -1018,7 +1018,7 @@ void coVR3DTransRotScaleInteractor::updateArrowColors()
     setMaterial(m_zArrow.shaft, zColor);
 }
 
-void coVR3DTransRotScaleInteractor::setUniformScale(float scale)
+void coVR3DTransformInteractor::setUniformScale(float scale)
 {
     // Scale all arrows together in uniform mode
     m_xArrow.setScale(scale);
@@ -1026,7 +1026,7 @@ void coVR3DTransRotScaleInteractor::setUniformScale(float scale)
     m_zArrow.setScale(scale);
 }
 
-bool coVR3DTransRotScaleInteractor::isArrowTip(osg::Node* node)
+bool coVR3DTransformInteractor::isArrowTip(osg::Node* node)
 {
     return (node == m_xArrow.tip.get() || node == m_yArrow.tip.get() || node == m_zArrow.tip.get());
 }
@@ -1088,7 +1088,7 @@ osg::ref_ptr<osg::Geode> createRotationVisualization(osg::MatrixTransform *trans
     return rotationVisualization;
 }
 
-void coVR3DTransRotScaleInteractor::createRotationVisualization()
+void coVR3DTransformInteractor::createRotationVisualization()
 {
     m_rotationVisualizationTransform = new osg::MatrixTransform;
     m_rotationVisualizationCCW = ::createRotationVisualization(m_rotationVisualizationTransform.get(), false, _interSize);
@@ -1097,7 +1097,7 @@ void coVR3DTransRotScaleInteractor::createRotationVisualization()
     m_root->addChild(m_rotationVisualizationTransform.get());
 }
 
-osg::Matrix coVR3DTransRotScaleInteractor::calculateRotationToActiveAxis()
+osg::Matrix coVR3DTransformInteractor::calculateRotationToActiveAxis()
 {
     auto [u, v] = getPerpendicularPlane(m_activeAxis);
 
@@ -1134,7 +1134,7 @@ const std::array<osg::Matrix, 3> visRotationCounterClockWise{
 };
 
 
-void coVR3DTransRotScaleInteractor::updateRotationVisualization(float angle)
+void coVR3DTransformInteractor::updateRotationVisualization(float angle)
 {
     bool ccw = (angle >= 0.0f);
     if (m_activeAxis == osg::Y_AXIS) //don't know why this flip is necessary, but it works

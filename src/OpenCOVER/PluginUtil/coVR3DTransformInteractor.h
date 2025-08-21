@@ -30,11 +30,11 @@ struct PLUGIN_UTILEXPORT Arrow{
     float currentScale = 1.0f;
 };
 }
-class PLUGIN_UTILEXPORT coVR3DTransRotScaleInteractor : public coVRIntersectionInteractor
+class PLUGIN_UTILEXPORT coVR3DTransformInteractor : public coVRIntersectionInteractor
 {
 public:
-    coVR3DTransRotScaleInteractor(float size, coInteraction::InteractionType type, const char *iconName, const char *interactorName, coInteraction::InteractionPriority priority);
-    virtual ~coVR3DTransRotScaleInteractor();
+    coVR3DTransformInteractor(float size, coInteraction::InteractionType type, const char *iconName, const char *interactorName, coInteraction::InteractionPriority priority);
+    virtual ~coVR3DTransformInteractor();
     
     // Transform operations
     void updateTransform(const osg::Matrix &matrix);
