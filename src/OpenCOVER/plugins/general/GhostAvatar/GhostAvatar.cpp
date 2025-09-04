@@ -34,43 +34,6 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
-osg::Quat computeRotation(const osg::Vec3 &target, const osg::Vec3 &boneVector)
-{
-    // Current bone direction
-    osg::Vec3 v = boneVector;
-    v.normalize();
-
-    // Dot and cross
-    double c = v * target;       // dot product
-    osg::Vec3 axis = v ^ target; // cross product
-    double s = axis.length();
-
-    if (s < 1e-8) // vectors nearly parallel
-    {
-        if (c > 0.0)
-        {
-            // Already aligned
-            return osg::Quat(); // identity
-        }
-        else
-        {
-            // Opposite direction: rotate 180° about a perpendicular axis
-            osg::Vec3 perp = osg::Vec3(1, 0, 0);
-            if (fabs(v * perp) > 0.9) // too parallel, pick another
-                perp = osg::Vec3(0, 1, 0);
-
-            axis = v ^ perp;
-            axis.normalize();
-            return osg::Quat(osg::PI, axis);
-        }
-    }
-
-    axis.normalize();
-    double angle = atan2(s, c);
-
-    return osg::Quat(angle, axis);
-}
-
 class GhostAvatar : public coVRPlugin, public ui::Owner
 {
 public:
@@ -104,37 +67,37 @@ public:
 
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
 
-        auto rightArm = m_parser.findNode("RightArm");
-        if (rightArm != m_parser.nodeToIk.end())
+        auto armNode = m_parser.findNode("RightArm");
+        if (armNode != m_parser.nodeToIk.end())
         {
-            auto &bone = rightArm->second;
-            if (bone.rot && m_interactorHand)
+            auto &armBoneParser = armNode->second;
+            if (armBoneParser.rot && m_interactorHand)
             {
-                auto localToWorldMat = rightArm->second.parent->osgNode->getWorldMatrices(cover->getObjectsRoot())[0];
+                // matrices to convert between local and world coordinates
+                auto localToWorldMat = armNode->second.parent->osgNode->getWorldMatrices(cover->getObjectsRoot())[0];
                 auto worldToLocalMat = osg::Matrix::inverse(localToWorldMat);
 
-                // get right arm position and target position in local frame coordinates
-                auto rightArmPosLocal = rightArm->second.basePos;
-                auto rightArmPosWorld = rightArmPosLocal * localToWorldMat;
+                auto localArmPos = armNode->second.basePos;
+                auto worldArmPos = localArmPos * localToWorldMat;
 
-                auto targetPosWorld = m_interactorHand->getMatrix().getTrans();
-                auto targetPosLocal = targetPosWorld * worldToLocalMat;
+                auto worldTargetPos = m_interactorHand->getMatrix().getTrans();
+                auto localTargetPos = worldTargetPos * worldToLocalMat;
 
-                // Compute direction from base to target in local coordinates
-                osg::Vec3 targetDirLocal = targetPosLocal - rightArmPosLocal;
-                targetDirLocal.normalize();
+                // compute vector from the base of the arm to the target
+                osg::Vec3 localTargetDir = localTargetPos - localArmPos;
+                localTargetDir.normalize();
 
-                // Compute quaternion to rotate bone's default direction to target direction
-                osg::Vec3 boneDefaultDir(0, 0, 1); // Confirmed default direction
-                osg::Quat boneQuat = computeRotation(targetDirLocal, boneDefaultDir);
-                bone.rot->setQuaternion(boneQuat);
+                // we have to adjust the target direction because the axis conventions of the model and cover differ
+                osg::Vec3 adjustedTargetDir(localTargetDir.x(), localTargetDir.z(), -localTargetDir.y());
 
-                // Visualize the bone
-                auto rotatedDirection = boneQuat * boneDefaultDir;
-                float boneLength = 1.5f; // use actual bone length if available
-                auto endPosLocal = rightArmPosLocal + rotatedDirection * boneLength;
-                auto endPosWorld = endPosLocal * localToWorldMat;
-                drawArmTargetLine(rightArmPosWorld, endPosWorld);
+                // rotate the arm bone to point to the target
+                osg::Vec3 localArmDir(0, 1, 0); 
+                osg::Quat rotation;
+
+                rotation.makeRotate(localArmDir, adjustedTargetDir);
+                armBoneParser.rot->setQuaternion(rotation);
+
+                drawDebugLine(worldArmPos, worldTargetPos);
             }
         }
         return true;
@@ -149,7 +112,7 @@ public:
         cover->getObjectsRoot()->addChild(m_avatarTrans);
     }
 
-    void drawArmTargetLine(const osg::Vec3 &armBase, const osg::Vec3 &targetPos)
+    void drawDebugLine(const osg::Vec3 &armBase, const osg::Vec3 &targetPos)
     {
         // Remove previous line if exists
         if (m_debugLine.valid())
