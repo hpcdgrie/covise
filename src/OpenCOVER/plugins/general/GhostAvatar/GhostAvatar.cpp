@@ -34,6 +34,61 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
+void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float length, const std::string &name, osg::ref_ptr<osg::MatrixTransform> &framePtr)
+{
+    if (framePtr.valid())
+    {
+        cover->getObjectsRoot()->removeChild(framePtr);
+        framePtr = nullptr;
+    }
+
+    osg::ref_ptr<osg::Geometry> geom = new osg::Geometry();
+    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+    osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+
+    // Extract rotation part of orientation matrix
+    osg::Matrix rotMat = orientation;
+    rotMat.setTrans(0, 0, 0);
+
+    // X axis (red)
+    osg::Vec3 xAxis = osg::Vec3(1, 0, 0) * rotMat;
+    vertices->push_back(origin);
+    vertices->push_back(origin + xAxis * length);
+    colors->push_back(osg::Vec4(1, 0, 0, 1));
+    colors->push_back(osg::Vec4(1, 0, 0, 1));
+
+    // Y axis (green)
+    osg::Vec3 yAxis = osg::Vec3(0, 1, 0) * rotMat;
+    vertices->push_back(origin);
+    vertices->push_back(origin + yAxis * length);
+    colors->push_back(osg::Vec4(0, 1, 0, 1));
+    colors->push_back(osg::Vec4(0, 1, 0, 1));
+
+    // Z axis (blue)
+    osg::Vec3 zAxis = osg::Vec3(0, 0, 1) * rotMat;
+    vertices->push_back(origin);
+    vertices->push_back(origin + zAxis * length);
+    colors->push_back(osg::Vec4(0, 0, 1, 1));
+    colors->push_back(osg::Vec4(0, 0, 1, 1));
+
+    geom->setVertexArray(vertices);
+    geom->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
+    geom->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+    geom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 6));
+    osg::ref_ptr<osg::LineWidth> linewidth = new osg::LineWidth(4.0f);
+    geom->getOrCreateStateSet()->setAttributeAndModes(linewidth, osg::StateAttribute::ON);
+    geom->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+    geode->addDrawable(geom);
+
+    framePtr = new osg::MatrixTransform();
+    framePtr->setName(name);
+    framePtr->addChild(geode);
+
+    cover->getObjectsRoot()->addChild(framePtr);
+}
+
 class GhostAvatar : public coVRPlugin, public ui::Owner
 {
 public:
@@ -67,7 +122,11 @@ public:
 
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
 
-        auto armNode = m_parser.findNode("RightArm");
+        // Draw global frame at interactorFloor position
+        osg::Vec3 globalOrigin = m_interactorFloor->getMatrix().getTrans();
+        drawFrame(globalOrigin, osg::Matrix::identity(), 40.0f, "GlobalFrame", m_globalFrame);
+
+        auto armNode = m_parser.findNode("LeftArm");
         if (armNode != m_parser.nodeToIk.end())
         {
             auto &armBoneParser = armNode->second;
@@ -87,15 +146,33 @@ public:
                 osg::Vec3 localTargetDir = localTargetPos - localArmPos;
                 localTargetDir.normalize();
 
-                // we have to adjust the target direction because the axis conventions of the model and cover differ
-                osg::Vec3 adjustedTargetDir(localTargetDir.x(), localTargetDir.z(), -localTargetDir.y());
+                // to make the frames of the right arm and COVER match, we must swap y and z and negate y:
+                // --- RIGHT ARM ---
+                /*
+                osg::Matrix adjustMatrix(
+                    1, 0, 0, 0,
+                    0, 0, 1, 0,
+                    0, -1, 0, 0,
+                    0, 0, 0, 1);
+                */
+                // --- LEFT ARM ---
+                osg::Matrix adjustMatrix(
+                    1, 0, 0, 0,
+                    0, 0, -1, 0,
+                    0, 1, 0, 0,
+                    0, 0, 0, 1);
+
+                osg::Vec3 adjustedTargetDir = adjustMatrix * localTargetDir;
 
                 // rotate the arm bone to point to the target
-                osg::Vec3 localArmDir(0, 1, 0); 
+                osg::Vec3 localArmDir(0, 1, 0); // this could be different, too, depending on the bone!
                 osg::Quat rotation;
 
                 rotation.makeRotate(localArmDir, adjustedTargetDir);
                 armBoneParser.rot->setQuaternion(rotation);
+
+                // Draw local arm frame at worldArmPos, with orientation from localToWorldMat
+                drawFrame(worldArmPos, localToWorldMat, 1.0f, "ArmLocalFrame", m_armLocalFrame);
 
                 drawDebugLine(worldArmPos, worldTargetPos);
             }
@@ -148,6 +225,8 @@ public:
 private:
     osg::MatrixTransform *m_avatarTrans = nullptr;
     osg::ref_ptr<osg::MatrixTransform> m_debugLine;
+    osg::ref_ptr<osg::MatrixTransform> m_globalFrame;
+    osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
     BoneParser m_parser;
     std::vector<ui::Slider *> m_animationSliders, m_eulerSliders;
     ui::Menu *m_menu = nullptr;
