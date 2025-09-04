@@ -34,73 +34,49 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
-void printMatrix(const osg::Matrix &m)
+/*osg::Quat computeRotation(const osg::Vec3 &target, const osg::Vec3 &boneVector)
 {
-    for (int i = 0; i < 4; ++i)
+    // Current bone direction
+    osg::Vec3 v = boneVector;
+    v.normalize();
+
+    // Dot and cross
+    double c = v * target;       // dot product
+    osg::Vec3 axis = v ^ target; // cross product
+    double s = axis.length();
+
+    if (s < 1e-8) // vectors nearly parallel
     {
-        for (int j = 0; j < 4; ++j)
+        if (c > 0.0)
         {
-            std::cerr << m(i, j) << " ";
+            // Already aligned
+            return osg::Quat(); // identity
         }
-        std::cerr << std::endl;
-    }
-    std::cerr << "------------------------" << std::endl;
-}
-
-struct AnimationManagerFinder : public osg::NodeVisitor
-{
-    osg::ref_ptr<osgAnimation::BasicAnimationManager> m_am;
-    AnimationManagerFinder() : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN) {}
-    void apply(osg::Node &node) override
-    {
-
-        if (m_am.valid())
-            return;
-
-        if (node.getUpdateCallback())
+        else
         {
-            m_am = dynamic_cast<osgAnimation::BasicAnimationManager *>(node.getUpdateCallback());
-            return;
-        }
+            // Opposite direction: rotate 180° about a perpendicular axis
+            osg::Vec3 perp = osg::Vec3(1, 0, 0);
+            if (fabs(v * perp) > 0.9) // too parallel, pick another
+                perp = osg::Vec3(0, 1, 0);
 
-        traverse(node);
+            axis = v ^ perp;
+            axis.normalize();
+            return osg::Quat(osg::PI, axis);
+        }
     }
-};
+
+    axis.normalize();
+    double angle = atan2(s, c);
+
+    return osg::Quat(angle, axis);
+}*/
 
 class GhostAvatar : public coVRPlugin, public ui::Owner
 {
 public:
-    void loadAnimations()
-    {
-        m_avatarTrans->accept(m_amFinder);
-        if (m_amFinder.m_am.valid())
-        {
-            std::cerr << "Found AnimationManager" << std::endl;
-        }
-        else
-        {
-            std::cerr << "No AnimationManager found" << std::endl;
-            return;
-        }
-        for (const auto &anim : m_amFinder.m_am->getAnimationList())
-        {
-            auto slider = new ui::Slider(m_menu, anim->getName());
-            slider->setBounds(0, 1);
-            slider->setCallback([this, &anim](double val, bool x)
-                                { m_amFinder.m_am->playAnimation(anim, 1, val); });
-            m_animationSliders.push_back(slider);
-        }
-    }
     GhostAvatar()
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
-        auto reloadButton = new ui::Action(m_menu, "Reload Animations");
-        reloadButton->setCallback([this]()
-                                  {
-            for (auto slider : m_animationSliders)
-                delete slider;
-            m_animationSliders.clear();
-            loadAnimations(); });
 
         // add sliders to control arm manually with Euler angles (for debugging)
         const char *names[3] = {"Pitch", "Yaw", "Roll"};
@@ -124,7 +100,6 @@ public:
             loadAvatar();
             m_avatarTrans->accept(m_parser);
             createInteractors();
-            loadAnimations();
         }
 
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
@@ -135,49 +110,88 @@ public:
             auto &bone = rightArm->second;
             if (bone.rot && m_interactorHand)
             {
-                auto parentWorld = rightArm->second.parent->osgNode->getWorldMatrices(cover->getObjectsRoot())[0];
-                auto boneBindPos = rightArm->second.basePos;
+                auto localToWorldMat = rightArm->second.parent->osgNode->getWorldMatrices(cover->getObjectsRoot())[0];
+                auto worldToLocalMat = osg::Matrix::inverse(localToWorldMat);
 
-                osg::Vec3 boneWorldPos = boneBindPos * parentWorld;
-                auto boneWorldMat = osg::Matrix::translate(boneBindPos) * parentWorld;
+                // get right arm position and target position in local frame coordinates
+                auto rightArmPosLocal = rightArm->second.basePos;
+                auto rightArmPosWorld = rightArmPosLocal * localToWorldMat;
 
-                auto targetWorldPos = m_interactorHand->getMatrix().getTrans();
-                osg::Vec3 targetDir = targetWorldPos * osg::Matrix::inverse(boneWorldMat);
-                targetDir.normalize();
+                auto targetPosWorld = m_interactorHand->getMatrix().getTrans();
+                auto targetPosLocal = targetPosWorld * worldToLocalMat;
 
-                osg::Quat rot;
-                // Use fixed T-pose direction as rest direction
-                // This is the print output of (targetWorldPos - boneWorldPos).normalized() 
-                // when the avatar is in T-pose
-                osg::Vec3 restDir(-0.152421, -0.0302438, 0.987853); // T-pose direction
-                restDir.normalize();
-                rot.makeRotate(restDir, targetDir);
-                bone.rot->setQuaternion(rot);
+                // get the directional vector between target position and right arm base
+                // auto direction = targetPosLocal - rightArmPosLocal;
+                // direction.normalize();
 
-                // ----- DEBUGGING (delete methods if not needed anymore) -----
-                //printRotationEuler(rot);               
-                drawDebugLine(boneWorldPos, targetWorldPos);
-                //bone.rot->setQuaternion(getQuaternionFromEulerSliders()); 
-                
-                // osg::Vec3 tPoseDir = targetWorldPos - boneWorldPos;
-                // tPoseDir.normalize();
-                // std::cerr << "tPoseDir: " << tPoseDir.x() << ", " << tPoseDir.y() << ", " << tPoseDir.z() << std::endl;
-                // ----- DEBUGGING -----
+                auto boneQuat = getQuaternionFromEulerSliders();
+                bone.rot->setQuaternion(boneQuat);
+
+                // yaw and roll seem to be switched
+                boneQuat = osg::Quat(
+                    osg::DegreesToRadians(m_eulerAngles[0]), osg::Vec3(1, 0, 0), 
+                    osg::DegreesToRadians(-m_eulerAngles[2]), osg::Vec3(0, 1, 0), 
+                    osg::DegreesToRadians(m_eulerAngles[1]), osg::Vec3(0, 0, 1)  
+                );
+                auto rotatedDirection = boneQuat *  osg::Vec3(0, 0, 1); // rotate direction by quaternion
+
+                float boneLength = 1.5f; // use actual bone length if available
+                auto endPosLocal = rightArmPosLocal + rotatedDirection * boneLength;
+                auto endPosWorld = endPosLocal * localToWorldMat;
+
+                // auto quat = computeRotation(direction, osg::Vec3(1, 0, 0));
+                // bone.rot->setQuaternion(quat);
+
+                // drawArmTargetLine(rightArmPosWorld, targetPosWorld);
+                drawArmTargetLine(rightArmPosWorld, endPosWorld);
             }
         }
         return true;
     }
+
     void loadAvatar()
     {
-        auto model = osgDB::readNodeFile("/data/STARTS-ECHO/Avatars/ghost_noCloth.fbx");
+        auto model = osgDB::readNodeFile("/home/hpcsmalh/STARTS/ECHO/CoviseAvatar/ghost_noCloth.fbx");
         m_avatarTrans = new osg::MatrixTransform();
         m_avatarTrans->setName("AvatarTrans");
         m_avatarTrans->addChild(model);
         cover->getObjectsRoot()->addChild(m_avatarTrans);
     }
 
+    void drawArmTargetLine(const osg::Vec3 &armBase, const osg::Vec3 &targetPos)
+    {
+        // Remove previous line if exists
+        if (m_debugLine.valid())
+        {
+            cover->getObjectsRoot()->removeChild(m_debugLine);
+            m_debugLine = nullptr;
+        }
+
+        osg::ref_ptr<osg::Geometry> geom = new osg::Geometry();
+        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array();
+        vertices->push_back(armBase);
+        vertices->push_back(targetPos);
+        geom->setVertexArray(vertices);
+
+        geom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2));
+
+        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
+        colors->push_back(osg::Vec4(1, 0, 0, 1)); // red
+        geom->setColorArray(colors, osg::Array::BIND_OVERALL);
+
+        osg::ref_ptr<osg::LineWidth> linewidth = new osg::LineWidth(3.0f);
+        geom->getOrCreateStateSet()->setAttributeAndModes(linewidth, osg::StateAttribute::ON);
+
+        osg::ref_ptr<osg::Geode> geode = new osg::Geode();
+        geode->addDrawable(geom);
+
+        m_debugLine = new osg::MatrixTransform();
+        m_debugLine->addChild(geode);
+
+        cover->getObjectsRoot()->addChild(m_debugLine);
+    }
+
 private:
-    AnimationManagerFinder m_amFinder;
     osg::MatrixTransform *m_avatarTrans = nullptr;
     osg::ref_ptr<osg::MatrixTransform> m_debugLine;
     BoneParser m_parser;
@@ -198,41 +212,6 @@ private:
         m_interactorHand.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
         m_interactorHand->enableIntersection();
         m_interactorHand->show();
-    }
-
-    void drawDebugLine(const osg::Vec3 &start, const osg::Vec3 &end)
-    {
-        if (m_debugLine.valid())
-            m_avatarTrans->removeChild(m_debugLine);
-        osg::ref_ptr<osg::Geode> lineGeode = new osg::Geode();
-        osg::ref_ptr<osg::Geometry> lineGeom = new osg::Geometry();
-        osg::ref_ptr<osg::Vec3Array> verts = new osg::Vec3Array();
-        verts->push_back(start);
-        verts->push_back(end);
-        lineGeom->setVertexArray(verts);
-        lineGeom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 2));
-        osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array();
-        colors->push_back(osg::Vec4(1, 0, 0, 1)); // Red
-        lineGeom->setColorArray(colors, osg::Array::BIND_OVERALL);
-        lineGeode->addDrawable(lineGeom);
-        // Set line width for better visibility
-        osg::ref_ptr<osg::LineWidth> lineWidth = new osg::LineWidth(8.0f);
-        lineGeode->getOrCreateStateSet()->setAttributeAndModes(lineWidth.get(), osg::StateAttribute::ON);
-        m_debugLine = new osg::MatrixTransform();
-        m_debugLine->addChild(lineGeode);
-        m_avatarTrans->addChild(m_debugLine);
-    }
-
-    void printRotationEuler(const osg::Quat &rot)
-    {
-        double pitch, yaw, roll;
-        pitch = std::atan2(2.0 * (rot.w() * rot.x() + rot.y() * rot.z()), 1.0 - 2.0 * (rot.x() * rot.x() + rot.y() * rot.y()));
-        yaw = std::asin(2.0 * (rot.w() * rot.y() - rot.z() * rot.x()));
-        roll = std::atan2(2.0 * (rot.w() * rot.z() + rot.x() * rot.y()), 1.0 - 2.0 * (rot.y() * rot.y() + rot.z() * rot.z()));
-        pitch = osg::RadiansToDegrees(pitch);
-        yaw = osg::RadiansToDegrees(yaw);
-        roll = osg::RadiansToDegrees(roll);
-        std::cerr << "rot Euler angles (deg): pitch=" << pitch << " yaw=" << yaw << " roll=" << roll << std::endl;
     }
 
     osg::Quat getQuaternionFromEulerSliders()
