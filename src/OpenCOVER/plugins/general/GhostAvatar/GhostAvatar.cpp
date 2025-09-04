@@ -34,7 +34,7 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
-/*osg::Quat computeRotation(const osg::Vec3 &target, const osg::Vec3 &boneVector)
+osg::Quat computeRotation(const osg::Vec3 &target, const osg::Vec3 &boneVector)
 {
     // Current bone direction
     osg::Vec3 v = boneVector;
@@ -69,7 +69,7 @@ using namespace ui;
     double angle = atan2(s, c);
 
     return osg::Quat(angle, axis);
-}*/
+}
 
 class GhostAvatar : public coVRPlugin, public ui::Owner
 {
@@ -120,29 +120,20 @@ public:
                 auto targetPosWorld = m_interactorHand->getMatrix().getTrans();
                 auto targetPosLocal = targetPosWorld * worldToLocalMat;
 
-                // get the directional vector between target position and right arm base
-                // auto direction = targetPosLocal - rightArmPosLocal;
-                // direction.normalize();
+                // Compute direction from base to target in local coordinates
+                osg::Vec3 targetDirLocal = targetPosLocal - rightArmPosLocal;
+                targetDirLocal.normalize();
 
-                auto boneQuat = getQuaternionFromEulerSliders();
+                // Compute quaternion to rotate bone's default direction to target direction
+                osg::Vec3 boneDefaultDir(0, 0, 1); // Confirmed default direction
+                osg::Quat boneQuat = computeRotation(targetDirLocal, boneDefaultDir);
                 bone.rot->setQuaternion(boneQuat);
 
-                // yaw and roll seem to be switched
-                boneQuat = osg::Quat(
-                    osg::DegreesToRadians(m_eulerAngles[0]), osg::Vec3(1, 0, 0), 
-                    osg::DegreesToRadians(-m_eulerAngles[2]), osg::Vec3(0, 1, 0), 
-                    osg::DegreesToRadians(m_eulerAngles[1]), osg::Vec3(0, 0, 1)  
-                );
-                auto rotatedDirection = boneQuat *  osg::Vec3(0, 0, 1); // rotate direction by quaternion
-
+                // Visualize the bone
+                auto rotatedDirection = boneQuat * boneDefaultDir;
                 float boneLength = 1.5f; // use actual bone length if available
                 auto endPosLocal = rightArmPosLocal + rotatedDirection * boneLength;
                 auto endPosWorld = endPosLocal * localToWorldMat;
-
-                // auto quat = computeRotation(direction, osg::Vec3(1, 0, 0));
-                // bone.rot->setQuaternion(quat);
-
-                // drawArmTargetLine(rightArmPosWorld, targetPosWorld);
                 drawArmTargetLine(rightArmPosWorld, endPosWorld);
             }
         }
@@ -225,7 +216,7 @@ private:
         osg::Quat qPitch(pitchRad, osg::Vec3(1, 0, 0));
         osg::Quat qYaw(yawRad, osg::Vec3(0, 1, 0));
         osg::Quat qRoll(rollRad, osg::Vec3(0, 0, 1));
-        return qRoll * qYaw * qPitch;
+        return qPitch * qRoll * qYaw;
     }
 };
 
