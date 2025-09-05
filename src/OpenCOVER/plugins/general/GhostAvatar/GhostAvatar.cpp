@@ -8,6 +8,7 @@
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/FileBrowser.h>
 #include <cover/ui/Owner.h>
+#include <cover/ui/Button.h>
 #include <osg/MatrixTransform>
 #include <map>
 #include <cover/ui/Menu.h>
@@ -96,6 +97,7 @@ public:
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
         createArmBaseDirectionMenu();
+        createDebugMenu();
     }
 
     bool update() override
@@ -108,13 +110,28 @@ public:
             m_avatarTrans->accept(m_parser);
             createInteractors();
         }
-
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
-
-        // Draw global frame at interactorFloor position
-        osg::Vec3 globalOrigin = m_interactorFloor->getMatrix().getTrans();
-        drawFrame(globalOrigin, osg::Matrix::identity(), 40.0f, "GlobalFrame", m_globalFrame);
-
+        // Remove frames if toggled off
+        if ((!m_showFrames || !m_showFrames->state()) && m_globalFrame.valid())
+        {
+            cover->getObjectsRoot()->removeChild(m_globalFrame);
+            m_globalFrame = nullptr;
+        }
+        if ((!m_showFrames || !m_showFrames->state()) && m_armLocalFrame.valid())
+        {
+            cover->getObjectsRoot()->removeChild(m_armLocalFrame);
+            m_armLocalFrame = nullptr;
+        }
+        if ((!m_showDebugLine || !m_showDebugLine->state()) && m_debugLine.valid())
+        {
+            cover->getObjectsRoot()->removeChild(m_debugLine);
+            m_debugLine = nullptr;
+        }
+        if (m_showFrames && m_showFrames->state())
+        {
+            osg::Vec3 globalOrigin = m_interactorFloor->getMatrix().getTrans();
+            drawFrame(globalOrigin, osg::Matrix::identity(), 40.0f, "GlobalFrame", m_globalFrame);
+        }
         auto armNode = m_parser.findNode("LeftArm");
         if (armNode != m_parser.nodeToIk.end())
         {
@@ -161,9 +178,26 @@ public:
                 armBoneParser.rot->setQuaternion(rotation);
 
                 // Draw local arm frame at worldArmPos, with orientation from localToWorldMat
-                drawFrame(worldArmPos, localToWorldMat, 1.0f, "ArmLocalFrame", m_armLocalFrame);
-
-                drawDebugLine(worldArmPos, worldTargetPos);
+                if (m_showFrames && m_showFrames->state())
+                {
+                    drawFrame(worldArmPos, localToWorldMat, 1.0f, "ArmLocalFrame", m_armLocalFrame);
+                }
+                // Remove arm local frame if toggled off
+                else if (m_armLocalFrame.valid())
+                {
+                    cover->getObjectsRoot()->removeChild(m_armLocalFrame);
+                    m_armLocalFrame = nullptr;
+                }
+                if (m_showDebugLine && m_showDebugLine->state())
+                {
+                    drawDebugLine(worldArmPos, worldTargetPos);
+                }
+                // Remove debug line if toggled off
+                else if (m_debugLine.valid())
+                {
+                    cover->getObjectsRoot()->removeChild(m_debugLine);
+                    m_debugLine = nullptr;
+                }
             }
         }
         return true;
@@ -221,6 +255,10 @@ private:
     ui::Menu *m_armBaseDirMenu = nullptr;
     std::vector<ui::SelectionList *> m_armBaseDirChoices;
     float m_armBaseDir[3] = {0, 1, 0};
+    ui::Menu *m_debugMenu = nullptr;
+    ui::Button *m_showFrames = nullptr;
+    ui::Button *m_showDebugLine = nullptr;
+    ui::Action *m_axisNote = nullptr;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
     void createInteractors()
     {
@@ -248,11 +286,26 @@ private:
             list->setList(options);
             list->select(defaultArmBaseDir[i]);
             list->setCallback([this, i](int idx)
-            {
-                m_armBaseDir[i] = idx;
-            });
+                              { m_armBaseDir[i] = idx; });
             m_armBaseDirChoices.push_back(list);
         }
+    }
+    void createDebugMenu()
+    {
+        m_debugMenu = new ui::Menu(m_menu, "Debugging");
+
+        m_showDebugLine = new ui::Button(m_debugMenu, "Show Debug Line");
+        m_showDebugLine->setState(false);
+        m_showDebugLine->setCallback([this](bool state)
+                                     { m_showDebugLine->setState(state); });
+
+        m_showFrames = new ui::Button(m_debugMenu, "Show Frames");
+        m_showFrames->setState(false);
+        m_showFrames->setCallback([this](bool state)
+                                  { m_showFrames->setState(state); });
+
+        m_axisNote = new ui::Action(m_debugMenu, "x - red, y - green, z - blue");
+        m_axisNote->setEnabled(false);
     }
 };
 
