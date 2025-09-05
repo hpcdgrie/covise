@@ -97,6 +97,7 @@ public:
     GhostAvatar()
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
+        m_tabletUINote = new ui::Action(m_menu, "Please make changes in TabletUI!");
         createArmBaseDirectionMenu();
         createAdjustMatrixMenu();
         createDebugMenu();
@@ -157,18 +158,10 @@ public:
                 localTargetDir.normalize();
 
                 // the axis convention of the bone might note match with the one used in COVER
-                osg::Matrix adjustMatrix(
-                    m_adjustMatrix[0][0], m_adjustMatrix[0][1], m_adjustMatrix[0][2], 0,
-                    m_adjustMatrix[1][0], m_adjustMatrix[1][1], m_adjustMatrix[1][2], 0,
-                    m_adjustMatrix[2][0], m_adjustMatrix[2][1], m_adjustMatrix[2][2], 0,
-                    0, 0, 0, 1);
-
-                osg::Vec3 adjustedTargetDir = adjustMatrix * localTargetDir;
+                osg::Vec3 adjustedTargetDir = m_adjustMatrix * localTargetDir;
 
                 // rotate the arm bone to point to the target
-                //osg::Vec3 armBaseDir(m_armBaseDir[0], m_armBaseDir[1], m_armBaseDir[2]);
                 osg::Quat rotation;
-
                 rotation.makeRotate(m_armBaseDir, adjustedTargetDir);
                 armBoneParser.rot->setQuaternion(rotation);
 
@@ -244,14 +237,12 @@ private:
     ui::Button *m_showFrames = nullptr;
     ui::Button *m_showTargetLine = nullptr;
     ui::Action *m_axisNote = nullptr;
+    ui::Action *m_tabletUINote = nullptr;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
 
-    // Add member variables for adjustMatrix UI
-    std::vector<ui::SelectionList *> m_adjustMatrixChoices;
-    float m_adjustMatrix[3][3] = {
-        {1, 0, 0},
-        {0, 0, 1},
-        {0, -1, 0}}; // Default: right arm
+    // Replace 9 SelectionLists with 3 VectorEditFields for adjustMatrix
+    std::array<ui::VectorEditField *, 3> m_adjustMatrixVecFields;
+    osg::Matrix m_adjustMatrix = osg::Matrix::identity();
     ui::Menu *m_adjustMatrixMenu = nullptr;
 
     ui::VectorEditField *m_armBaseDirField = nullptr;
@@ -301,61 +292,37 @@ private:
     }
     void createAdjustMatrixMenu()
     {
-        if (m_adjustMatrixMenu)
-            delete m_adjustMatrixMenu;
         m_adjustMatrixMenu = new ui::Menu(m_menu, "Change Adjust Matrix");
-        m_adjustMatrixChoices.clear();
-        std::vector<std::string> options = {"-1", "0", "1"};
-        // Set default for right/left arm
+        
+        // set correct axis conventions for the GhostAvatar model
         if (m_armNodeName == "LeftArm")
         {
-            m_adjustMatrix[0][0] = 1;
-            m_adjustMatrix[0][1] = 0;
-            m_adjustMatrix[0][2] = 0;
-            m_adjustMatrix[1][0] = 0;
-            m_adjustMatrix[1][1] = 0;
-            m_adjustMatrix[1][2] = -1;
-            m_adjustMatrix[2][0] = 0;
-            m_adjustMatrix[2][1] = 1;
-            m_adjustMatrix[2][2] = 0;
+            m_adjustMatrix.set(
+                1, 0, 0, 0,
+                0, 0, -1, 0,
+                0, 1, 0, 0,
+                0, 0, 0, 1);
         }
         else if (m_armNodeName == "RightArm")
         {
-            m_adjustMatrix[0][0] = 1;
-            m_adjustMatrix[0][1] = 0;
-            m_adjustMatrix[0][2] = 0;
-            m_adjustMatrix[1][0] = 0;
-            m_adjustMatrix[1][1] = 0;
-            m_adjustMatrix[1][2] = 1;
-            m_adjustMatrix[2][0] = 0;
-            m_adjustMatrix[2][1] = -1;
-            m_adjustMatrix[2][2] = 0;
+            m_adjustMatrix.set(
+                1, 0, 0, 0,
+                0, 0, 1, 0,
+                0, -1, 0, 0,
+                0, 0, 0, 1);
         }
-        else
-        {
-            m_adjustMatrix[0][0] = 1;
-            m_adjustMatrix[0][1] = 0;
-            m_adjustMatrix[0][2] = 0;
-            m_adjustMatrix[1][0] = 0;
-            m_adjustMatrix[1][1] = 1;
-            m_adjustMatrix[1][2] = 0;
-            m_adjustMatrix[2][0] = 0;
-            m_adjustMatrix[2][1] = 0;
-            m_adjustMatrix[2][2] = 1;
-        }
+
         for (int row = 0; row < 3; ++row)
         {
-            for (int col = 0; col < 3; ++col)
-            {
-                std::string label = "m[" + std::to_string(row) + "][" + std::to_string(col) + "]";
-                auto list = new ui::SelectionList(m_adjustMatrixMenu, label);
-                list->setList(options);
-                int defIdx = (m_adjustMatrix[row][col] == -1) ? 0 : (m_adjustMatrix[row][col] == 0 ? 1 : 2);
-                list->select(defIdx);
-                list->setCallback([this, row, col](int idx)
-                                  { m_adjustMatrix[row][col] = idx - 1; });
-                m_adjustMatrixChoices.push_back(list);
-            }
+            osg::Vec3 rowVec(m_adjustMatrix(row, 0), m_adjustMatrix(row, 1), m_adjustMatrix(row, 2));
+            std::string label = "Row " + std::to_string(row);
+            m_adjustMatrixVecFields[row] = new ui::VectorEditField(m_adjustMatrixMenu, label);
+            m_adjustMatrixVecFields[row]->setValue(rowVec);
+            m_adjustMatrixVecFields[row]->setCallback([this, row](const osg::Vec3 &v)
+                                                      {
+                m_adjustMatrix(row, 0) = v.x();
+                m_adjustMatrix(row, 1) = v.y();
+                m_adjustMatrix(row, 2) = v.z(); });
         }
     }
 };
