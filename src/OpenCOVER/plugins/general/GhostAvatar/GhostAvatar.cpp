@@ -95,18 +95,6 @@ public:
     GhostAvatar()
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
-
-        // add sliders to control arm manually with Euler angles (for debugging)
-        const char *names[3] = {"Pitch", "Yaw", "Roll"};
-        for (int i = 0; i < 3; ++i)
-        {
-            auto slider = new ui::Slider(m_menu, names[i]);
-            slider->setBounds(-180, 180);
-            slider->setValue(0);
-            slider->setCallback([this, i](double val, bool)
-                                { m_eulerAngles[i] = val; });
-            m_eulerSliders.push_back(slider);
-        }
     }
 
     bool update() override
@@ -228,10 +216,8 @@ private:
     osg::ref_ptr<osg::MatrixTransform> m_globalFrame;
     osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
     BoneParser m_parser;
-    std::vector<ui::Slider *> m_animationSliders, m_eulerSliders;
     ui::Menu *m_menu = nullptr;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
-    float m_eulerAngles[3] = {0, 0, 0}; // pitch, yaw, roll
     void createInteractors()
     {
         osg::Matrix m;
@@ -245,20 +231,6 @@ private:
         m_interactorHand.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
         m_interactorHand->enableIntersection();
         m_interactorHand->show();
-    }
-
-    osg::Quat getQuaternionFromEulerSliders()
-    {
-        //  Convert Euler angles (degrees) to radians
-        double pitchRad = osg::DegreesToRadians(m_eulerAngles[0]);
-        double yawRad = osg::DegreesToRadians(m_eulerAngles[1]);
-        double rollRad = osg::DegreesToRadians(m_eulerAngles[2]);
-
-        // Create quaternion from Euler angles (ZYX order: roll, yaw, pitch)
-        osg::Quat qPitch(pitchRad, osg::Vec3(1, 0, 0));
-        osg::Quat qYaw(yawRad, osg::Vec3(0, 1, 0));
-        osg::Quat qRoll(rollRad, osg::Vec3(0, 0, 1));
-        return qPitch * qRoll * qYaw;
     }
 };
 
