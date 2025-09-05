@@ -97,6 +97,7 @@ public:
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
         createArmBaseDirectionMenu();
+        createAdjustMatrixMenu();
         createDebugMenu();
     }
 
@@ -129,10 +130,12 @@ public:
             loadAvatar();
             m_avatarTrans->accept(m_parser);
             createInteractors();
+
+            auto rightArm = m_parser.findNode(m_armNodeName);
         }
         m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
 
-        auto armNode = m_parser.findNode("LeftArm");
+        auto armNode = m_parser.findNode(m_armNodeName);
         if (armNode != m_parser.nodeToIk.end())
         {
             auto &armBoneParser = armNode->second;
@@ -152,20 +155,11 @@ public:
                 osg::Vec3 localTargetDir = localTargetPos - localArmPos;
                 localTargetDir.normalize();
 
-                // to make the frames of the right arm and COVER match, we must swap y and z and negate y:
-                // --- RIGHT ARM ---
-                /*
+                // the axis convention of the bone might note match with the one used in COVER
                 osg::Matrix adjustMatrix(
-                    1, 0, 0, 0,
-                    0, 0, 1, 0,
-                    0, -1, 0, 0,
-                    0, 0, 0, 1);
-                */
-                // --- LEFT ARM ---
-                osg::Matrix adjustMatrix(
-                    1, 0, 0, 0,
-                    0, 0, -1, 0,
-                    0, 1, 0, 0,
+                    m_adjustMatrix[0][0], m_adjustMatrix[0][1], m_adjustMatrix[0][2], 0,
+                    m_adjustMatrix[1][0], m_adjustMatrix[1][1], m_adjustMatrix[1][2], 0,
+                    m_adjustMatrix[2][0], m_adjustMatrix[2][1], m_adjustMatrix[2][2], 0,
                     0, 0, 0, 1);
 
                 osg::Vec3 adjustedTargetDir = adjustMatrix * localTargetDir;
@@ -242,6 +236,7 @@ private:
     osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
     BoneParser m_parser;
     ui::Menu *m_menu = nullptr;
+    std::string m_armNodeName = "RightArm";
     ui::Menu *m_armBaseDirMenu = nullptr;
     std::vector<ui::SelectionList *> m_armBaseDirChoices;
     float m_armBaseDir[3] = {0, 1, 0};
@@ -250,6 +245,15 @@ private:
     ui::Button *m_showTargetLine = nullptr;
     ui::Action *m_axisNote = nullptr;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
+
+    // Add member variables for adjustMatrix UI
+    std::vector<ui::SelectionList *> m_adjustMatrixChoices;
+    float m_adjustMatrix[3][3] = {
+        {1, 0, 0},
+        {0, 0, 1},
+        {0, -1, 0}}; // Default: right arm
+    ui::Menu *m_adjustMatrixMenu = nullptr;
+
     void createInteractors()
     {
         osg::Matrix m;
@@ -287,8 +291,8 @@ private:
         m_showTargetLine = new ui::Button(m_debugMenu, "Show Target Line");
         m_showTargetLine->setState(false);
         m_showTargetLine->setCallback([this](bool state)
-                                     { m_showTargetLine->setState(state); 
-                                       cleanUpDebugLines();});
+                                      { m_showTargetLine->setState(state); 
+                                       cleanUpDebugLines(); });
 
         m_showFrames = new ui::Button(m_debugMenu, "Show Frames");
         m_showFrames->setState(false);
@@ -298,6 +302,65 @@ private:
 
         m_axisNote = new ui::Action(m_debugMenu, "x - red, y - green, z - blue");
         m_axisNote->setEnabled(false);
+    }
+    void createAdjustMatrixMenu()
+    {
+        if (m_adjustMatrixMenu)
+            delete m_adjustMatrixMenu;
+        m_adjustMatrixMenu = new ui::Menu(m_menu, "Adjust Matrix (3x3)");
+        m_adjustMatrixChoices.clear();
+        std::vector<std::string> options = {"-1", "0", "1"};
+        // Set default for right/left arm
+        if (m_armNodeName == "LeftArm")
+        {
+            m_adjustMatrix[0][0] = 1;
+            m_adjustMatrix[0][1] = 0;
+            m_adjustMatrix[0][2] = 0;
+            m_adjustMatrix[1][0] = 0;
+            m_adjustMatrix[1][1] = 0;
+            m_adjustMatrix[1][2] = -1;
+            m_adjustMatrix[2][0] = 0;
+            m_adjustMatrix[2][1] = 1;
+            m_adjustMatrix[2][2] = 0;
+        }
+        else if (m_armNodeName == "RightArm")
+        {
+            m_adjustMatrix[0][0] = 1;
+            m_adjustMatrix[0][1] = 0;
+            m_adjustMatrix[0][2] = 0;
+            m_adjustMatrix[1][0] = 0;
+            m_adjustMatrix[1][1] = 0;
+            m_adjustMatrix[1][2] = 1;
+            m_adjustMatrix[2][0] = 0;
+            m_adjustMatrix[2][1] = -1;
+            m_adjustMatrix[2][2] = 0;
+        }
+        else
+        {
+            m_adjustMatrix[0][0] = 1;
+            m_adjustMatrix[0][1] = 0;
+            m_adjustMatrix[0][2] = 0;
+            m_adjustMatrix[1][0] = 0;
+            m_adjustMatrix[1][1] = 1;
+            m_adjustMatrix[1][2] = 0;
+            m_adjustMatrix[2][0] = 0;
+            m_adjustMatrix[2][1] = 0;
+            m_adjustMatrix[2][2] = 1;
+        }
+        for (int row = 0; row < 3; ++row)
+        {
+            for (int col = 0; col < 3; ++col)
+            {
+                std::string label = "m[" + std::to_string(row) + "][" + std::to_string(col) + "]";
+                auto list = new ui::SelectionList(m_adjustMatrixMenu, label);
+                list->setList(options);
+                int defIdx = (m_adjustMatrix[row][col] == -1) ? 0 : (m_adjustMatrix[row][col] == 0 ? 1 : 2);
+                list->select(defIdx);
+                list->setCallback([this, row, col](int idx)
+                                  { m_adjustMatrix[row][col] = idx - 1; });
+                m_adjustMatrixChoices.push_back(list);
+            }
+        }
     }
 };
 
