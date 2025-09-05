@@ -95,6 +95,7 @@ public:
     GhostAvatar()
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
+        createArmBaseDirectionMenu();
     }
 
     bool update() override
@@ -153,10 +154,10 @@ public:
                 osg::Vec3 adjustedTargetDir = adjustMatrix * localTargetDir;
 
                 // rotate the arm bone to point to the target
-                osg::Vec3 localArmDir(0, 1, 0); // this could be different, too, depending on the bone!
+                osg::Vec3 armBaseDir(m_armBaseDir[0], m_armBaseDir[1], m_armBaseDir[2]);
                 osg::Quat rotation;
 
-                rotation.makeRotate(localArmDir, adjustedTargetDir);
+                rotation.makeRotate(armBaseDir, adjustedTargetDir);
                 armBoneParser.rot->setQuaternion(rotation);
 
                 // Draw local arm frame at worldArmPos, with orientation from localToWorldMat
@@ -217,6 +218,9 @@ private:
     osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
     BoneParser m_parser;
     ui::Menu *m_menu = nullptr;
+    ui::Menu *m_armBaseDirMenu = nullptr;
+    std::vector<ui::SelectionList *> m_armBaseDirChoices;
+    float m_armBaseDir[3] = {0, 1, 0};
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
     void createInteractors()
     {
@@ -231,6 +235,24 @@ private:
         m_interactorHand.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
         m_interactorHand->enableIntersection();
         m_interactorHand->show();
+    }
+    void createArmBaseDirectionMenu()
+    {
+        m_armBaseDirMenu = new ui::Menu(m_menu, "Arm Base Direction");
+        const char *names[3] = {"X", "Y", "Z"};
+        std::vector<std::string> options = {"-1", "0", "1"};
+        int defaultArmBaseDir[3] = {0, 1, 0};
+        for (int i = 0; i < 3; ++i)
+        {
+            auto list = new ui::SelectionList(m_armBaseDirMenu, names[i]);
+            list->setList(options);
+            list->select(defaultArmBaseDir[i]);
+            list->setCallback([this, i](int idx)
+            {
+                m_armBaseDir[i] = idx;
+            });
+            m_armBaseDirChoices.push_back(list);
+        }
     }
 };
 
