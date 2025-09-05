@@ -9,6 +9,7 @@
 #include <cover/ui/FileBrowser.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/Button.h>
+#include <cover/ui/VectorEditField.h>
 #include <osg/MatrixTransform>
 #include <map>
 #include <cover/ui/Menu.h>
@@ -165,10 +166,10 @@ public:
                 osg::Vec3 adjustedTargetDir = adjustMatrix * localTargetDir;
 
                 // rotate the arm bone to point to the target
-                osg::Vec3 armBaseDir(m_armBaseDir[0], m_armBaseDir[1], m_armBaseDir[2]);
+                //osg::Vec3 armBaseDir(m_armBaseDir[0], m_armBaseDir[1], m_armBaseDir[2]);
                 osg::Quat rotation;
 
-                rotation.makeRotate(armBaseDir, adjustedTargetDir);
+                rotation.makeRotate(m_armBaseDir, adjustedTargetDir);
                 armBoneParser.rot->setQuaternion(rotation);
 
                 // UI elements for debugging
@@ -238,8 +239,7 @@ private:
     ui::Menu *m_menu = nullptr;
     std::string m_armNodeName = "RightArm";
     ui::Menu *m_armBaseDirMenu = nullptr;
-    std::vector<ui::SelectionList *> m_armBaseDirChoices;
-    float m_armBaseDir[3] = {0, 1, 0};
+    osg::Vec3 m_armBaseDir = {0, 1, 0};
     ui::Menu *m_debugMenu = nullptr;
     ui::Button *m_showFrames = nullptr;
     ui::Button *m_showTargetLine = nullptr;
@@ -253,6 +253,9 @@ private:
         {0, 0, 1},
         {0, -1, 0}}; // Default: right arm
     ui::Menu *m_adjustMatrixMenu = nullptr;
+
+    ui::VectorEditField *m_armBaseDirField = nullptr;
+    osg::Vec3 m_testVec = osg::Vec3(1.0f, 2.0f, 3.0f); // Example default value
 
     void createInteractors()
     {
@@ -268,21 +271,14 @@ private:
         m_interactorHand->enableIntersection();
         m_interactorHand->show();
     }
+
     void createArmBaseDirectionMenu()
     {
-        m_armBaseDirMenu = new ui::Menu(m_menu, "Arm Base Direction");
-        const char *names[3] = {"X", "Y", "Z"};
-        std::vector<std::string> options = {"-1", "0", "1"};
-        int defaultArmBaseDir[3] = {1, 2, 1};
-        for (int i = 0; i < 3; ++i)
-        {
-            auto list = new ui::SelectionList(m_armBaseDirMenu, names[i]);
-            list->setList(options);
-            list->select(defaultArmBaseDir[i]);
-            list->setCallback([this, i](int idx)
-                              { m_armBaseDir[i] = idx - 1; });
-            m_armBaseDirChoices.push_back(list);
-        }
+        m_armBaseDirMenu = new ui::Menu(m_menu, "Change Arm Base Direction");
+        m_armBaseDirField = new ui::VectorEditField(m_armBaseDirMenu, "Direction");
+        m_armBaseDirField->setValue(m_armBaseDir);
+        m_armBaseDirField->setCallback([this](const osg::Vec3 &dir)
+                                       { m_armBaseDir = dir; });
     }
     void createDebugMenu()
     {
@@ -307,7 +303,7 @@ private:
     {
         if (m_adjustMatrixMenu)
             delete m_adjustMatrixMenu;
-        m_adjustMatrixMenu = new ui::Menu(m_menu, "Adjust Matrix (3x3)");
+        m_adjustMatrixMenu = new ui::Menu(m_menu, "Change Adjust Matrix");
         m_adjustMatrixChoices.clear();
         std::vector<std::string> options = {"-1", "0", "1"};
         // Set default for right/left arm
