@@ -43,7 +43,7 @@ private:
     void createInteractors();
 
     // settings
-    std::string m_pathToFbx = "/home/hpcsmalh/STARTS/ECHO/CoviseAvatar/ghost_noCloth.fbx";
+    std::string m_pathToFbx = "/data/STARTS-ECHO/Avatars/ghost_noCloth.fbx";
     std::string m_armNodeName = "RightArm"; // "LeftArm"
 
     // debugging
