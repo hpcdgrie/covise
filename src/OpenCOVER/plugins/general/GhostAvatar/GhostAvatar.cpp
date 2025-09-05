@@ -98,8 +98,7 @@ public:
         : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_menu(new ui::Menu("GhostAvatar", this))
     {
         m_tabletUINote = new ui::Action(m_menu, "Please make changes in TabletUI!");
-        createArmBaseDirectionMenu();
-        createAdjustMatrixMenu();
+        createSettingsMenu();
         createDebugMenu();
     }
 
@@ -230,7 +229,7 @@ private:
     osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
     BoneParser m_parser;
     ui::Menu *m_menu = nullptr;
-    std::string m_armNodeName = "RightArm";
+    std::string m_armNodeName = "LeftArm";
     ui::Menu *m_armBaseDirMenu = nullptr;
     osg::Vec3 m_armBaseDir = {0, 1, 0};
     ui::Menu *m_debugMenu = nullptr;
@@ -244,6 +243,8 @@ private:
     std::array<ui::VectorEditField *, 3> m_adjustMatrixVecFields;
     osg::Matrix m_adjustMatrix = osg::Matrix::identity();
     ui::Menu *m_adjustMatrixMenu = nullptr;
+
+    ui::Menu *m_settingsMenu = nullptr;
 
     ui::VectorEditField *m_armBaseDirField = nullptr;
     osg::Vec3 m_testVec = osg::Vec3(1.0f, 2.0f, 3.0f); // Example default value
@@ -265,8 +266,8 @@ private:
 
     void createArmBaseDirectionMenu()
     {
-        m_armBaseDirMenu = new ui::Menu(m_menu, "Change Arm Base Direction");
-        m_armBaseDirField = new ui::VectorEditField(m_armBaseDirMenu, "Direction");
+        m_armBaseDirMenu = new ui::Menu(m_settingsMenu, "Change Arm Base Direction");
+        m_armBaseDirField = new ui::VectorEditField(m_armBaseDirMenu, "Arm Base Direction");
         m_armBaseDirField->setValue(m_armBaseDir);
         m_armBaseDirField->setCallback([this](const osg::Vec3 &dir)
                                        { m_armBaseDir = dir; });
@@ -292,8 +293,8 @@ private:
     }
     void createAdjustMatrixMenu()
     {
-        m_adjustMatrixMenu = new ui::Menu(m_menu, "Change Adjust Matrix");
-        
+        m_adjustMatrixMenu = new ui::Menu(m_settingsMenu, "Change Adjust Matrix");
+
         // set correct axis conventions for the GhostAvatar model
         if (m_armNodeName == "LeftArm")
         {
@@ -324,6 +325,14 @@ private:
                 m_adjustMatrix(row, 1) = v.y();
                 m_adjustMatrix(row, 2) = v.z(); });
         }
+    }
+
+    void createSettingsMenu()
+    {
+        m_settingsMenu = new ui::Menu(m_menu, "Settings");
+
+        createArmBaseDirectionMenu();
+        createAdjustMatrixMenu();
     }
 };
 
