@@ -119,8 +119,11 @@ bool GhostAvatar::update()
 
             // rotate the arm bone to point to the target
             osg::Quat rotation;
-            rotation.makeRotate(m_armBaseDir, adjustedTargetDir);
-            armBoneParser.rot->setQuaternion(rotation);
+            if (m_armBaseVec[0] != 0 || m_armBaseVec[1] != 0 || m_armBaseVec[2] != 0)
+            {
+                rotation.makeRotate(m_armBaseVec, adjustedTargetDir);
+                armBoneParser.rot->setQuaternion(rotation);
+            }
 
             // UI elements for debugging
             if (m_showFrames && m_showFrames->state())
@@ -211,17 +214,17 @@ void GhostAvatar::createSettingsMenu()
     m_settingsMenu = new ui::Menu(m_mainMenu, "Settings");
     m_tabletUINote = new ui::Action(m_settingsMenu, "Changes can only be made in the TabletUI!");
 
-    createArmBaseDirectionMenu();
+    createArmBaseVectorMenu();
     createAdjustMatrixMenu();
 }
 
-void GhostAvatar::createArmBaseDirectionMenu()
+void GhostAvatar::createArmBaseVectorMenu()
 {
-    m_armBaseDirMenu = new ui::Menu(m_settingsMenu, "Arm Base Direction");
-    m_armBaseDirField = new ui::VectorEditField(m_armBaseDirMenu, "Vector");
-    m_armBaseDirField->setValue(m_armBaseDir);
-    m_armBaseDirField->setCallback([this](const osg::Vec3 &dir)
-                                   { m_armBaseDir = dir; });
+    m_armBaseVecMenu = new ui::Menu(m_settingsMenu, "Arm Base Vector");
+    m_armBaseVecField = new ui::VectorEditField(m_armBaseVecMenu, "Vector");
+    m_armBaseVecField->setValue(m_armBaseVec);
+    m_armBaseVecField->setCallback([this](const osg::Vec3 &dir)
+                                   { m_armBaseVec = dir; });
 }
 
 void GhostAvatar::createAdjustMatrixMenu()

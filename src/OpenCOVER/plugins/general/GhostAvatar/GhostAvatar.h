@@ -37,7 +37,7 @@ private:
     osg::MatrixTransform *m_avatarTrans = nullptr;
     BoneParser m_parser;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
-    osg::Vec3 m_armBaseDir = {0, 1, 0};
+    osg::Vec3 m_armBaseVec = {0, 1, 0};
     osg::Matrix m_adjustMatrix = osg::Matrix::identity();
 
     void createInteractors();
@@ -56,8 +56,8 @@ private:
 
     opencover::ui::Menu *m_settingsMenu = nullptr;
     opencover::ui::Action *m_tabletUINote = nullptr;
-    opencover::ui::Menu *m_armBaseDirMenu = nullptr;
-    opencover::ui::VectorEditField *m_armBaseDirField = nullptr;
+    opencover::ui::Menu *m_armBaseVecMenu = nullptr;
+    opencover::ui::VectorEditField *m_armBaseVecField = nullptr;
     opencover::ui::Menu *m_adjustMatrixMenu = nullptr;
     std::array<opencover::ui::VectorEditField *, 3> m_adjustMatrixVecFields;
 
@@ -68,7 +68,7 @@ private:
 
     // methods to create UI elements
     void createSettingsMenu();
-    void createArmBaseDirectionMenu();
+    void createArmBaseVectorMenu();
     void createAdjustMatrixMenu();
     void createDebugMenu();
 };
