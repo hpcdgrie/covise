@@ -42,13 +42,13 @@ class COVEREXPORT VRAvatar
 {
 public:
     bool initialized = false;
-    osg::MatrixTransform *handTransform;
-    osg::Node *handNode;
-    osg::MatrixTransform *headTransform;
-    osg::Node *brilleNode;
-    osg::MatrixTransform *feetTransform;
-    osg::Node *schuheNode;
-    osg::Node *hostIconNode;
+    osg::ref_ptr<osg::MatrixTransform> handTransform;
+    osg::ref_ptr<osg::Node> handNode;
+    osg::ref_ptr<osg::MatrixTransform> headTransform;
+    osg::ref_ptr<osg::Node> brilleNode;
+    osg::ref_ptr<osg::MatrixTransform> feetTransform;
+    osg::ref_ptr<osg::Node> schuheNode;
+    osg::ref_ptr<osg::Node> hostIconNode;
     osg::ref_ptr<osg::Group> avatarNodes;
     ///create an Avatar that only holds the local tramsfom matrices 
     ///Used to collect the data to send it to the partners
