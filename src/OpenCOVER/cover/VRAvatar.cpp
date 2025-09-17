@@ -133,9 +133,10 @@ void PartnerAvatar::loadPartnerIcon()
         if (!hostIconNode)
         {
             auto iconFile = coVRFileManager::instance()->findOrGetFile(m_partner->userInfo().icon, m_partner->ID());
-            hostIconNode = coVRFileManager::instance()->loadIcon(iconFile.c_str());
             if (!hostIconNode)
                 cerr << "host icon not found " << iconFile << endl;
+            else
+                hostIconNode = coVRFileManager::instance()->loadIcon(iconFile.c_str());
         }
     }
     coBillboard *bb = new coBillboard;
