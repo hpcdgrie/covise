@@ -31,7 +31,7 @@ GhostAvatarPlugin::GhostAvatarPlugin()
                 return avatar->ID() == partner->ID();
             });
             if (it == m_avatars.end())
-                m_avatars.push_back(std::make_unique<GhostAvatar>(partner->ID(), m_adjustMatrix));
+                m_avatars.push_back(std::make_unique<GhostAvatar>(partner->ID(), m_adjustMatrix, m_permFix));
         }
     });
 
@@ -61,7 +61,7 @@ GhostAvatarPlugin::GhostAvatarPlugin()
         {
             if(partner->ID() == coVRPartnerList::instance()->me()->ID())
                 continue;
-            m_avatars.push_back(std::make_unique<GhostAvatar>(partner->ID(), m_adjustMatrix));
+            m_avatars.push_back(std::make_unique<GhostAvatar>(partner->ID(), m_adjustMatrix, m_permFix));
         }
     });
 
@@ -82,6 +82,7 @@ void GhostAvatarPlugin::createSettingsMenu()
 
     createArmBaseVectorMenu();
     createAdjustMatrixMenu();
+    createPermFixMenu();
 }
 
 void GhostAvatarPlugin::createArmBaseVectorMenu()
@@ -129,16 +130,97 @@ void GhostAvatarPlugin::createAdjustMatrixMenu()
                                                   {
                 m_adjustMatrix(row, 0) = v.x();
                 m_adjustMatrix(row, 1) = v.y();
-                m_adjustMatrix(row, 2) = v.z(); });
+                m_adjustMatrix(row, 2) = v.z();
                 for(auto &avatar : m_avatars)
                 {
                     avatar->setAdjustMatrix(m_adjustMatrix);
-                }
+                }});
     }
     for(auto &avatar : m_avatars)
     {
         avatar->setAdjustMatrix(m_adjustMatrix);
     }
+}
+
+void GhostAvatarPlugin::createPermFixMenu()
+{
+    m_permFixMenu = new ui::Menu(m_settingsMenu, "Axis Permutation (permFix)");
+
+    // Default to identity; users can change rows to select which source axis maps to target X/Y/Z
+    // Provide a helpful initial mapping comment in UI names
+    for (int row = 0; row < 3; ++row)
+    {
+        osg::Vec3 rowVec(m_permFix(row, 0), m_permFix(row, 1), m_permFix(row, 2));
+        std::string label = std::string("Row ") + std::to_string(row) + " (target " + (row==0?"X":row==1?"Y":"Z") + ")";
+        m_permFixVecFields[row] = new ui::VectorEditField(m_permFixMenu, label);
+        m_permFixVecFields[row]->setValue(rowVec);
+        m_permFixVecFields[row]->setCallback([this, row](const osg::Vec3 &v)
+                                             {
+            // Keep last column as 0 and bottom row untouched (Matrix is affine with last row 0,0,0,1)
+            m_permFix(row, 0) = v.x();
+            m_permFix(row, 1) = v.y();
+            m_permFix(row, 2) = v.z();
+            // Enforce last column row-wise and last row for safety
+            m_permFix(0,3) = 0; m_permFix(1,3) = 0; m_permFix(2,3) = 0;
+            m_permFix(3,0) = 0; m_permFix(3,1) = 0; m_permFix(3,2) = 0; m_permFix(3,3) = 1;
+            // Also update axis-angle representation to match new matrix (extracting axis-angle can be ambiguous; we leave axis & angle untouched for now)
+            for (auto &avatar : m_avatars)
+                avatar->setPermFix(m_permFix);
+        });
+    }
+
+    // Ensure bottom row is [0 0 0 1]
+    m_permFix(3,0) = 0; m_permFix(3,1) = 0; m_permFix(3,2) = 0; m_permFix(3,3) = 1;
+    for (auto &avatar : m_avatars)
+        avatar->setPermFix(m_permFix);
+
+    // Axis-angle controls
+    m_permAxisField = new ui::VectorEditField(m_permFixMenu, "Rotation Axis (X,Y,Z)");
+    m_permAxisField->setValue(m_permAxis);
+    m_permAxisField->setCallback([this](const osg::Vec3 &axis){
+        m_permAxis = axis;
+        recomputePermFixFromAxisAngle();
+    });
+
+    m_permAngleSlider = new ui::Slider(m_permFixMenu, "Rotation Angle (deg)");
+    m_permAngleSlider->setBounds(-360.0, 360.0);
+    m_permAngleSlider->setValue(m_permAngleDeg);
+    m_permAngleSlider->setCallback([this](double val, bool){
+        m_permAngleDeg = val;
+        recomputePermFixFromAxisAngle();
+    });
+}
+
+void GhostAvatarPlugin::recomputePermFixFromAxisAngle()
+{
+    osg::Vec3 axis = m_permAxis;
+    // If axis is zero, keep identity and avoid NaNs
+    if (axis.length2() < 1e-12)
+    {
+        m_permFix.makeIdentity();
+    }
+    else
+    {
+        axis.normalize();
+        double rad = m_permAngleDeg * M_PI / 180.0;
+        osg::Quat q(rad, axis);
+        osg::Matrix rot(q);
+        // Ensure pure rotation in top-left 3x3 and affine bottom row/col
+        m_permFix = rot;
+        m_permFix(0,3) = 0; m_permFix(1,3) = 0; m_permFix(2,3) = 0;
+        m_permFix(3,0) = 0; m_permFix(3,1) = 0; m_permFix(3,2) = 0; m_permFix(3,3) = 1;
+    }
+
+    // Update row UI fields to reflect the new matrix
+    for (int row = 0; row < 3; ++row)
+    {
+        osg::Vec3 rowVec(m_permFix(row,0), m_permFix(row,1), m_permFix(row,2));
+        if (m_permFixVecFields[row])
+            m_permFixVecFields[row]->setValue(rowVec);
+    }
+    // Push to avatars
+    for (auto &avatar : m_avatars)
+        avatar->setPermFix(m_permFix);
 }
 
 void GhostAvatarPlugin::createDebugMenu()
