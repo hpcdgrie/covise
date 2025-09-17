@@ -4,10 +4,14 @@
 #include <osgDB/ReadFile>
 
 #include "GhostAvatar.h"
-
+#include <cover/coVRPluginSupport.h>
+#include <cover/coVRPartner.h>
+#include <cover/VRAvatar.h>
 using namespace covise;
 using namespace opencover;
 using namespace ui;
+
+constexpr bool USE_INTERACTORS = false;
 
 void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float length, const std::string &name, osg::ref_ptr<osg::MatrixTransform> &framePtr)
 {
@@ -64,52 +68,83 @@ void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float le
     cover->getObjectsRoot()->addChild(framePtr);
 }
 
-GhostAvatar::GhostAvatar()
-    : coVRPlugin(COVER_PLUGIN_NAME), Owner(COVER_PLUGIN_NAME, cover->ui), m_mainMenu(new ui::Menu("GhostAvatar", this))
+GhostAvatar::GhostAvatar(int id, osg::Matrix adjustMatrix)
+    : m_id(id), m_adjustMatrix(adjustMatrix)
 {
-    createSettingsMenu();
-    createDebugMenu();
+    std::cerr << "Creating GhostAvatar for partner ID " << m_id << "\n";
+}
+
+GhostAvatar::~GhostAvatar()
+{
+    std::cerr << "Destroying GhostAvatar for partner ID " << m_id << "\n";
+    cover->getObjectsRoot()->removeChild(m_avatarTrans);
+    cover->getObjectsRoot()->removeChild(m_globalFrame);
+    cover->getObjectsRoot()->removeChild(m_armLocalFrame);
 }
 
 void GhostAvatar::loadAvatar()
 {
     auto model = osgDB::readNodeFile(m_pathToFbx);
+
     m_avatarTrans = new osg::MatrixTransform();
     m_avatarTrans->setName("AvatarTrans");
-    m_avatarTrans->addChild(model);
+
+    // Fixed axis conversion: Model' = [Bz, Bx, By]
+    osg::ref_ptr<osg::MatrixTransform> axisFix = new osg::MatrixTransform();
+    axisFix->setName("AxisFix");
+
+    // Try to adapt blender's orientation for cover:
+    // Row-major set(): rows are target X,Y,Z; columns pick source X,Y,Z.
+    // Here:
+    //   X' = Z  -> row0: [0,0,1,0]
+    //   Y' = X  -> row1: [1,0,0,0]
+    //   Z' = Y  -> row2: [0,1,0,0]
+    osg::Matrix permFix;
+    permFix.set(
+        0, 0, 1, 0,  // row 0
+        1, 0, 0, 0,  // row 1
+        0, 1, 0, 0,  // row 2
+        0, 0, 0, 1   // row 3
+    );
+    axisFix->setMatrix(permFix);
+
+    axisFix->addChild(model);
+    m_avatarTrans->addChild(axisFix);
     cover->getObjectsRoot()->addChild(m_avatarTrans);
 }
 
 bool GhostAvatar::update()
 {
-    static bool first = true;
-    if (first)
+    if (m_firstUpdate)
     {
-        first = false;
+        m_firstUpdate = false;
         loadAvatar();
         m_avatarTrans->accept(m_parser);
-        createInteractors();
+        if(USE_INTERACTORS)
+            createInteractors();
 
-        auto rightArm = m_parser.findNode(m_armNodeName);
+        auto rightArm = m_parser.findNode(ARM_NODE_NAME);
     }
-    m_avatarTrans->setMatrix(m_interactorFloor->getMatrix());
+    auto floorPos = USE_INTERACTORS ? m_interactorFloor->getMatrix() :coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix();
+    m_avatarTrans->setMatrix(floorPos);
 
-    auto armNode = m_parser.findNode(m_armNodeName);
+    auto armNode = m_parser.findNode(ARM_NODE_NAME);
     if (armNode != m_parser.nodeToIk.end())
     {
         auto &armBoneParser = armNode->second;
         if (armBoneParser.rot && m_interactorHand)
         {
             // matrices to convert between local and world coordinates
+            assert(armNode->second.parent);
             auto localToWorldMat = armNode->second.parent->osgNode->getWorldMatrices(cover->getObjectsRoot())[0];
             auto worldToLocalMat = osg::Matrix::inverse(localToWorldMat);
 
             auto localArmPos = armNode->second.basePos;
             auto worldArmPos = localArmPos * localToWorldMat;
 
-            auto worldTargetPos = m_interactorHand->getMatrix().getTrans();
-            auto localTargetPos = worldTargetPos * worldToLocalMat;
+            auto worldTargetPos = USE_INTERACTORS ? m_interactorHand->getMatrix().getTrans() : coVRPartnerList::instance()->get(m_id)->getAvatar()->handTransform->getMatrix().getTrans();
 
+            auto localTargetPos = worldTargetPos * worldToLocalMat;
             // compute vector from the base of the arm to the target
             osg::Vec3 localTargetDir = localTargetPos - localArmPos;
             localTargetDir.normalize();
@@ -124,15 +159,15 @@ bool GhostAvatar::update()
                 rotation.makeRotate(m_armBaseVec, adjustedTargetDir);
                 armBoneParser.rot->setQuaternion(rotation);
             }
-
+            
             // UI elements for debugging
-            if (m_showFrames && m_showFrames->state())
+            if (m_showFrames)
             {
-                drawFrame(m_interactorFloor->getMatrix().getTrans(), osg::Matrix::identity(), 40.0f, "GlobalFrame", m_globalFrame);
+                drawFrame(floorPos.getTrans(), osg::Matrix::identity(), 40.0f, "GlobalFrame", m_globalFrame);
                 drawFrame(worldArmPos, localToWorldMat, 1.0f, "ArmLocalFrame", m_armLocalFrame);
             }
 
-            if (m_showTargetLine && m_showTargetLine->state())
+            if (m_showTargetLine)
             {
                 drawLine(worldArmPos, worldTargetPos);
             }
@@ -176,18 +211,18 @@ void GhostAvatar::drawLine(const osg::Vec3 &armBase, const osg::Vec3 &targetPos)
 
 void GhostAvatar::cleanUpDebugLines()
 {
-    if ((!m_showFrames || !m_showFrames->state()) && m_globalFrame.valid())
+    if (m_showFrames && m_globalFrame.valid())
     {
         cover->getObjectsRoot()->removeChild(m_globalFrame);
         m_globalFrame = nullptr;
     }
-    if ((!m_showFrames || !m_showFrames->state()) && m_armLocalFrame.valid())
+    if (!m_showFrames && m_armLocalFrame.valid())
     {
         cover->getObjectsRoot()->removeChild(m_armLocalFrame);
         m_armLocalFrame = nullptr;
     }
 
-    if ((!m_showTargetLine || !m_showTargetLine->state()) && m_targetLine.valid())
+    if (!m_showTargetLine && m_targetLine.valid())
     {
         cover->getObjectsRoot()->removeChild(m_targetLine);
         m_targetLine = nullptr;
@@ -196,6 +231,7 @@ void GhostAvatar::cleanUpDebugLines()
 
 void GhostAvatar::createInteractors()
 {
+    std::cerr << "Creating interactors for GhostAvatar " << m_id << "\n";
     osg::Matrix m;
     auto interSize = 10.2;
     m.setTrans(0, 10, 0.2);
@@ -209,76 +245,3 @@ void GhostAvatar::createInteractors()
     m_interactorHand->show();
 }
 
-void GhostAvatar::createSettingsMenu()
-{
-    m_settingsMenu = new ui::Menu(m_mainMenu, "Settings");
-    m_tabletUINote = new ui::Action(m_settingsMenu, "Changes can only be made in the TabletUI!");
-
-    createArmBaseVectorMenu();
-    createAdjustMatrixMenu();
-}
-
-void GhostAvatar::createArmBaseVectorMenu()
-{
-    m_armBaseVecMenu = new ui::Menu(m_settingsMenu, "Arm Base Vector");
-    m_armBaseVecField = new ui::VectorEditField(m_armBaseVecMenu, "Vector");
-    m_armBaseVecField->setValue(m_armBaseVec);
-    m_armBaseVecField->setCallback([this](const osg::Vec3 &dir)
-                                   { m_armBaseVec = dir; });
-}
-
-void GhostAvatar::createAdjustMatrixMenu()
-{
-    m_adjustMatrixMenu = new ui::Menu(m_settingsMenu, "Adjust Matrix");
-
-    // set correct axis conventions for the GhostAvatar model
-    if (m_armNodeName == "LeftArm")
-    {
-        m_adjustMatrix.set(
-            1, 0, 0, 0,
-            0, 0, -1, 0,
-            0, 1, 0, 0,
-            0, 0, 0, 1);
-    }
-    else if (m_armNodeName == "RightArm")
-    {
-        m_adjustMatrix.set(
-            1, 0, 0, 0,
-            0, 0, 1, 0,
-            0, -1, 0, 0,
-            0, 0, 0, 1);
-    }
-
-    for (int row = 0; row < 3; ++row)
-    {
-        osg::Vec3 rowVec(m_adjustMatrix(row, 0), m_adjustMatrix(row, 1), m_adjustMatrix(row, 2));
-        std::string label = "Row " + std::to_string(row);
-        m_adjustMatrixVecFields[row] = new ui::VectorEditField(m_adjustMatrixMenu, label);
-        m_adjustMatrixVecFields[row]->setValue(rowVec);
-        m_adjustMatrixVecFields[row]->setCallback([this, row](const osg::Vec3 &v)
-                                                  {
-                m_adjustMatrix(row, 0) = v.x();
-                m_adjustMatrix(row, 1) = v.y();
-                m_adjustMatrix(row, 2) = v.z(); });
-    }
-}
-
-void GhostAvatar::createDebugMenu()
-{
-    m_debugMenu = new ui::Menu(m_mainMenu, "Debugging");
-
-    m_showTargetLine = new ui::Button(m_debugMenu, "Show Target Line");
-    m_showTargetLine->setState(false);
-    m_showTargetLine->setCallback([this](bool state)
-                                  { m_showTargetLine->setState(state); 
-                                       cleanUpDebugLines(); });
-
-    m_showFrames = new ui::Button(m_debugMenu, "Show Frames");
-    m_showFrames->setState(false);
-    m_showFrames->setCallback([this](bool state)
-                              { m_showFrames->setState(state);
-                                    cleanUpDebugLines(); });
-
-    m_axisNote = new ui::Action(m_debugMenu, "x - red, y - green, z - blue");
-    m_axisNote->setEnabled(false);
-}

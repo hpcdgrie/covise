@@ -18,23 +18,30 @@
 #include <PluginUtil/coVR3DTransRotInteractor.h>
 
 #include "Bone.h"
-
-class GhostAvatar : public opencover::coVRPlugin, public opencover::ui::Owner
+const std::string ARM_NODE_NAME = "RightArm"; // "LeftArm"
+class GhostAvatar
 {
 public:
-    GhostAvatar();
+    GhostAvatar(int id, osg::Matrix adjustMatrix);
+    ~GhostAvatar();
 
     void loadAvatar();
 
     // positions avatar at m_interactorFloor and makes the avatar's arm follow m_interactorHand
-    bool update() override;
+    bool update();
 
     // debugging
     void drawLine(const osg::Vec3 &armBase, const osg::Vec3 &targetPos);
     void cleanUpDebugLines();
+    int ID() const { return m_id; }
 
+    void showFrames(bool show) { m_showFrames = show; }
+    void showTargetLine(bool show) { m_showTargetLine = show; }
+    void setArmBaseVector(const osg::Vec3 &vec) { m_armBaseVec = vec; }
+    void setAdjustMatrix(const osg::Matrix &mat) { m_adjustMatrix = mat; }
+    
 private:
-    osg::MatrixTransform *m_avatarTrans = nullptr;
+    osg::ref_ptr<osg::MatrixTransform> m_avatarTrans;
     BoneParser m_parser;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
     osg::Vec3 m_armBaseVec = {0, 1, 0};
@@ -43,36 +50,21 @@ private:
     void createInteractors();
 
     // settings
-    std::string m_pathToFbx = "/data/STARTS-ECHO/Avatars/ghost_noCloth.fbx";
-    std::string m_armNodeName = "RightArm"; // "LeftArm"
+    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\ghost_noCloth.fbx";
+    // std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE3_noAnimation.fbx";
 
     // debugging
     osg::ref_ptr<osg::MatrixTransform> m_targetLine;
     osg::ref_ptr<osg::MatrixTransform> m_globalFrame;
     osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
 
-    // UI elements
-    opencover::ui::Menu *m_mainMenu = nullptr;
+    const int m_id = -1;
+    bool m_showFrames = false;
+    bool m_showTargetLine = false;
+    bool m_firstUpdate = true;
 
-    opencover::ui::Menu *m_settingsMenu = nullptr;
-    opencover::ui::Action *m_tabletUINote = nullptr;
-    opencover::ui::Menu *m_armBaseVecMenu = nullptr;
-    opencover::ui::VectorEditField *m_armBaseVecField = nullptr;
-    opencover::ui::Menu *m_adjustMatrixMenu = nullptr;
-    std::array<opencover::ui::VectorEditField *, 3> m_adjustMatrixVecFields;
 
-    opencover::ui::Menu *m_debugMenu = nullptr;
-    opencover::ui::Button *m_showFrames = nullptr;
-    opencover::ui::Button *m_showTargetLine = nullptr;
-    opencover::ui::Action *m_axisNote = nullptr;
-
-    // methods to create UI elements
-    void createSettingsMenu();
-    void createArmBaseVectorMenu();
-    void createAdjustMatrixMenu();
-    void createDebugMenu();
+    
 };
-
-COVERPLUGIN(GhostAvatar)
 
 #endif // COVER_PLUGIN_GHOSTAVATAR_GhostAvatar_H
