@@ -68,8 +68,8 @@ void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float le
     cover->getObjectsRoot()->addChild(framePtr);
 }
 
-GhostAvatar::GhostAvatar(int id, osg::Matrix adjustMatrix)
-    : m_id(id), m_adjustMatrix(adjustMatrix)
+GhostAvatar::GhostAvatar(int id, osg::Matrix adjustMatrix, osg::Matrix permFix)
+    : m_id(id), m_adjustMatrix(adjustMatrix), m_permFix(permFix)
 {
     std::cerr << "Creating GhostAvatar for partner ID " << m_id << "\n";
 }
@@ -90,26 +90,14 @@ void GhostAvatar::loadAvatar()
     m_avatarTrans->setName("AvatarTrans");
 
     // Fixed axis conversion: Model' = [Bz, Bx, By]
-    osg::ref_ptr<osg::MatrixTransform> axisFix = new osg::MatrixTransform();
-    axisFix->setName("AxisFix");
+    m_axisFix = new osg::MatrixTransform();
+    m_axisFix->setName("AxisFix");
 
-    // Try to adapt blender's orientation for cover:
-    // Row-major set(): rows are target X,Y,Z; columns pick source X,Y,Z.
-    // Here:
-    //   X' = Z  -> row0: [0,0,1,0]
-    //   Y' = X  -> row1: [1,0,0,0]
-    //   Z' = Y  -> row2: [0,1,0,0]
-    osg::Matrix permFix;
-    permFix.set(
-        0, 0, 1, 0,  // row 0
-        1, 0, 0, 0,  // row 1
-        0, 1, 0, 0,  // row 2
-        0, 0, 0, 1   // row 3
-    );
-    axisFix->setMatrix(permFix);
+    // Apply UI-configurable axis permutation (defaults to identity)
+    m_axisFix->setMatrix(m_permFix);
 
-    axisFix->addChild(model);
-    m_avatarTrans->addChild(axisFix);
+    m_axisFix->addChild(model);
+    m_avatarTrans->addChild(m_axisFix);
     cover->getObjectsRoot()->addChild(m_avatarTrans);
 }
 

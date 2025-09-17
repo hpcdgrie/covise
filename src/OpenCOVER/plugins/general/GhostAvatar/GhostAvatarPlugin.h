@@ -15,6 +15,7 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/VectorEditField.h>
+#include <cover/ui/Slider.h>
 
 #include "Bone.h"
 
@@ -40,17 +41,26 @@ private:
     opencover::ui::VectorEditField *m_armBaseVecField = nullptr;
     opencover::ui::Menu *m_adjustMatrixMenu = nullptr;
     std::array<opencover::ui::VectorEditField *, 3> m_adjustMatrixVecFields;
+    opencover::ui::Menu *m_permFixMenu = nullptr;
+    std::array<opencover::ui::VectorEditField *, 3> m_permFixVecFields{};
+    opencover::ui::VectorEditField *m_permAxisField = nullptr;
+    opencover::ui::Slider *m_permAngleSlider = nullptr; // degrees
 
     opencover::ui::Menu *m_debugMenu = nullptr;
     opencover::ui::Button *m_showFrames = nullptr;
     opencover::ui::Button *m_showTargetLine = nullptr;
     opencover::ui::Action *m_axisNote = nullptr;
     osg::Matrix m_adjustMatrix;
+    osg::Matrix m_permFix{osg::Matrix::identity()};
+    osg::Vec3 m_permAxis{0,0,1};
+    double m_permAngleDeg = 0.0;
     // methods to create UI elements
     void createSettingsMenu();
     void createArmBaseVectorMenu();
     void createAdjustMatrixMenu();
+    void createPermFixMenu();
     void createDebugMenu();
+    void recomputePermFixFromAxisAngle();
 };
 
 COVERPLUGIN(GhostAvatarPlugin)

@@ -22,7 +22,7 @@ const std::string ARM_NODE_NAME = "RightArm"; // "LeftArm"
 class GhostAvatar
 {
 public:
-    GhostAvatar(int id, osg::Matrix adjustMatrix);
+    GhostAvatar(int id, osg::Matrix adjustMatrix, osg::Matrix permFix = osg::Matrix::identity());
     ~GhostAvatar();
 
     void loadAvatar();
@@ -39,13 +39,16 @@ public:
     void showTargetLine(bool show) { m_showTargetLine = show; }
     void setArmBaseVector(const osg::Vec3 &vec) { m_armBaseVec = vec; }
     void setAdjustMatrix(const osg::Matrix &mat) { m_adjustMatrix = mat; }
+    void setPermFix(const osg::Matrix &mat) { m_permFix = mat; m_axisFix->setMatrix(m_permFix); }
     
 private:
     osg::ref_ptr<osg::MatrixTransform> m_avatarTrans;
+    osg::ref_ptr<osg::MatrixTransform> m_axisFix;
     BoneParser m_parser;
     std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
     osg::Vec3 m_armBaseVec = {0, 1, 0};
     osg::Matrix m_adjustMatrix = osg::Matrix::identity();
+    osg::Matrix m_permFix = osg::Matrix::identity();
 
     void createInteractors();
 
