@@ -11,7 +11,7 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
-constexpr bool USE_INTERACTORS = false;
+constexpr bool USE_INTERACTORS = true;
 
 void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float length, const std::string &name, osg::ref_ptr<osg::MatrixTransform> &framePtr)
 {
@@ -101,6 +101,27 @@ void GhostAvatar::loadAvatar()
     cover->getObjectsRoot()->addChild(m_avatarTrans);
 }
 
+static void setBoneToWorldPosition(osgAnimation::Bone* bone,
+                                   const osg::Vec3 &worldPos)
+{
+    if (!bone || !bone->getParent(0)) return;
+
+    // stop UpdateBone (so stacked elements / callbacks won't overwrite us)
+    bone->setUpdateCallback(nullptr);
+
+    // compute world->skeleton (avatar root + axis fix define skeleton->world)
+    auto reference = bone->getParent(0)->getWorldMatrices(cover->getObjectsRoot())[0];
+    auto inv = osg::Matrix::inverse(reference);
+    // transform world position into skeleton space (note Vec * Matrix)
+    osg::Vec3 posInSkeleton = worldPos * inv;
+
+    // build a matrix for the bone in skeleton space (only translation here)
+    osg::Matrix boneMtxInSkeleton = osg::Matrix::translate(posInSkeleton);
+
+    // apply directly to the bone
+    bone->setMatrixInSkeletonSpace(boneMtxInSkeleton);
+}
+
 bool GhostAvatar::update()
 {
     if (m_firstUpdate)
@@ -112,10 +133,29 @@ bool GhostAvatar::update()
             createInteractors();
 
         auto rightArm = m_parser.findNode(ARM_NODE_NAME);
+        m_head = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone.002")->second.osgNode);
+        m_arm = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone.003")->second.osgNode);
+        m_feet = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone")->second.osgNode);
+        // stop any stacked-transform update callbacks on these bones so we can set their matrices directly
+        if (m_head)
+            m_head->setUpdateCallback(nullptr);
+        if (m_arm)
+            m_arm->setUpdateCallback(nullptr);
+        if (m_feet)
+            m_feet->setUpdateCallback(nullptr);
+    
     }
     auto floorPos = USE_INTERACTORS ? m_interactorFloor->getMatrix() :coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix();
-    m_avatarTrans->setMatrix(floorPos);
+    // m_avatarTrans->setMatrix(floorPos);
 
+    if(m_head && m_arm && USE_INTERACTORS)
+    {
+        setBoneToWorldPosition(m_arm, m_interactorHand->getMatrix().getTrans());
+        setBoneToWorldPosition(m_head, m_interactorHead->getMatrix().getTrans());
+        setBoneToWorldPosition(m_feet, m_interactorFloor->getMatrix().getTrans());
+
+    }
+    return true;
     auto armNode = m_parser.findNode(ARM_NODE_NAME);
     if (armNode != m_parser.nodeToIk.end())
     {
@@ -222,14 +262,21 @@ void GhostAvatar::createInteractors()
     std::cerr << "Creating interactors for GhostAvatar " << m_id << "\n";
     osg::Matrix m;
     auto interSize = 10.2;
-    m.setTrans(0, 10, 0.2);
-    m_interactorFloor.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "floor", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    m.setTrans(0, 0, 237);
+    m_interactorFloor.reset(new coVR3DTransformInteractor(interSize, vrui::coInteraction::InteractionType::ButtonA, "floor", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    m_interactorFloor->updateTransform(m);
     m_interactorFloor->enableIntersection();
     m_interactorFloor->show();
 
-    m.setTrans(-45, 165, 265);
-    m_interactorHand.reset(new coVR3DTransRotInteractor(m, interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    m.setTrans(130, 0, 53);
+    m_interactorHand.reset(new coVR3DTransformInteractor(interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    m_interactorHand->updateTransform(m);
     m_interactorHand->enableIntersection();
     m_interactorHand->show();
-}
 
+    m.setTrans(0, 0, 27);
+    m_interactorHead.reset(new coVR3DTransformInteractor(interSize, vrui::coInteraction::InteractionType::ButtonA, "headBone", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
+    m_interactorHead->updateTransform(m);
+    m_interactorHead->enableIntersection();
+    m_interactorHead->show();
+}
