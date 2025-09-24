@@ -15,10 +15,11 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/VectorEditField.h>
-#include <PluginUtil/coVR3DTransRotInteractor.h>
+#include <PluginUtil/coVR3DTransformInteractor.h>
 
 #include "Bone.h"
 const std::string ARM_NODE_NAME = "RightArm"; // "LeftArm"
+const std::string HEAD_NODE_NAME = "Bone.002";
 class GhostAvatar
 {
 public:
@@ -45,7 +46,7 @@ private:
     osg::ref_ptr<osg::MatrixTransform> m_avatarTrans;
     osg::ref_ptr<osg::MatrixTransform> m_axisFix;
     BoneParser m_parser;
-    std::unique_ptr<opencover::coVR3DTransRotInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
+    std::unique_ptr<opencover::coVR3DTransformInteractor> m_interactorHead, m_interactorFloor, m_interactorHand;
     osg::Vec3 m_armBaseVec = {0, 1, 0};
     osg::Matrix m_adjustMatrix = osg::Matrix::identity();
     osg::Matrix m_permFix = osg::Matrix::identity();
@@ -53,13 +54,17 @@ private:
     void createInteractors();
 
     // settings
-    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\ghost_noCloth.fbx";
-    // std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE3_noAnimation.fbx";
+    // std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\ghost_noCloth.fbx";
+    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE3.fbx";
 
     // debugging
     osg::ref_ptr<osg::MatrixTransform> m_targetLine;
     osg::ref_ptr<osg::MatrixTransform> m_globalFrame;
     osg::ref_ptr<osg::MatrixTransform> m_armLocalFrame;
+
+    osgAnimation::Bone* m_head = nullptr;
+    osgAnimation::Bone* m_arm = nullptr;
+    osgAnimation::Bone* m_feet = nullptr;
 
     const int m_id = -1;
     bool m_showFrames = false;
