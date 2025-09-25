@@ -55,7 +55,7 @@ private:
 
     // settings
     // std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\ghost_noCloth.fbx";
-    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE3.fbx";
+    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE4.fbx";
 
     // debugging
     osg::ref_ptr<osg::MatrixTransform> m_targetLine;
