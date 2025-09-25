@@ -11,7 +11,7 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
-constexpr bool USE_INTERACTORS = true;
+constexpr bool USE_INTERACTORS = false;
 
 void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float length, const std::string &name, osg::ref_ptr<osg::MatrixTransform> &framePtr)
 {
@@ -137,69 +137,25 @@ bool GhostAvatar::update()
         m_arm = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone.003")->second.osgNode);
         m_feet = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone")->second.osgNode);
         // stop any stacked-transform update callbacks on these bones so we can set their matrices directly
-        if (m_head)
-            m_head->setUpdateCallback(nullptr);
-        if (m_arm)
-            m_arm->setUpdateCallback(nullptr);
-        if (m_feet)
-            m_feet->setUpdateCallback(nullptr);
+        // if (m_head)
+        //     m_head->setUpdateCallback(nullptr);
+        // if (m_arm)
+        //     m_arm->setUpdateCallback(nullptr);
+        // if (m_feet)
+        //     m_feet->setUpdateCallback(nullptr);
     
     }
-    auto floorPos = USE_INTERACTORS ? m_interactorFloor->getMatrix() :coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix();
-    // m_avatarTrans->setMatrix(floorPos);
+    auto floorPos = USE_INTERACTORS ? m_interactorFloor->getMatrix() : coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix();
+    m_avatarTrans->setMatrix(coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix());
 
-    if(m_head && m_arm && USE_INTERACTORS)
+    if(m_head && m_arm)
     {
-        setBoneToWorldPosition(m_arm, m_interactorHand->getMatrix().getTrans());
-        setBoneToWorldPosition(m_head, m_interactorHead->getMatrix().getTrans());
-        setBoneToWorldPosition(m_feet, m_interactorFloor->getMatrix().getTrans());
+        auto armPos = USE_INTERACTORS ? m_interactorHand->getMatrix() : coVRPartnerList::instance()->get(m_id)->getAvatar()->handTransform->getMatrix();
+        auto headPos = USE_INTERACTORS ? m_interactorHead->getMatrix() : coVRPartnerList::instance()->get(m_id)->getAvatar()->headTransform->getMatrix();
 
-    }
-    return true;
-    auto armNode = m_parser.findNode(ARM_NODE_NAME);
-    if (armNode != m_parser.nodeToIk.end())
-    {
-        auto &armBoneParser = armNode->second;
-        if (armBoneParser.rot && m_interactorHand)
-        {
-            // matrices to convert between local and world coordinates
-            assert(armNode->second.parent);
-            auto localToWorldMat = armNode->second.parent->osgNode->getWorldMatrices(cover->getObjectsRoot())[0];
-            auto worldToLocalMat = osg::Matrix::inverse(localToWorldMat);
+        setBoneToWorldPosition(m_arm, armPos.getTrans());
+        setBoneToWorldPosition(m_head, headPos.getTrans());
 
-            auto localArmPos = armNode->second.basePos;
-            auto worldArmPos = localArmPos * localToWorldMat;
-
-            auto worldTargetPos = USE_INTERACTORS ? m_interactorHand->getMatrix().getTrans() : coVRPartnerList::instance()->get(m_id)->getAvatar()->handTransform->getMatrix().getTrans();
-
-            auto localTargetPos = worldTargetPos * worldToLocalMat;
-            // compute vector from the base of the arm to the target
-            osg::Vec3 localTargetDir = localTargetPos - localArmPos;
-            localTargetDir.normalize();
-
-            // the axis convention of the bone might note match with the one used in COVER
-            osg::Vec3 adjustedTargetDir = m_adjustMatrix * localTargetDir;
-
-            // rotate the arm bone to point to the target
-            osg::Quat rotation;
-            if (m_armBaseVec[0] != 0 || m_armBaseVec[1] != 0 || m_armBaseVec[2] != 0)
-            {
-                rotation.makeRotate(m_armBaseVec, adjustedTargetDir);
-                armBoneParser.rot->setQuaternion(rotation);
-            }
-            
-            // UI elements for debugging
-            if (m_showFrames)
-            {
-                drawFrame(floorPos.getTrans(), osg::Matrix::identity(), 40.0f, "GlobalFrame", m_globalFrame);
-                drawFrame(worldArmPos, localToWorldMat, 1.0f, "ArmLocalFrame", m_armLocalFrame);
-            }
-
-            if (m_showTargetLine)
-            {
-                drawLine(worldArmPos, worldTargetPos);
-            }
-        }
     }
     return true;
 }
