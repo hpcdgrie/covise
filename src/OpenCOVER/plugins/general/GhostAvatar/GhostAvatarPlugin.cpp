@@ -20,6 +20,10 @@ GhostAvatarPlugin::GhostAvatarPlugin()
 {
     createSettingsMenu();
     createDebugMenu();
+    m_permFix.set(-1,0,0,0,
+                0,1,0,0,
+                0,0,-1,0,
+                0,0,0,1); // invert X and Z axes
     coVRCommunication::instance()->subscribeNotification(coVRCommunication::Notification::PartnerJoined, [this]() {
         std::cerr << "Partner joined\n";
         // check for new partners and add avatars
@@ -59,7 +63,7 @@ GhostAvatarPlugin::GhostAvatarPlugin()
         m_avatars.clear();  
         for(const auto &partner : *coVRPartnerList::instance())
         {
-            if(partner->ID() == coVRPartnerList::instance()->me()->ID())
+            if(partner->ID() == coVRPartnerList::instance()->me()->ID() || partner->sessionID() != coVRPartnerList::instance()->me()->sessionID())
                 continue;
             m_avatars.push_back(std::make_unique<GhostAvatar>(partner->ID(), m_adjustMatrix, m_permFix));
         }

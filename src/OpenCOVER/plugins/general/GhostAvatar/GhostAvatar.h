@@ -16,6 +16,8 @@
 #include <cover/ui/Owner.h>
 #include <cover/ui/VectorEditField.h>
 #include <PluginUtil/coVR3DTransformInteractor.h>
+#include <osgAnimation/Skeleton>
+
 
 #include "Bone.h"
 const std::string ARM_NODE_NAME = "RightArm"; // "LeftArm"
@@ -55,7 +57,7 @@ private:
 
     // settings
     // std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\ghost_noCloth.fbx";
-    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE4.fbx";
+    std::string m_pathToFbx = "C:\\Users\\Dennis\\Data\\Starts\\PLANEE5.fbx";
 
     // debugging
     osg::ref_ptr<osg::MatrixTransform> m_targetLine;
@@ -65,6 +67,7 @@ private:
     osgAnimation::Bone* m_head = nullptr;
     osgAnimation::Bone* m_arm = nullptr;
     osgAnimation::Bone* m_feet = nullptr;
+    osgAnimation::Skeleton* m_skeleton = nullptr;
 
     const int m_id = -1;
     bool m_showFrames = false;
