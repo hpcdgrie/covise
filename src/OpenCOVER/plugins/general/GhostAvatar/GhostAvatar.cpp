@@ -11,7 +11,7 @@ using namespace covise;
 using namespace opencover;
 using namespace ui;
 
-constexpr bool USE_INTERACTORS = false;
+constexpr bool USE_INTERACTORS = true;
 
 void drawFrame(const osg::Vec3 &origin, const osg::Matrix &orientation, float length, const std::string &name, osg::ref_ptr<osg::MatrixTransform> &framePtr)
 {
@@ -84,7 +84,8 @@ GhostAvatar::~GhostAvatar()
 
 void GhostAvatar::loadAvatar()
 {
-    auto model = osgDB::readNodeFile(m_pathToFbx);
+    auto avatarFile = coVRPartnerList::instance()->get(m_id)->userInfo().avatar;
+    auto model = osgDB::readNodeFile(avatarFile.empty() ? m_pathToFbx : avatarFile);
 
     m_avatarTrans = new osg::MatrixTransform();
     m_avatarTrans->setName("AvatarTrans");
@@ -101,24 +102,20 @@ void GhostAvatar::loadAvatar()
     cover->getObjectsRoot()->addChild(m_avatarTrans);
 }
 
-static void setBoneToWorldPosition(osgAnimation::Bone* bone,
-                                   const osg::Vec3 &worldPos)
+static void setBoneToWorldPosition(osgAnimation::Bone* bone, osgAnimation::Skeleton* skeleton,
+                                   const osg::Matrix &worldTrans)
 {
-    if (!bone || !bone->getParent(0)) return;
+    if (!bone || !bone->getParent(0) || !skeleton) return;
+    osg::Matrix worldNoScale;
+    worldNoScale.makeRotate(worldTrans.getRotate());
+    worldNoScale.setTrans(worldTrans.getTrans());
 
-    // stop UpdateBone (so stacked elements / callbacks won't overwrite us)
-    bone->setUpdateCallback(nullptr);
+    osg::Matrix skeletonRootWorld = skeleton->getWorldMatrices(cover->getObjectsRoot())[0];
+    osg::Matrix invSkel = osg::Matrix::inverse(skeletonRootWorld); // world -> skeleton
 
-    // compute world->skeleton (avatar root + axis fix define skeleton->world)
-    auto reference = bone->getParent(0)->getWorldMatrices(cover->getObjectsRoot())[0];
-    auto inv = osg::Matrix::inverse(reference);
-    // transform world position into skeleton space (note Vec * Matrix)
-    osg::Vec3 posInSkeleton = worldPos * inv;
+    // convert world (no-scale) into skeleton space and set that directly
+    osg::Matrix boneMtxInSkeleton = invSkel * worldNoScale; // pre-multiply!
 
-    // build a matrix for the bone in skeleton space (only translation here)
-    osg::Matrix boneMtxInSkeleton = osg::Matrix::translate(posInSkeleton);
-
-    // apply directly to the bone
     bone->setMatrixInSkeletonSpace(boneMtxInSkeleton);
 }
 
@@ -137,24 +134,32 @@ bool GhostAvatar::update()
         m_arm = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone.003")->second.osgNode);
         m_feet = dynamic_cast<osgAnimation::Bone*>(m_parser.findNode("Bone")->second.osgNode);
         // stop any stacked-transform update callbacks on these bones so we can set their matrices directly
-        // if (m_head)
-        //     m_head->setUpdateCallback(nullptr);
-        // if (m_arm)
-        //     m_arm->setUpdateCallback(nullptr);
-        // if (m_feet)
-        //     m_feet->setUpdateCallback(nullptr);
+        if (m_head)
+            m_head->setUpdateCallback(nullptr);
+        if (m_arm)
+            m_arm->setUpdateCallback(nullptr);
+        if (m_feet)
+            m_feet->setUpdateCallback(nullptr);
+        osg::Node* p = m_head->getParent(0);
+        while (p && !m_skeleton)
+        {
+            m_skeleton = dynamic_cast<osgAnimation::Skeleton*>(p);
+            if (m_skeleton) break;
+            if (p->getNumParents() == 0) break;
+            p = p->getParent(0);
+        } 
     
     }
     auto floorPos = USE_INTERACTORS ? m_interactorFloor->getMatrix() : coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix();
-    m_avatarTrans->setMatrix(coVRPartnerList::instance()->get(m_id)->getAvatar()->feetTransform->getMatrix());
+    m_avatarTrans->setMatrix(floorPos);
 
     if(m_head && m_arm)
     {
         auto armPos = USE_INTERACTORS ? m_interactorHand->getMatrix() : coVRPartnerList::instance()->get(m_id)->getAvatar()->handTransform->getMatrix();
         auto headPos = USE_INTERACTORS ? m_interactorHead->getMatrix() : coVRPartnerList::instance()->get(m_id)->getAvatar()->headTransform->getMatrix();
 
-        setBoneToWorldPosition(m_arm, armPos.getTrans());
-        setBoneToWorldPosition(m_head, headPos.getTrans());
+        setBoneToWorldPosition(m_arm, m_skeleton, armPos);
+        setBoneToWorldPosition(m_head, m_skeleton, headPos);
 
     }
     return true;
@@ -217,20 +222,20 @@ void GhostAvatar::createInteractors()
 {
     std::cerr << "Creating interactors for GhostAvatar " << m_id << "\n";
     osg::Matrix m;
-    auto interSize = 10.2;
-    m.setTrans(0, 0, 237);
+    auto interSize = 20.2;
+    m.setTrans(120, 0, -847);
     m_interactorFloor.reset(new coVR3DTransformInteractor(interSize, vrui::coInteraction::InteractionType::ButtonA, "floor", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
     m_interactorFloor->updateTransform(m);
     m_interactorFloor->enableIntersection();
     m_interactorFloor->show();
 
-    m.setTrans(130, 0, 53);
+    m.setTrans(-1000, 0, 0);
     m_interactorHand.reset(new coVR3DTransformInteractor(interSize, vrui::coInteraction::InteractionType::ButtonA, "hand", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
     m_interactorHand->updateTransform(m);
     m_interactorHand->enableIntersection();
     m_interactorHand->show();
 
-    m.setTrans(0, 0, 27);
+    m.setTrans(-150, 0, 753);
     m_interactorHead.reset(new coVR3DTransformInteractor(interSize, vrui::coInteraction::InteractionType::ButtonA, "headBone", "targetInteractor", vrui::coInteraction::InteractionPriority::Medium));
     m_interactorHead->updateTransform(m);
     m_interactorHead->enableIntersection();
