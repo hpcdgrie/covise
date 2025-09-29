@@ -19,7 +19,18 @@
 
 #include "Bone.h"
 
+
+/*
+Load an fbx model generated with blender as avatar for remote users in a collaborative session.
+The model for each partner are specified in the partners config file (remote fetch might not work for external fbx materials)
+The model is expected to have a bone called "head" and one called "arm" (names are case-sensitive).
+In Blender the model should be oriented such that:
+ - the model's feet are at the origin, +Y is up, +X is right, +Z is forward
+FBX export with "Forward_ -Z Forward" and "Up Y Up" settings
+*/
+
 class GhostAvatar;
+
 
 class GhostAvatarPlugin : public opencover::coVRPlugin, public opencover::ui::Owner
 {
