@@ -133,10 +133,16 @@ void PartnerAvatar::loadPartnerIcon()
         if (!hostIconNode)
         {
             auto iconFile = coVRFileManager::instance()->findOrGetFile(m_partner->userInfo().icon, m_partner->ID());
-            if (!hostIconNode)
+            if (iconFile.empty())
                 cerr << "host icon not found " << iconFile << endl;
             else
-                hostIconNode = coVRFileManager::instance()->loadIcon(iconFile.c_str());
+            {
+                auto n = coVRFileManager::instance()->loadIcon(iconFile.c_str());
+                if (!n)
+                    cerr << "failed to load " << iconFile << endl;
+                else
+                    hostIconNode = n;
+            }
         }
     }
     coBillboard *bb = new coBillboard;

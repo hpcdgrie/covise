@@ -334,10 +334,10 @@ void opencover::coVRPartnerList::receiveAvatarMessage(covise::TokenBuffer &tb)
     if (av->init(adress))
     {
 
-        if(!coVRPluginList::instance()->getPlugin("AnimatedAvatar") && !coVRPluginList::instance()->getPlugin("FbxAvatar"))
-            av->loadPartnerIcon();
         if (m_avatarsVisible && p->ID() != coVRCommunication::instance()->getID() && p->sessionID() == coVRCommunication::instance()->getSessionID())
         {
+            if(!coVRPluginList::instance()->getPlugin("AnimatedAvatar") && !coVRPluginList::instance()->getPlugin("FbxAvatar"))
+                av->loadPartnerIcon();
             av->show();
         }
         else
