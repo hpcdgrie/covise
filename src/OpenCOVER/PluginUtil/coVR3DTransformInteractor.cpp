@@ -359,20 +359,59 @@ osg::Geode* coVR3DTransformInteractor::createRotationRing(const osg::Vec3 &axis,
 {
     osg::Geode* geode = new osg::Geode;
     
-    osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
-    osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
-    osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
-    
-    const int ringSegments = 64;  // Number of segments around the ring
-    const int tubeSegments = 16;  // Number of segments around the tube cross-section
-    const float majorRadius = ringRadius;  // Ring radius
-    const float minorRadius = arrowLength * 0.02f; // Tube thickness radius
-    
-    // Create a proper coordinate system for the torus
-    osg::Vec3 torusNormal = axis;  // The axis is the normal to the torus plane
-    torusNormal.normalize();
-    
-    // Create two perpendicular vectors in the torus plane
+    auto makeTorusGeom = [](const osg::Vec3 &torusNormal,
+                            const osg::Vec3 &u, const osg::Vec3 &v,
+                            int ringSegments, int tubeSegments,
+                            float majorRadius, float minorRadius)
+    {
+        osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+        osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+
+        for (int i = 0; i < ringSegments; ++i) {
+            float theta = 2.0f * osg::PI * i / ringSegments;
+            osg::Vec3 majorCirclePoint = u * cos(theta) * majorRadius + v * sin(theta) * majorRadius;
+            osg::Vec3 tubeU = u * cos(theta) + v * sin(theta);
+            osg::Vec3 tubeV = torusNormal;
+            for (int j = 0; j < tubeSegments; ++j) {
+                float phi = 2.0f * osg::PI * j / tubeSegments;
+                osg::Vec3 tubeOffset = (tubeU * cos(phi) + tubeV * sin(phi)) * minorRadius;
+                osg::Vec3 vertex = majorCirclePoint + tubeOffset;
+                osg::Vec3 normal = tubeOffset;
+                normal.normalize();
+                vertices->push_back(vertex);
+                normals->push_back(normal);
+            }
+        }
+
+        osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
+        for (int i = 0; i < ringSegments; ++i) {
+            int nextI = (i + 1) % ringSegments;
+            for (int j = 0; j < tubeSegments; ++j) {
+                int nextJ = (j + 1) % tubeSegments;
+                int v0 = i * tubeSegments + j;
+                int v1 = i * tubeSegments + nextJ;
+                int v2 = nextI * tubeSegments + nextJ;
+                int v3 = nextI * tubeSegments + j;
+                indices->push_back(v0); indices->push_back(v1); indices->push_back(v2);
+                indices->push_back(v0); indices->push_back(v2); indices->push_back(v3);
+            }
+        }
+
+        geometry->setVertexArray(vertices.get());
+        geometry->setNormalArray(normals.get());
+        geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+        geometry->addPrimitiveSet(indices.get());
+        return geometry.release();
+    };
+
+    const int ringSegments = 64;
+    const int tubeSegments = 16;
+    const float majorRadius = ringRadius;
+    const float minorRadius = arrowLength * 0.02f;
+
+    // Build orthonormal basis in torus plane
+    osg::Vec3 torusNormal = axis; torusNormal.normalize();
     osg::Vec3 u, v;
     if (fabs(torusNormal.x()) < 0.9f) {
         u = torusNormal ^ osg::Vec3(1, 0, 0);
@@ -382,74 +421,37 @@ osg::Geode* coVR3DTransformInteractor::createRotationRing(const osg::Vec3 &axis,
     u.normalize();
     v = torusNormal ^ u;
     v.normalize();
-    
-    // Generate torus vertices and normals
-    for (int i = 0; i < ringSegments; ++i) {
-        float theta = 2.0f * osg::PI * i / ringSegments;  // Angle around the major radius
-        
-        // Point on the major radius circle (center of the tube at this position)
-        osg::Vec3 majorCirclePoint = u * cos(theta) * majorRadius + v * sin(theta) * majorRadius;
-        
-        // Direction vectors for the tube cross-section
-        osg::Vec3 tubeU = u * cos(theta) + v * sin(theta);  // Radial direction from torus center
-        osg::Vec3 tubeV = torusNormal;                       // Axial direction
-        
-        // Generate the tube cross-section
-        for (int j = 0; j < tubeSegments; ++j) {
-            float phi = 2.0f * osg::PI * j / tubeSegments;  // Angle around the tube cross-section
-            
-            // Point on the tube circumference
-            osg::Vec3 tubeOffset = (tubeU * cos(phi) + tubeV * sin(phi)) * minorRadius;
-            osg::Vec3 vertex = majorCirclePoint + tubeOffset;
-            
-            // Normal points outward from the tube center
-            osg::Vec3 normal = tubeOffset;
-            normal.normalize();
-            
-            vertices->push_back(vertex);
-            normals->push_back(normal);
-        }
-    }
-    
-    // Generate triangle indices
-    osg::ref_ptr<osg::DrawElementsUInt> indices = new osg::DrawElementsUInt(GL_TRIANGLES);
-    
-    for (int i = 0; i < ringSegments; ++i) {
-        int nextI = (i + 1) % ringSegments;
-        
-        for (int j = 0; j < tubeSegments; ++j) {
-            int nextJ = (j + 1) % tubeSegments;
-            
-            // Calculate vertex indices for the current quad
-            int v0 = i * tubeSegments + j;
-            int v1 = i * tubeSegments + nextJ;
-            int v2 = nextI * tubeSegments + nextJ;
-            int v3 = nextI * tubeSegments + j;
-            
-            // Create two triangles for each quad
-            // Triangle 1: v0 -> v1 -> v2
-            indices->push_back(v0);
-            indices->push_back(v1);
-            indices->push_back(v2);
-            
-            // Triangle 2: v0 -> v2 -> v3
-            indices->push_back(v0);
-            indices->push_back(v2);
-            indices->push_back(v3);
-        }
-    }
-    
-    geometry->setVertexArray(vertices);
-    geometry->setNormalArray(normals);
-    geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
-    geometry->addPrimitiveSet(indices);
-    
-    // Enable smooth shading
-    geometry->getOrCreateStateSet()->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
-    
-    geode->addDrawable(geometry);
-    setMaterial(geode, color);
-    
+
+    // Visible torus (as before)
+    osg::Geometry* visGeom = makeTorusGeom(torusNormal, u, v, ringSegments, tubeSegments, majorRadius, minorRadius);
+    geode->addDrawable(visGeom);
+    setMaterial(geode, color); // keep existing material for visible part
+
+    // Invisible (by default) slightly larger torus used only for hit detection
+    // Define SHOW_EXTENDED_ROTATION_RINGS at compile time to make this hit-torus
+    // slightly visible (low alpha) so you can get a feel for the extended hit area.
+    const float hitScale = 4.0f; // increase hit radius without changing visual size
+    osg::ref_ptr<osg::Geometry> hitGeom = makeTorusGeom(torusNormal, u, v, ringSegments/4, tubeSegments/4, majorRadius, minorRadius * hitScale);
+
+    // Color the hit geometry. When not compiling with SHOW_EXTENDED_ROTATION_RINGS
+    // the hit geometry is fully transparent so it remains invisible but pickable.
+    osg::ref_ptr<osg::Vec4Array> hitColor = new osg::Vec4Array;
+
+    hitColor->push_back(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f)); // invisible
+    hitGeom->setColorArray(hitColor.get(), osg::Array::BIND_OVERALL);
+
+    osg::StateSet* ss = hitGeom->getOrCreateStateSet();
+    ss->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    ss->setMode(GL_BLEND, osg::StateAttribute::ON);
+    ss->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+    // ensure it doesn't get a material/shading that would make it visible
+    ss->removeAttribute(osg::StateAttribute::MATERIAL);
+
+    geode->addDrawable(hitGeom.get());
+
+    // Keep smooth shading off for the combined geode
+    visGeom->getOrCreateStateSet()->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
+
     return geode;
 }
 
