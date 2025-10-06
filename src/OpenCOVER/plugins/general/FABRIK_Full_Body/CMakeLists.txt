@@ -8,7 +8,7 @@ SET(SOURCES
     ConnectionLine.cpp
 )
 
-find_package(fabrik REQUIRED) # Ensure fabrik is found, or stop the configuration process
+find_package(fabrik)
 if(NOT fabrik_FOUND)
     return()
 endif()
