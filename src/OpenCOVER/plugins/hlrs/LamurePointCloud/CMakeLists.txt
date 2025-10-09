@@ -1,4 +1,5 @@
 # Set the source directory
+return()
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Include additional CMake scripts
