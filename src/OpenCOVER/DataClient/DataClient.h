@@ -72,22 +72,17 @@ public:
 
 protected:
     void statusChanged();
-
+    Client** getClientReference(const ObserverHandle &handle);
 private:
 
     virtual std::unique_ptr<detail::MultiDimensionalArrayBase> getArrayImpl(std::type_index type, const std::string &name) = 0;
     virtual std::vector<std::string> getNodesWith(std::type_index type, bool isScalar) const = 0;
-    virtual std::vector<std::string> getNodesWith(bool mustBeArithmetic, bool isScalar) const = 0;
+    virtual std::vector<std::string> getNodesWith(bool isArithmetic, bool isScalar) const = 0;
     std::mutex m_mutex;
     std::vector<size_t> m_nodesToUnregister;
     std::map<void*, bool> m_statusObservers; //stores which objects received a changed status
     bool m_connected = false;
 };
-
-
-//todo: dummy getter for now
-DATACLIENTEXPORT Client *getClient(const std::string &name);
-
 
 }} // namespace
 

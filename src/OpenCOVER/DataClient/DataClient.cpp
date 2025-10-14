@@ -36,11 +36,6 @@ std::vector<std::string> Client::availableNumericalArrays() const
     return getNodesWith(true, false);
 }
 
-Client *opencover::dataclient::getClient(const std::string &name)
-{
-    return nullptr;
-}
-
 auto msController = opencover::coVRMSController::instance();
 
 Client::StatusChange Client::statusChanged(void* caller)
@@ -69,4 +64,9 @@ void Client::statusChanged()
     std::lock_guard<std::mutex> lock(m_mutex);
     for(auto &obs : m_statusObservers)
         obs.second = false;
+}
+
+Client** Client::getClientReference(const ObserverHandle &handle)
+{
+    return &handle.m_deleter->m_client;
 }
