@@ -16,6 +16,7 @@ void MachineNodeBase::initFields(MachineNodeBase *node, VrmlNodeType *t) {
         field("axisOrientations", node->axisOrientations),
         field("offsets", node->offsets),
         field("axisNames", node->axisNames),
+        field("axisTypes", node->axisTypes),
         field("toolNumberName", node->toolNumberName),
         field("toolLengthName", node->toolLengthName),
         field("toolRadiusName", node->toolRadiusName),

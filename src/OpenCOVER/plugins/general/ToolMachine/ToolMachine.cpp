@@ -3,7 +3,7 @@
 #include "Oct.h"
 #include <OpcUaClient/opcua.h>
 #include <vrml97/vrml/VrmlScene.h>
-
+#include <DataClient/DummyClient.h>
 using namespace covise;
 using namespace opencover;
 using namespace vrml;
@@ -33,7 +33,8 @@ Machine::Machine(opencover::ui::Menu *menu, opencover::config::File *file, Machi
 void Machine::connectOpcua()
 {
     if(!m_client)
-    m_client = opcua::connect(m_machineNode->machineName.get());
+    // m_client = opcua::connect(m_machineNode->machineName.get());
+        m_client = new dataclient::DummyClient(m_machineNode->machineName.get());
     if(!m_client || !m_client->isConnected())
         return;
     m_mathExpressionObserver = std::make_unique<MathExpressionObserver>(m_client);
@@ -66,17 +67,21 @@ void Machine::connectOpcua()
 
 void Machine::move(int axis, float value)
 {
-    if(axis >= m_machineNode->axisNames.size())
+    if(axis >= m_machineNode->axisNames.size() || axis >= m_machineNode->axisTypes.size())
         return;
     auto v = osg::Vec3{*m_machineNode->axisOrientations[axis], *(m_machineNode->axisOrientations[axis] + 1), *(m_machineNode->axisOrientations[axis] +2) };
     auto osgNode = toOsg(m_machineNode->axisNodes[axis]);
-    if(axis <= 2) // ugly hack to find out if an axis is translational
+    if(strcmp(m_machineNode->axisTypes[axis], "trans") == 0) // ugly hack to find out if an axis is translational
     {
         v *= (value * m_machineNode->opcUaToVrml.get());
         osgNode->setMatrix(osg::Matrix::translate(v));
     }
-    else{
-        osgNode->setMatrix(osg::Matrix::rotate(value / 180 *(float)osg::PI, v));
+    else if (strcmp(m_machineNode->axisTypes[axis], "rot") == 0)
+    {
+        auto m = osgNode->getMatrix();
+        auto translation = m.getTrans();
+        auto rotation = osg::Matrix::rotate(value / 180 * (float)osg::PI, v);
+        osgNode->setMatrix(rotation * osg::Matrix::translate(translation));
     }
 }
 
@@ -129,12 +134,12 @@ bool Machine::addTool()
     ui::Group *machineGroup = new ui::Group(m_menu, m_machineNode->machineName.get());
     if(strcmp(m_machineNode->visualizationType.get(), "Currents") == 0 )
     {
-        SelfDeletingTool::create(m_tool, std::make_unique<Currents>(machineGroup, *m_configFile, toolHead, table));
+        SelfDeletingTool::create(m_tool, std::make_unique<Currents>(machineGroup, *m_configFile, toolHead, table, m_client));
         return true;
     }
     if(strcmp(m_machineNode->visualizationType.get(), "Oct") == 0 )
     {
-        SelfDeletingTool::create(m_tool, std::make_unique<Oct>(machineGroup, *m_configFile, toolHead, table));
+        SelfDeletingTool::create(m_tool, std::make_unique<Oct>(machineGroup, *m_configFile, toolHead, table, m_client));
         dynamic_cast<Oct*>(m_tool->value.get())->setScale(m_machineNode->opcUaToVrml.get());
         return true;
     }

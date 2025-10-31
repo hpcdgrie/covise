@@ -33,7 +33,7 @@ class SelfDeletingTool;
 class Tool{
 public:
     friend SelfDeletingTool;
-    Tool(opencover::ui::Group* group, opencover::config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode);
+    Tool(opencover::ui::Group* group, opencover::config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode, opencover::dataclient::Client *client);
     virtual ~Tool() = default;
     void update(const opencover::dataclient::MultiDimensionalArray<double> &data);
     void update();

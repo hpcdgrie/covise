@@ -18,8 +18,8 @@ opencover::coVRShader *applyLineShader(osg::Drawable *drawable, const opencover:
     return applyShader(drawable, colorMap, "MapColorsAttribUnlit");
 }
 
-Currents::Currents(ui::Group *group, config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode)
-: Tool(group, file, toolHeadNode, tableNode)
+Currents::Currents(ui::Group *group, config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode, dataclient::Client *client)
+: Tool(group, file, toolHeadNode, tableNode, client)
 {
     initGeo();
 }

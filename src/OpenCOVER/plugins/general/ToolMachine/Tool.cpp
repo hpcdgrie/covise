@@ -8,11 +8,11 @@ using namespace opencover;
 
 
 
-Tool::Tool(ui::Group *group, config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode)
+Tool::Tool(ui::Group *group, config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode, dataclient::Client *client)
 : m_toolHeadNode(toolHeadNode)
 , m_tableNode(tableNode)
 , m_group(group)
-, m_client(opcua::getClient(group->name()))
+, m_client(client)
 , m_mathExpressionObserver(m_client)
 {
     auto clearBtn = new ui::Action(group, "clear");
