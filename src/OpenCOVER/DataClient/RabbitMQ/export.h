@@ -1,0 +1,12 @@
+#ifndef COVER_DATACLIENT_RABBITMQEXPORT_H
+#define COVER_DATACLIENT_RABBITMQEXPORT_H
+
+#include <util/coExport.h>
+
+#if defined(coRabbitMQClient_EXPORTS)
+#define RABBITMQEXPORT COEXPORT
+#else
+#define RABBITMQEXPORT COIMPORT
+#endif
+
+#endif // COVER_DATACLIENT_RABBITMQEXPORT_H
