@@ -23,7 +23,8 @@ public:
     vrml::VrmlSFNode tableNode;
     vrml::VrmlMFVec3f axisOrientations;
     vrml::VrmlMFFloat offsets;
-    vrml::VrmlMFString axisNames;
+    vrml::VrmlMFString axisNames; // trans or rot
+    vrml::VrmlMFString axisTypes;
     vrml::VrmlSFString toolNumberName;
     vrml::VrmlSFString toolLengthName;
     vrml::VrmlSFString toolRadiusName;

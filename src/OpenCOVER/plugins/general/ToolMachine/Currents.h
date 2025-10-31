@@ -10,7 +10,7 @@
 class Currents : public Tool
 {
 public:
-    Currents(opencover::ui::Group *group, opencover::config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode);
+    Currents(opencover::ui::Group *group, opencover::config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode, opencover::dataclient::Client *client);
 private:
     void clear() override;
     void applyShader(const opencover::ColorMap& map) override;

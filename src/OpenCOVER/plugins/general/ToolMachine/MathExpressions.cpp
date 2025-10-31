@@ -42,19 +42,20 @@ MathExpressionObserver::ObserverHandle::ptr MathExpressionObserver::observe(cons
     auto availableNodes = m_client->allAvailableScalars();
     for(auto s : symbols)
     {
-        auto serverSymbol = std::find_if(availableNodes.begin(), availableNodes.end(),
-                        [&s](const std::string &node) {
-                            return boost::iequals(s, node);
-                        });
-        if(*serverSymbol == opencover::dataclient::NoNodeName)
-            return nullptr;
+        // auto serverSymbol = std::find_if(availableNodes.begin(), availableNodes.end(),
+        //                 [&s](const std::string &node) {
+        //                     return boost::iequals(s, node);
+        //                 });
+        // assert(serverSymbol != availableNodes.end());
+        // if(*serverSymbol == opencover::dataclient::NoNodeName)
+        //     return nullptr;
 
-        if(serverSymbol == availableNodes.end())
-        {
-            std::cerr << "MathExpressionObserver: could not find opcua node " << s << std::endl;
-            return nullptr;
-        }
-        s = *serverSymbol;
+        // if(serverSymbol == availableNodes.end())
+        // {
+        //     std::cerr << "MathExpressionObserver: could not find opcua node " << s << std::endl;
+        //     return nullptr;
+        // }
+        // s = *serverSymbol;
         auto opcuaHandle = m_opcuaHandles.find(s);
         if(opcuaHandle != m_opcuaHandles.end())
         {
