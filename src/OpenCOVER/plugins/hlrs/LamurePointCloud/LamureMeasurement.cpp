@@ -1029,18 +1029,19 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
             if (!rnd->getGraphicsThreadDoesCull() && base>0) --base;
 
         double cull=0, draw=0, gpu=0; unsigned offC=0, offD=0, offG=0;
+        bool hasCull = false, hasDraw = false, hasGpu = false;
 
         if (getTimeTakenMsBacksearch(cs, base, m_gpuBackSearch,
             "Cull traversal time taken", "Cull traversal begin time", "Cull traversal end time",
             cull, offC))
-        { stats.backoff_cull = std::max(stats.backoff_cull, offC); sumCull += cull; }
+        { stats.backoff_cull = std::max(stats.backoff_cull, offC); sumCull += cull; hasCull = true; }
         if (m_measure_timeline)
             (void)tryAddBlock(cs, base, m_gpuBackSearch, "Cull traversal", "Cull traversal", "camera", int(i), blocks);
 
         if (getTimeTakenMsBacksearch(cs, base, m_gpuBackSearch,
             "Draw traversal time taken", "Draw traversal begin time", "Draw traversal end time",
             draw, offD))
-        { stats.backoff_draw = std::max(stats.backoff_draw, offD); sumDraw += draw; }
+        { stats.backoff_draw = std::max(stats.backoff_draw, offD); sumDraw += draw; hasDraw = true; }
         if (m_measure_timeline)
             (void)tryAddBlock(cs, base, m_gpuBackSearch, "Draw traversal", "Draw traversal", "camera", int(i), blocks);
 
@@ -1052,11 +1053,24 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
                 "GPU time taken", "GPU begin time", "GPU end time",
                 gpu, offG);
         }
-        if (gpu > 0.0) { stats.backoff_gpu = std::max(stats.backoff_gpu, offG); sumGpu += gpu; }
+        if (gpu > 0.0) { stats.backoff_gpu = std::max(stats.backoff_gpu, offG); sumGpu += gpu; hasGpu = true; }
 
         if (m_measure_timeline) {
             if (!tryAddBlock(cs, base, m_gpuBackSearch, "GPU draw", "GPU draw", "camera", int(i), blocks))
                 (void)tryAddBlock(cs, base, m_gpuBackSearch, "GPU", "GPU time", "camera", int(i), blocks);
+        }
+
+        if (auto* renderer = m_plugin->getRenderer()) {
+            int ctxId = -1;
+            if (auto* gc = cam->getGraphicsContext()) {
+                if (auto* gst = gc->getState()) {
+                    ctxId = static_cast<int>(gst->getContextID());
+                }
+            }
+            renderer->noteContextStats(ctxId, stats.frame_number,
+                hasCull ? cull : -1.0,
+                hasDraw ? draw : -1.0,
+                hasGpu ? gpu : -1.0);
         }
     }
     if (m_measure_timeline && !blocks.empty())
@@ -1162,6 +1176,10 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
     add_wait(stats.finish_ms);
     stats.wait_ms = any_wait_known ? waits : -1.0f;
 
+    if (auto* renderer = m_plugin->getRenderer()) {
+        renderer->noteGlobalStats(stats.frame_number, stats.cpu_update_ms, stats.wait_ms);
+    }
+
     // Prozente nur berechnen, wenn ft > 0
     if (ft > 0.0f) {
         const float cpu_clip  = std::max(0.0f, stats.cpu_main_ms);
@@ -1191,6 +1209,16 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
         stats.boundness = "CPU-bound";
     else
         stats.boundness = "mixed";
+
+    if (auto* renderer = m_plugin->getRenderer()) {
+        const auto timing = renderer->getTimingSnapshot(stats.frame_number);
+        if (timing.frame_number == stats.frame_number) {
+            stats.dispatch_ms       = static_cast<float>(timing.dispatch_ms);
+            stats.context_update_ms = static_cast<float>(timing.context_update_ms);
+            stats.render_cpu_ms     = static_cast<float>(timing.render_cpu_ms);
+            stats.ctx_timing        = renderer->getTimingCompactString(stats.frame_number);
+        }
+    }
 
     // --- FrameMarks (nur in Full)
     if (m_plugin->getSettings().measure_full) {
@@ -1580,7 +1608,8 @@ bool LamureMeasurement::writeFramesCSV(
             "rendering_traversals_ms;cpu_update_ms;cpu_cull_ms;cpu_draw_ms;gpu_time_ms;"
             "gpu_clock;gpu_mem_clock;gpu_util;gpu_pci;sync_time_ms;swap_time_ms;finish_ms;"
             "isect_ms;plugin_ms;opencover_ms;cpu_main_ms;cpu_busy_pct_proxy;gpu_busy_pct_proxy;"
-            "wait_ms;wait_frac_pct;boundness;rendered_primitives;rendered_nodes;rendered_bounding_boxes;"
+            "wait_ms;wait_frac_pct;dispatch_ms;context_update_ms;render_cpu_ms;ctx_timing;boundness;"
+            "rendered_primitives;rendered_nodes;rendered_bounding_boxes;"
             "est_screen_px;est_sum_area_px;est_density;est_coverage;est_coverage_px;est_overdraw;"
             "est_density_raw;est_coverage_raw;est_coverage_px_raw;est_overdraw_raw;"
             "pos_x;pos_y;pos_z;quat_x;quat_y;quat_z;quat_w;backoff_cull;backoff_draw;backoff_gpu;"
@@ -1673,6 +1702,10 @@ bool LamureMeasurement::writeFramesCSV(
         emitD(s.gpu_busy_pct_proxy);emitSep();
         emitD(s.wait_ms);           emitSep();
         emitD(s.wait_frac_pct);     emitSep();
+        emitD(s.dispatch_ms);       emitSep();
+        emitD(s.context_update_ms); emitSep();
+        emitD(s.render_cpu_ms);     emitSep();
+        emitS(csvQuote(s.ctx_timing)); emitSep();
         emitS(s.boundness);         emitSep();
         emitD( (s.rendered_primitives > 0) ? double(s.rendered_primitives) : -1.0 ); emitSep();
         emitD( (s.rendered_nodes      > 0) ? double(s.rendered_nodes)      : -1.0 ); emitSep();

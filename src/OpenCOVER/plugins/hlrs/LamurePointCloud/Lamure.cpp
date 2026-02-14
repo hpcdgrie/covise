@@ -137,10 +137,17 @@ Lamure::~Lamure()
 
     if (m_edit_tool)
         m_edit_tool->disable();
-    if (m_renderer && m_lamure_grp)
-        m_renderer->destroyEditBrushNode(m_lamure_grp.get());
+
+    if (m_renderer) {
+        if (m_lamure_grp)
+            m_renderer->destroyEditBrushNode(m_lamure_grp.get());
+        m_renderer->shutdown();
+    }
+
     opencover::cover->getObjectsRoot()->removeChild(m_lamure_grp);
+    m_lamure_grp = nullptr;
     opencover::coVRFileManager::instance()->unregisterFileHandler(&handler);
+    plugin = nullptr;
 }
 
 void Lamure::setModelVisible(uint16_t idx, bool v) {
@@ -1164,7 +1171,9 @@ void Lamure::loadSettingsFromCovise() {
     s.show_pointcloud         = getOn((std::string(root) + ".show_pointcloud").c_str(),        s.show_pointcloud);
     s.show_boundingbox        = getOn((std::string(root) + ".show_boundingbox").c_str(),       s.show_boundingbox);
     s.show_frustum            = getOn((std::string(root) + ".show_frustum").c_str(),           s.show_frustum);
-    s.show_text               = getOn((std::string(root) + ".show_text").c_str(),              s.show_text);
+    // Legacy compatibility: old key was .show_text
+    s.show_stats              = getOn((std::string(root) + ".show_text").c_str(),              s.show_stats);
+    s.show_stats              = getOn((std::string(root) + ".show_stats").c_str(),             s.show_stats);
     s.show_sync               = getOn((std::string(root) + ".show_sync").c_str(),              s.show_sync);
     s.show_notify             = getOn((std::string(root) + ".show_notify").c_str(),            s.show_notify);
     s.show_pvs                = getOn((std::string(root) + ".show_pvs").c_str(),               s.show_pvs);
@@ -1795,7 +1804,8 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
     add_bool("show_pointcloud",  s.show_pointcloud);
     add_bool("show_boundingbox", s.show_boundingbox);
     add_bool("show_frustum",     s.show_frustum);
-    add_bool("show_text",        s.show_text);
+    add_bool("show_stats",       s.show_stats);
+    add_bool("show_text",        s.show_stats);
     add_bool("show_sync",        s.show_sync);
     add_bool("show_notify",      s.show_notify);
 

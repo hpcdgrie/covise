@@ -98,15 +98,15 @@ private:
     LamureRenderer* _renderer{nullptr};
 };
 
-class TextDrawCallback : public osg::Drawable::DrawCallback
+class StatsDrawCallback : public osg::Drawable::DrawCallback
 {
 public:
-    TextDrawCallback(Lamure* plugin, osgText::Text* values);
+    StatsDrawCallback(Lamure* plugin, osgText::Text* values);
     void drawImplementation(osg::RenderInfo &renderInfo, const osg::Drawable *drawable) const override;
 
 private:
     Lamure *_plugin{nullptr};
-    osg::ref_ptr<osgText::Text> _values;
+    osg::observer_ptr<osgText::Text> _values;
     LamureRenderer *_renderer{nullptr};
     mutable std::chrono::steady_clock::time_point _lastUpdateTime;
     std::chrono::milliseconds _minInterval;
@@ -542,6 +542,37 @@ private:
         SurfelPass2Shader sh_surfel_pass2;
         SurfelPass3Shader sh_surfel_pass3;
         LineShader sh_line;
+        GLShader sh_coverage_query;
+
+        struct PixelQuerySlot {
+            GLuint query_id{0};
+            uint64_t frame_number{std::numeric_limits<uint64_t>::max()};
+            double viewport_pixels{-1.0};
+            bool issued{false};
+            bool is_coverage{false};
+        };
+        static constexpr size_t kPixelQuerySlotCount = 128;
+        std::array<PixelQuerySlot, kPixelQuerySlotCount> pixel_query_slots{};
+        uint32_t pixel_query_next_slot{0};
+        bool pixel_metrics_checked{false};
+        bool pixel_metrics_supported{false};
+        bool pixel_queries_ready{false};
+        GLuint pixel_stencil_bit{0};
+        uint64_t pixel_current_frame{std::numeric_limits<uint64_t>::max()};
+
+        bool pixel_capture_active{false};
+        GLuint pixel_total_query_active{0};
+        double pixel_capture_viewport_pixels{-1.0};
+        uint64_t pixel_capture_frame{std::numeric_limits<uint64_t>::max()};
+
+        GLboolean pixel_prev_stencil_test{GL_FALSE};
+        GLint pixel_prev_stencil_func{GL_ALWAYS};
+        GLint pixel_prev_stencil_ref{0};
+        GLint pixel_prev_stencil_value_mask{~0};
+        GLint pixel_prev_stencil_writemask{~0};
+        GLint pixel_prev_stencil_fail{GL_KEEP};
+        GLint pixel_prev_stencil_zfail{GL_KEEP};
+        GLint pixel_prev_stencil_zpass{GL_KEEP};
 
         // FBOs
         std::unordered_map<MultipassTargetKey, MultipassTarget, MultipassTargetKeyHash> multipass_targets;
@@ -579,7 +610,7 @@ private:
     // Geodes
     osg::ref_ptr<osg::Geode> m_init_geode;
     osg::ref_ptr<osg::Geode> m_dispatch_geode;
-    osg::ref_ptr<osg::Geode> m_text_geode;
+    osg::ref_ptr<osg::Geode> m_stats_geode;
     osg::ref_ptr<osg::Geode> m_frustum_geode;
     osg::ref_ptr<osg::Geode> m_edit_brush_geode;
     osg::ref_ptr<osg::MatrixTransform> m_edit_brush_transform;
@@ -587,7 +618,7 @@ private:
     // Stateset
     osg::ref_ptr<osg::StateSet> m_init_stateset;
     osg::ref_ptr<osg::StateSet> m_dispatch_stateset;
-    osg::ref_ptr<osg::StateSet> m_text_stateset;
+    osg::ref_ptr<osg::StateSet> m_stats_stateset;
     osg::ref_ptr<osg::StateSet> m_frustum_stateset;
 
     // Geometry
@@ -725,7 +756,7 @@ public:
     const lamure::ren::camera* getScmCamera(int ctxId) const { return getResources(ctxId).scm_camera.get(); }
 
     MultipassTarget& acquireMultipassTarget(lamure::context_t contextID, const osg::Camera* camera, int width, int height);
-    osg::ref_ptr<osg::Geode> getTextGeode() { return m_text_geode; }
+    osg::ref_ptr<osg::Geode> getStatsGeode() { return m_stats_geode; }
     osg::ref_ptr<osg::Geode> getFrustumGeode() { return m_frustum_geode; }
     osg::ref_ptr<osg::MatrixTransform> getEditBrushTransform() { return m_edit_brush_transform; }
     osg::MatrixTransform* ensureEditBrushNode(osg::Group* parent);
@@ -792,10 +823,57 @@ public:
     int clipPlaneCount() const { return m_clip_plane_count; }
     bool supportsClipPlanes(ShaderType type) const;
 
+    struct ContextTimingSample {
+        uint64_t frame_number{std::numeric_limits<uint64_t>::max()};
+        double dispatch_ms{-1.0};
+        double context_update_ms{-1.0};
+        double cpu_cull_ms{-1.0};
+        double cpu_draw_ms{-1.0};
+        double gpu_ms{-1.0};
+        double render_cpu_ms{-1.0};
+        double samples_passed{-1.0};
+        double covered_samples{-1.0};
+        double viewport_pixels{-1.0};
+        double coverage{-1.0};
+        double overdraw{-1.0};
+    };
+
+    struct TimingSnapshot {
+        uint64_t frame_number{0};
+        double cpu_update_ms{-1.0};
+        double wait_ms{-1.0};
+        double dispatch_ms{-1.0};
+        double context_update_ms{-1.0};
+        double cpu_cull_ms{-1.0};
+        double cpu_draw_ms{-1.0};
+        double gpu_ms{-1.0};
+        double render_cpu_ms{-1.0};
+        double samples_passed{-1.0};
+        double covered_samples{-1.0};
+        double viewport_pixels{-1.0};
+        double coverage{-1.0};
+        double overdraw{-1.0};
+        std::vector<std::pair<int, ContextTimingSample>> per_context;
+    };
+
     ContextResources& getResources(int ctxId);
     const ContextResources& getResources(int id) const {
         return const_cast<LamureRenderer*>(this)->getResources(id);
     }
+
+    bool isTimingModeActive() const;
+    void noteContextUpdateMs(int ctxId, uint64_t frameNo, double ms);
+    void noteDispatchMs(int ctxId, uint64_t frameNo, double ms);
+    void noteContextStats(int ctxId, uint64_t frameNo, double cullMs, double drawMs, double gpuMs);
+    void noteContextPixelStats(int ctxId, uint64_t frameNo, double samplesPassed, double coveredSamples, double viewportPixels);
+    void noteGlobalStats(uint64_t frameNo, double cpuUpdateMs, double waitMs);
+    TimingSnapshot getTimingSnapshot(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
+    std::string getTimingCompactString(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
+    void updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
+    bool beginPixelMetricsCapture(int ctxId, uint64_t frameNo, double viewportPixels);
+    void endPixelMetricsCapture(int ctxId);
+    void pollPixelMetricsQueries(int ctxId);
+    void releasePixelMetricsQueries(ContextResources& res);
 
     const PointShader&                  getPointShader(int ctxId)                const { return getResources(ctxId).sh_point; }
     const PointColorShader&             getPointColorShader(int ctxId)           const { return getResources(ctxId).sh_point_color; }
@@ -812,6 +890,13 @@ public:
     const SurfelPass3Shader&            getSurfelPass3Shader(int ctxId)          const { return getResources(ctxId).sh_surfel_pass3; }
 
     const LineShader&                   getLineShader(int ctxId)                 const { return getResources(ctxId).sh_line; }
+
+private:
+    std::unordered_map<int, ContextTimingSample> m_timing_by_ctx;
+    mutable std::mutex m_timing_mutex;
+    uint64_t m_timing_global_frame{std::numeric_limits<uint64_t>::max()};
+    double m_timing_cpu_update_ms{-1.0};
+    double m_timing_wait_ms{-1.0};
 
 };
 

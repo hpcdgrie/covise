@@ -196,7 +196,7 @@ public:
         bool show_pointcloud{ true };
         bool show_boundingbox{ false };
         bool show_frustum{ false };
-        bool show_text{ false };
+        bool show_stats{ false };
         bool show_sync{ true };
         bool show_notify{ true };
         bool use_initial_navigation{ false };

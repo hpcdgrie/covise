@@ -26,6 +26,7 @@
 #include <osg/GraphicsContext>
 #include <osg/ClipNode>
 #include <osg/ClipPlane>
+#include <osg/Stats>
 #include <osgViewer/Viewer>
 #include <osgViewer/Renderer>
 #include <osgText/Text>
@@ -58,6 +59,105 @@
 #include <boost/regex.hpp>
 
 namespace {
+    constexpr uint64_t kInvalidTimingFrame = std::numeric_limits<uint64_t>::max();
+
+    inline uint64_t frameNumberFromRenderInfo(const osg::RenderInfo& renderInfo)
+    {
+        const osg::State* state = renderInfo.getState();
+        const osg::FrameStamp* fs = state ? state->getFrameStamp() : nullptr;
+        return fs ? static_cast<uint64_t>(fs->getFrameNumber()) : kInvalidTimingFrame;
+    }
+
+    inline double elapsedMs(const std::chrono::steady_clock::time_point& t0)
+    {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    }
+
+    inline bool isSetMs(double v)
+    {
+        return std::isfinite(v) && v >= 0.0;
+    }
+
+    inline void accumulateMs(double& dst, double v)
+    {
+        if (!isSetMs(v)) return;
+        if (!isSetMs(dst)) dst = 0.0;
+        dst += v;
+    }
+
+    inline double sumKnownMs(std::initializer_list<double> vals)
+    {
+        double sum = 0.0;
+        bool any = false;
+        for (double v : vals) {
+            if (isSetMs(v)) {
+                sum += v;
+                any = true;
+            }
+        }
+        return any ? sum : -1.0;
+    }
+
+    inline bool queryTimeTakenMsBacksearch(
+        osg::Stats* stats,
+        unsigned baseFrame,
+        unsigned backsearch,
+        const char* prefix,
+        double& outMs)
+    {
+        outMs = -1.0;
+        if (!stats || !prefix) return false;
+
+        const unsigned earliest = stats->getEarliestFrameNumber();
+        const unsigned latest = stats->getLatestFrameNumber();
+        if (baseFrame > latest) baseFrame = latest;
+
+        const std::string takenKey = std::string(prefix) + " time taken";
+        const std::string beginKey = std::string(prefix) + " begin time";
+        const std::string endKey = std::string(prefix) + " end time";
+
+        for (unsigned off = 0; off <= backsearch; ++off) {
+            if (baseFrame < off) break;
+            const unsigned f = baseFrame - off;
+            if (f < earliest) break;
+
+            double vTaken = 0.0;
+            if (stats->getAttribute(f, takenKey, vTaken)) {
+                outMs = vTaken * 1000.0;
+                return true;
+            }
+
+            double b = 0.0, e = 0.0;
+            if (stats->getAttribute(f, beginKey, b) && stats->getAttribute(f, endKey, e) && e >= b) {
+                outMs = (e - b) * 1000.0;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline void ensureCameraStatsEnabled(osg::Camera* cam)
+    {
+        if (!cam) return;
+        if (!cam->getStats()) {
+            cam->setStats(new osg::Stats("LamureCameraStats"));
+        }
+        if (auto* stats = cam->getStats()) {
+            stats->collectStats("rendering", true);
+            stats->collectStats("gpu", true);
+        }
+    }
+
+    inline void ensureViewerCameraStatsEnabled(opencover::VRViewer* viewer)
+    {
+        if (!viewer) return;
+        osgViewer::ViewerBase::Cameras cams;
+        viewer->getCameras(cams);
+        for (osg::Camera* cam : cams) {
+            ensureCameraStatsEnabled(cam);
+        }
+    }
+
     struct MeasCtx {
         bool active = false;
         bool sampleThisFrame = false;
@@ -305,6 +405,8 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
     if (!_plugin || !_renderer) return;
 
     int ctx = renderInfo.getContextID();
+    const uint64_t frameNo = frameNumberFromRenderInfo(renderInfo);
+    const bool timingEnabled = _renderer->isTimingModeActive();
     auto& res = _renderer->getResources(ctx);
 
     // Ensure initialization happened
@@ -318,6 +420,7 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
         lamure::context_t context_id = controller->deduce_context_id(ctx);
         lamure::view_t view_id = res.scm_camera->view_id();
 
+        const auto tContextStart = std::chrono::steady_clock::now();
         cuts->send_camera(context_id, view_id, *res.scm_camera);
 
         const auto corner_values = res.scm_camera->get_frustum_corners();
@@ -332,8 +435,12 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
         if (_plugin->getSettings().use_pvs) {
             lamure::pvs::pvs_database::get_instance()->set_viewer_position(res.scm_camera->get_cam_pos());
         }
+        if (timingEnabled) {
+            _renderer->noteContextUpdateMs(ctx, frameNo, elapsedMs(tContextStart));
+        }
 
         if (!_plugin->getSettings().models.empty()) {
+            const auto tDispatchStart = std::chrono::steady_clock::now();
             try {
                 if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
                     controller->dispatch(context_id, _renderer->getDevice(ctx), _plugin->getDataProvenance());
@@ -344,6 +451,9 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
             }
             catch (const std::exception& e) {
                 if (_renderer->notifyOn()) std::cerr << "[Lamure][WARN] dispatch skipped: " << e.what() << "\n";
+            }
+            if (timingEnabled) {
+                _renderer->noteDispatchMs(ctx, frameNo, elapsedMs(tDispatchStart));
             }
         }
     }
@@ -364,6 +474,8 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
     }
 
     int ctx = renderInfo.getContextID();
+    const uint64_t frameNo = frameNumberFromRenderInfo(renderInfo);
+    const bool timingEnabled = m_renderer->isTimingModeActive();
     auto& res = m_renderer->getResources(ctx);
     
     // We assume InitDrawCallback has run and updated the camera if needed,
@@ -385,12 +497,16 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
     const scm::math::mat4 model_matrix = LamureUtil::matConv4F(model_osg);
     lamure::context_t context_id = controller->deduce_context_id(ctx);
 
+    const auto tContextStart = std::chrono::steady_clock::now();
     cuts->send_transform(context_id, data->modelId, model_matrix);
     if (Lamure::instance()) {
         cuts->send_threshold(context_id, data->modelId, Lamure::instance()->getSettings().lod_error);
     }
     cuts->send_rendered(context_id, data->modelId);
     database->get_model(data->modelId)->set_transform(model_matrix);
+    if (timingEnabled) {
+        m_renderer->noteContextUpdateMs(ctx, frameNo, elapsedMs(tContextStart));
+    }
     
     if (drawable) drawable->drawImplementation(renderInfo);
 }
@@ -519,6 +635,10 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
         before.restore();
         return;
     }
+
+    const uint64_t frameNo = frameNumberFromRenderInfo(renderInfo);
+    const bool pixelMetricsActive =
+        (!isMultipass) && m_renderer->beginPixelMetricsCapture(ctx, frameNo, static_cast<double>(vpW * vpH));
 
     const scm::math::mat4 mvp = proj * view * model_matrix;
     const scm::math::mat4 m = model_matrix;
@@ -794,7 +914,10 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
 
         plugin->getRenderInfo().rendered_primitives += rendered_primitives;
         plugin->getRenderInfo().rendered_nodes += rendered_nodes;
-        
+
+        if (pixelMetricsActive) {
+            m_renderer->endPixelMetricsCapture(ctx);
+        }
         m_renderer->endFrame(ctx);
         if (!res.vao_initialized) {
             GLState after = GLState::capture();
@@ -899,7 +1022,10 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
 
     plugin->getRenderInfo().rendered_primitives += rendered_primitives;
     plugin->getRenderInfo().rendered_nodes += rendered_nodes;
-    
+
+    if (pixelMetricsActive) {
+        m_renderer->endPixelMetricsCapture(ctx);
+    }
     m_renderer->endFrame(ctx);
     if (!res.vao_initialized) {
         // We can't easily detect the new VAO without a query if we are in FastState mode.
@@ -932,6 +1058,8 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
     if (!plugin)
         return;
     const int ctx = renderInfo.getContextID();
+    const uint64_t frameNo = frameNumberFromRenderInfo(renderInfo);
+    const bool timingEnabled = m_renderer->isTimingModeActive();
     auto& res = m_renderer->getResources(ctx);
     if (!m_renderer->gpuOrganizationReady())
         return;
@@ -969,6 +1097,7 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
     }
     scm::math::mat4 model_matrix = LamureUtil::matConv4F(model_osg);
 
+    const auto tContextStart = std::chrono::steady_clock::now();
     cuts->send_transform(context_id, data->modelId, model_matrix);
     if (Lamure::instance()) {
         cuts->send_threshold(context_id, data->modelId, Lamure::instance()->getSettings().lod_error);
@@ -993,8 +1122,12 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
         const scm::math::vec3d cam_pos = res.scm_camera->get_cam_pos();
         pvs->set_viewer_position(cam_pos);
     }
+    if (timingEnabled) {
+        m_renderer->noteContextUpdateMs(ctx, frameNo, elapsedMs(tContextStart));
+    }
 
     if (plugin->getSettings().lod_update && !plugin->isRebuildInProgress()) {
+        const auto tDispatchStart = std::chrono::steady_clock::now();
         try {
             if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
                 controller->dispatch(context_id, m_renderer->getDevice(ctx), plugin->getDataProvenance());
@@ -1003,6 +1136,9 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
             }
         } catch (const std::exception& e) {
             if (m_renderer->notifyOn()) std::cerr << "[Lamure][WARN] dispatch skipped (BB): " << e.what() << "\n";
+        }
+        if (timingEnabled) {
+            m_renderer->noteDispatchMs(ctx, frameNo, elapsedMs(tDispatchStart));
         }
     }
 
@@ -1086,6 +1222,461 @@ LamureRenderer::~LamureRenderer()
 bool LamureRenderer::notifyOn() const
 {
     return m_plugin && m_plugin->getSettings().show_notify;
+}
+
+bool LamureRenderer::isTimingModeActive() const
+{
+    if (!m_plugin) return false;
+    const auto& s = m_plugin->getSettings();
+    const auto* meas = m_plugin->getMeasurement();
+    const bool measurementActive = (meas && meas->isActive() && s.measure_full && !s.measure_off);
+    const bool statisticsOverlayActive = s.show_stats;
+    return statisticsOverlayActive || measurementActive;
+}
+
+void LamureRenderer::noteContextUpdateMs(int ctxId, uint64_t frameNo, double ms)
+{
+    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame) return;
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    auto& t = m_timing_by_ctx[ctxId];
+    if (t.frame_number != frameNo) {
+        t = ContextTimingSample{};
+        t.frame_number = frameNo;
+    }
+    accumulateMs(t.context_update_ms, ms);
+}
+
+void LamureRenderer::noteDispatchMs(int ctxId, uint64_t frameNo, double ms)
+{
+    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame) return;
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    auto& t = m_timing_by_ctx[ctxId];
+    if (t.frame_number != frameNo) {
+        t = ContextTimingSample{};
+        t.frame_number = frameNo;
+    }
+    accumulateMs(t.dispatch_ms, ms);
+}
+
+void LamureRenderer::noteContextStats(int ctxId, uint64_t frameNo, double cullMs, double drawMs, double gpuMs)
+{
+    if (!isTimingModeActive() || ctxId < 0 || frameNo == kInvalidTimingFrame) return;
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    auto& t = m_timing_by_ctx[ctxId];
+    if (t.frame_number != frameNo) {
+        t = ContextTimingSample{};
+        t.frame_number = frameNo;
+    }
+    accumulateMs(t.cpu_cull_ms, cullMs);
+    accumulateMs(t.cpu_draw_ms, drawMs);
+    accumulateMs(t.gpu_ms, gpuMs);
+    t.render_cpu_ms = sumKnownMs({t.context_update_ms, t.dispatch_ms, t.cpu_cull_ms, t.cpu_draw_ms});
+}
+
+void LamureRenderer::noteContextPixelStats(int ctxId, uint64_t frameNo, double samplesPassed, double coveredSamples, double viewportPixels)
+{
+    if (!isTimingModeActive() || ctxId < 0 || frameNo == kInvalidTimingFrame) return;
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    auto& t = m_timing_by_ctx[ctxId];
+    if (t.frame_number != kInvalidTimingFrame && frameNo < t.frame_number) {
+        frameNo = t.frame_number; // delayed query result: merge into newest known frame
+    }
+    if (t.frame_number != frameNo) {
+        t = ContextTimingSample{};
+        t.frame_number = frameNo;
+    }
+    if (isSetMs(samplesPassed)) {
+        accumulateMs(t.samples_passed, samplesPassed);
+    }
+    if (isSetMs(coveredSamples)) {
+        if (!isSetMs(t.covered_samples)) t.covered_samples = coveredSamples;
+        else t.covered_samples = std::max(t.covered_samples, coveredSamples);
+    }
+    if (isSetMs(viewportPixels)) {
+        t.viewport_pixels = viewportPixels;
+    }
+    if (isSetMs(t.covered_samples) && isSetMs(t.viewport_pixels) && t.viewport_pixels > 0.0) {
+        t.coverage = std::clamp(t.covered_samples / t.viewport_pixels, 0.0, 1.0);
+    }
+    if (isSetMs(t.samples_passed) && isSetMs(t.covered_samples) && t.covered_samples > 0.0) {
+        t.overdraw = t.samples_passed / t.covered_samples;
+    }
+}
+
+void LamureRenderer::noteGlobalStats(uint64_t frameNo, double cpuUpdateMs, double waitMs)
+{
+    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame) return;
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    if (m_timing_global_frame != frameNo) {
+        m_timing_global_frame = frameNo;
+        m_timing_cpu_update_ms = -1.0;
+        m_timing_wait_ms = -1.0;
+    }
+    if (isSetMs(cpuUpdateMs)) m_timing_cpu_update_ms = cpuUpdateMs;
+    if (isSetMs(waitMs))      m_timing_wait_ms = waitMs;
+}
+
+void LamureRenderer::releasePixelMetricsQueries(ContextResources& res)
+{
+    for (auto& slot : res.pixel_query_slots) {
+        if (slot.query_id) {
+            glDeleteQueries(1, &slot.query_id);
+            slot.query_id = 0;
+        }
+        slot.issued = false;
+        slot.frame_number = std::numeric_limits<uint64_t>::max();
+        slot.viewport_pixels = -1.0;
+    }
+    res.pixel_queries_ready = false;
+    res.pixel_metrics_checked = false;
+    res.pixel_metrics_supported = false;
+    res.pixel_capture_active = false;
+    res.pixel_total_query_active = 0;
+}
+
+void LamureRenderer::pollPixelMetricsQueries(int ctxId)
+{
+    auto& res = getResources(ctxId);
+    if (!res.pixel_queries_ready) return;
+
+    for (auto& slot : res.pixel_query_slots) {
+        if (!slot.issued || !slot.query_id) continue;
+
+        GLuint available = 0;
+        glGetQueryObjectuiv(slot.query_id, GL_QUERY_RESULT_AVAILABLE, &available);
+        if (!available) continue;
+
+        GLuint result = 0;
+        glGetQueryObjectuiv(slot.query_id, GL_QUERY_RESULT, &result);
+        if (slot.is_coverage) {
+            noteContextPixelStats(ctxId, slot.frame_number, -1.0, static_cast<double>(result), slot.viewport_pixels);
+        } else {
+            noteContextPixelStats(ctxId, slot.frame_number, static_cast<double>(result), -1.0, slot.viewport_pixels);
+        }
+        slot.issued = false;
+    }
+}
+
+bool LamureRenderer::beginPixelMetricsCapture(int ctxId, uint64_t frameNo, double viewportPixels)
+{
+    if (!m_plugin || !m_plugin->getSettings().show_stats) return false;
+    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame || viewportPixels <= 0.0) return false;
+    auto& res = getResources(ctxId);
+
+    if (!res.pixel_metrics_checked) {
+        GLint stencilBits = 0;
+        glGetIntegerv(GL_STENCIL_BITS, &stencilBits);
+        if (stencilBits > 0) {
+            const GLint bitIndex = std::max(0, std::min(stencilBits - 1, 7));
+            res.pixel_stencil_bit = static_cast<GLuint>(1u << bitIndex);
+            res.pixel_metrics_supported = true;
+        } else {
+            res.pixel_metrics_supported = false;
+        }
+        res.pixel_metrics_checked = true;
+    }
+    if (!res.pixel_metrics_supported) return false;
+
+    if (!res.pixel_queries_ready) {
+        for (auto& slot : res.pixel_query_slots) {
+            glGenQueries(1, &slot.query_id);
+        }
+        res.pixel_queries_ready = true;
+    }
+
+    pollPixelMetricsQueries(ctxId);
+
+    if (res.pixel_current_frame != frameNo) {
+        res.pixel_current_frame = frameNo;
+
+        const GLboolean prevStencilTest = glIsEnabled(GL_STENCIL_TEST);
+        GLint prevFunc = GL_ALWAYS, prevRef = 0, prevValMask = ~0, prevWriteMask = ~0;
+        GLint prevFail = GL_KEEP, prevZFail = GL_KEEP, prevZPass = GL_KEEP;
+        glGetIntegerv(GL_STENCIL_FUNC, &prevFunc);
+        glGetIntegerv(GL_STENCIL_REF, &prevRef);
+        glGetIntegerv(GL_STENCIL_VALUE_MASK, &prevValMask);
+        glGetIntegerv(GL_STENCIL_WRITEMASK, &prevWriteMask);
+        glGetIntegerv(GL_STENCIL_FAIL, &prevFail);
+        glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &prevZFail);
+        glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &prevZPass);
+
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(static_cast<GLuint>(res.pixel_stencil_bit));
+        glClearStencil(0);
+        glClear(GL_STENCIL_BUFFER_BIT);
+
+        if (prevStencilTest) glEnable(GL_STENCIL_TEST); else glDisable(GL_STENCIL_TEST);
+        glStencilFunc(prevFunc, prevRef, static_cast<GLuint>(prevValMask));
+        glStencilMask(static_cast<GLuint>(prevWriteMask));
+        glStencilOp(prevFail, prevZFail, prevZPass);
+    }
+
+    if (res.pixel_capture_active) return false;
+
+    ContextResources::PixelQuerySlot* totalSlot = nullptr;
+    for (size_t n = 0; n < res.pixel_query_slots.size(); ++n) {
+        auto& slot = res.pixel_query_slots[(res.pixel_query_next_slot + n) % res.pixel_query_slots.size()];
+        if (!slot.issued) {
+            totalSlot = &slot;
+            res.pixel_query_next_slot = static_cast<uint32_t>((res.pixel_query_next_slot + n + 1) % res.pixel_query_slots.size());
+            break;
+        }
+    }
+    if (!totalSlot || !totalSlot->query_id) return false;
+
+    res.pixel_prev_stencil_test = glIsEnabled(GL_STENCIL_TEST);
+    glGetIntegerv(GL_STENCIL_FUNC, &res.pixel_prev_stencil_func);
+    glGetIntegerv(GL_STENCIL_REF, &res.pixel_prev_stencil_ref);
+    glGetIntegerv(GL_STENCIL_VALUE_MASK, &res.pixel_prev_stencil_value_mask);
+    glGetIntegerv(GL_STENCIL_WRITEMASK, &res.pixel_prev_stencil_writemask);
+    glGetIntegerv(GL_STENCIL_FAIL, &res.pixel_prev_stencil_fail);
+    glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &res.pixel_prev_stencil_zfail);
+    glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &res.pixel_prev_stencil_zpass);
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_ALWAYS, static_cast<GLint>(res.pixel_stencil_bit), static_cast<GLuint>(res.pixel_stencil_bit));
+    glStencilMask(static_cast<GLuint>(res.pixel_stencil_bit));
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glBeginQuery(GL_SAMPLES_PASSED, totalSlot->query_id);
+    totalSlot->frame_number = frameNo;
+    totalSlot->viewport_pixels = viewportPixels;
+    totalSlot->is_coverage = false;
+    totalSlot->issued = true;
+
+    res.pixel_capture_active = true;
+    res.pixel_total_query_active = totalSlot->query_id;
+    res.pixel_capture_viewport_pixels = viewportPixels;
+    res.pixel_capture_frame = frameNo;
+    return true;
+}
+
+void LamureRenderer::endPixelMetricsCapture(int ctxId)
+{
+    auto& res = getResources(ctxId);
+    if (!res.pixel_capture_active || !res.pixel_total_query_active) return;
+
+    glEndQuery(GL_SAMPLES_PASSED);
+
+    ContextResources::PixelQuerySlot* coveredSlot = nullptr;
+    for (size_t n = 0; n < res.pixel_query_slots.size(); ++n) {
+        auto& slot = res.pixel_query_slots[(res.pixel_query_next_slot + n) % res.pixel_query_slots.size()];
+        if (!slot.issued) {
+            coveredSlot = &slot;
+            res.pixel_query_next_slot = static_cast<uint32_t>((res.pixel_query_next_slot + n + 1) % res.pixel_query_slots.size());
+            break;
+        }
+    }
+
+    if (coveredSlot && coveredSlot->query_id && res.sh_coverage_query.program && res.geo_screen_quad.vao) {
+        GLint prevProgram = 0, prevVAO = 0;
+        GLboolean prevBlend = glIsEnabled(GL_BLEND);
+        GLboolean prevCull = glIsEnabled(GL_CULL_FACE);
+        GLboolean prevDepth = glIsEnabled(GL_DEPTH_TEST);
+        GLboolean prevStencil = glIsEnabled(GL_STENCIL_TEST);
+        GLboolean prevColorMask[4] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE};
+        GLboolean prevDepthMask = GL_TRUE;
+        GLint prevStencilFunc = GL_ALWAYS, prevStencilRef = 0, prevStencilValMask = ~0, prevStencilWriteMask = ~0;
+        GLint prevStencilFail = GL_KEEP, prevStencilZFail = GL_KEEP, prevStencilZPass = GL_KEEP;
+
+        glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
+        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+        glGetBooleanv(GL_COLOR_WRITEMASK, prevColorMask);
+        glGetBooleanv(GL_DEPTH_WRITEMASK, &prevDepthMask);
+        glGetIntegerv(GL_STENCIL_FUNC, &prevStencilFunc);
+        glGetIntegerv(GL_STENCIL_REF, &prevStencilRef);
+        glGetIntegerv(GL_STENCIL_VALUE_MASK, &prevStencilValMask);
+        glGetIntegerv(GL_STENCIL_WRITEMASK, &prevStencilWriteMask);
+        glGetIntegerv(GL_STENCIL_FAIL, &prevStencilFail);
+        glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &prevStencilZFail);
+        glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &prevStencilZPass);
+
+        glUseProgram(res.sh_coverage_query.program);
+        glBindVertexArray(res.geo_screen_quad.vao);
+        glDisable(GL_BLEND);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+        glEnable(GL_STENCIL_TEST);
+        glStencilFunc(GL_EQUAL, static_cast<GLint>(res.pixel_stencil_bit), static_cast<GLuint>(res.pixel_stencil_bit));
+        glStencilMask(0);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+        glBeginQuery(GL_SAMPLES_PASSED, coveredSlot->query_id);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glEndQuery(GL_SAMPLES_PASSED);
+
+        coveredSlot->frame_number = res.pixel_capture_frame;
+        coveredSlot->viewport_pixels = res.pixel_capture_viewport_pixels;
+        coveredSlot->is_coverage = true;
+        coveredSlot->issued = true;
+
+        if (prevBlend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+        if (prevCull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+        if (prevDepth) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+        glDepthMask(prevDepthMask);
+        glColorMask(prevColorMask[0], prevColorMask[1], prevColorMask[2], prevColorMask[3]);
+        if (prevStencil) glEnable(GL_STENCIL_TEST); else glDisable(GL_STENCIL_TEST);
+        glStencilFunc(prevStencilFunc, prevStencilRef, static_cast<GLuint>(prevStencilValMask));
+        glStencilMask(static_cast<GLuint>(prevStencilWriteMask));
+        glStencilOp(prevStencilFail, prevStencilZFail, prevStencilZPass);
+        glBindVertexArray(static_cast<GLuint>(prevVAO));
+        glUseProgram(static_cast<GLuint>(prevProgram));
+    }
+
+    if (res.pixel_prev_stencil_test) glEnable(GL_STENCIL_TEST); else glDisable(GL_STENCIL_TEST);
+    glStencilFunc(res.pixel_prev_stencil_func, res.pixel_prev_stencil_ref, static_cast<GLuint>(res.pixel_prev_stencil_value_mask));
+    glStencilMask(static_cast<GLuint>(res.pixel_prev_stencil_writemask));
+    glStencilOp(res.pixel_prev_stencil_fail, res.pixel_prev_stencil_zfail, res.pixel_prev_stencil_zpass);
+
+    res.pixel_capture_active = false;
+    res.pixel_total_query_active = 0;
+    res.pixel_capture_viewport_pixels = -1.0;
+    res.pixel_capture_frame = std::numeric_limits<uint64_t>::max();
+}
+
+LamureRenderer::TimingSnapshot LamureRenderer::getTimingSnapshot(uint64_t preferredFrame) const
+{
+    TimingSnapshot snap{};
+    if (!isTimingModeActive()) return snap;
+
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    uint64_t target = preferredFrame;
+    if (target == kInvalidTimingFrame) {
+        bool found = false;
+        for (const auto& kv : m_timing_by_ctx) {
+            if (kv.second.frame_number != kInvalidTimingFrame) {
+                if (!found) target = kv.second.frame_number;
+                target = std::max(target, kv.second.frame_number);
+                found = true;
+            }
+        }
+        if (m_timing_global_frame != kInvalidTimingFrame) {
+            if (!found) target = m_timing_global_frame;
+            target = std::max(target, m_timing_global_frame);
+            found = true;
+        }
+        if (!found) return snap;
+    }
+
+    snap.frame_number = target;
+
+    if (m_timing_global_frame == target) {
+        snap.cpu_update_ms = m_timing_cpu_update_ms;
+        snap.wait_ms = m_timing_wait_ms;
+    }
+
+    for (const auto& kv : m_timing_by_ctx) {
+        if (kv.second.frame_number != target) continue;
+        auto per = kv.second;
+        per.render_cpu_ms = sumKnownMs({per.context_update_ms, per.dispatch_ms, per.cpu_cull_ms, per.cpu_draw_ms});
+        snap.per_context.emplace_back(kv.first, per);
+        accumulateMs(snap.dispatch_ms, per.dispatch_ms);
+        accumulateMs(snap.context_update_ms, per.context_update_ms);
+        accumulateMs(snap.cpu_cull_ms, per.cpu_cull_ms);
+        accumulateMs(snap.cpu_draw_ms, per.cpu_draw_ms);
+        accumulateMs(snap.gpu_ms, per.gpu_ms);
+        accumulateMs(snap.render_cpu_ms, per.render_cpu_ms);
+        accumulateMs(snap.samples_passed, per.samples_passed);
+        accumulateMs(snap.covered_samples, per.covered_samples);
+        accumulateMs(snap.viewport_pixels, per.viewport_pixels);
+    }
+
+    if (isSetMs(snap.covered_samples) && isSetMs(snap.viewport_pixels) && snap.viewport_pixels > 0.0) {
+        snap.coverage = std::clamp(snap.covered_samples / snap.viewport_pixels, 0.0, 1.0);
+    }
+    if (isSetMs(snap.samples_passed) && isSetMs(snap.covered_samples) && snap.covered_samples > 0.0) {
+        snap.overdraw = snap.samples_passed / snap.covered_samples;
+    }
+
+    std::sort(snap.per_context.begin(), snap.per_context.end(),
+        [](const auto& a, const auto& b) { return a.first < b.first; });
+    return snap;
+}
+
+std::string LamureRenderer::getTimingCompactString(uint64_t preferredFrame) const
+{
+    const auto snap = getTimingSnapshot(preferredFrame);
+    if (snap.per_context.empty()) return std::string();
+
+    std::ostringstream os;
+    os << std::fixed << std::setprecision(3);
+    bool first = true;
+    for (const auto& kv : snap.per_context) {
+        if (!first) os << '|';
+        first = false;
+        const auto& t = kv.second;
+        os << "ctx" << kv.first
+           << "(disp=" << (isSetMs(t.dispatch_ms) ? t.dispatch_ms : -1.0)
+           << ",ctx=" << (isSetMs(t.context_update_ms) ? t.context_update_ms : -1.0)
+           << ",cull=" << (isSetMs(t.cpu_cull_ms) ? t.cpu_cull_ms : -1.0)
+           << ",draw=" << (isSetMs(t.cpu_draw_ms) ? t.cpu_draw_ms : -1.0)
+           << ",gpu=" << (isSetMs(t.gpu_ms) ? t.gpu_ms : -1.0)
+           << ",rcpu=" << (isSetMs(t.render_cpu_ms) ? t.render_cpu_ms : -1.0)
+           << ')';
+    }
+    return os.str();
+}
+
+void LamureRenderer::updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId)
+{
+    if (!isTimingModeActive()) return;
+
+    const uint64_t frameNo = frameNumberFromRenderInfo(renderInfo);
+    if (frameNo == kInvalidTimingFrame) return;
+    pollPixelMetricsQueries(ctxId);
+
+    auto* viewer = opencover::VRViewer::instance();
+    if (!viewer) return;
+    ensureViewerCameraStatsEnabled(viewer);
+
+    osg::Stats* viewerStats = viewer->getViewerStats();
+    if (viewerStats) {
+        viewerStats->collectStats("update", true);
+        viewerStats->collectStats("sync", true);
+        viewerStats->collectStats("swap", true);
+        viewerStats->collectStats("finish", true);
+
+        double updMs = -1.0, syncMs = -1.0, swapMs = -1.0, finishMs = -1.0;
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "Update traversal", updMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "sync", syncMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "swap", swapMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "finish", finishMs);
+
+        const double waitMs = sumKnownMs({syncMs, swapMs, finishMs});
+        noteGlobalStats(frameNo, updMs, waitMs);
+    }
+
+    osgViewer::ViewerBase::Cameras cams;
+    viewer->getCameras(cams);
+    for (osg::Camera* cam : cams) {
+        if (!cam) continue;
+        ensureCameraStatsEnabled(cam);
+        osg::Stats* camStats = cam->getStats();
+        if (!camStats) continue;
+
+        camStats->collectStats("rendering", true);
+        camStats->collectStats("gpu", true);
+
+        unsigned base = static_cast<unsigned>(frameNo);
+        if (auto* rnd = dynamic_cast<osgViewer::Renderer*>(cam->getRenderer())) {
+            if (!rnd->getGraphicsThreadDoesCull() && base > 0u) --base;
+        }
+
+        double cullMs = -1.0, drawMs = -1.0, gpuMs = -1.0;
+        (void)queryTimeTakenMsBacksearch(camStats, base, 8, "Cull traversal", cullMs);
+        (void)queryTimeTakenMsBacksearch(camStats, base, 8, "Draw traversal", drawMs);
+        (void)queryTimeTakenMsBacksearch(camStats, base, 8, "GPU draw", gpuMs);
+
+        int camCtxId = ctxId;
+        if (auto* gc = cam->getGraphicsContext()) {
+            if (auto* gs = gc->getState()) {
+                camCtxId = static_cast<int>(gs->getContextID());
+            }
+        }
+        noteContextStats(camCtxId, frameNo, cullMs, drawMs, gpuMs);
+    }
 }
 
 void LamureRenderer::updateActiveClipPlanes()
@@ -1215,7 +1806,7 @@ void InitDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
     if (drawable) { drawable->drawImplementation(renderInfo); }
 }
 
-TextDrawCallback::TextDrawCallback(Lamure *plugin, osgText::Text *values)
+StatsDrawCallback::StatsDrawCallback(Lamure *plugin, osgText::Text *values)
     : _plugin(plugin)
     , _values(values)
     , _renderer(plugin ? plugin->getRenderer() : nullptr)
@@ -1224,7 +1815,7 @@ TextDrawCallback::TextDrawCallback(Lamure *plugin, osgText::Text *values)
 {
 }
 
-void TextDrawCallback::drawImplementation(osg::RenderInfo &renderInfo, const osg::Drawable *drawable) const
+void StatsDrawCallback::drawImplementation(osg::RenderInfo &renderInfo, const osg::Drawable *drawable) const
 {
     const bool verbose = _renderer && _renderer->notifyOn();
     const auto now = std::chrono::steady_clock::now();
@@ -1233,57 +1824,81 @@ void TextDrawCallback::drawImplementation(osg::RenderInfo &renderInfo, const osg
         int ctx = renderInfo.getContextID();
         auto& res = _renderer->getResources(ctx);
 
-        osg::Matrix baseMatrix = opencover::VRSceneGraph::instance()->getScaleTransform()->getMatrix();
-        osg::Matrix transformMatrix = opencover::VRSceneGraph::instance()->getTransform()->getMatrix();
-        baseMatrix.postMult(transformMatrix);
-
         {
-            osg::Matrixd view_osg;
-            osg::Matrixd proj_osg;
-            bool haveState = false;
-
-            if (auto *state = renderInfo.getState())
-            {
-                _renderer->getMatricesFromRenderInfo(renderInfo, view_osg, proj_osg);
-                haveState = true;
-            }
-            else if (auto osgCam = renderInfo.getCurrentCamera())
-            {
-                view_osg = osgCam->getViewMatrix();
-                proj_osg = osgCam->getProjectionMatrix();
-                haveState = true;
-            }
+            const bool haveState = (renderInfo.getState() != nullptr) || (renderInfo.getCurrentCamera() != nullptr);
 
             if (haveState && res.scm_camera && _values.valid() && _plugin)
             {
+                _renderer->updateLiveTimingFromRenderInfo(renderInfo, ctx);
+
                 const auto& render_info = _plugin->getRenderInfo();
                 const scm::math::vec3d pos = res.scm_camera->get_cam_pos();
-                const auto base = LamureUtil::matConv4D(baseMatrix);
-                const auto view = LamureUtil::matConv4D(view_osg);
-                const auto projection = LamureUtil::matConv4D(proj_osg);
 
                 std::stringstream value_ss;
-                std::stringstream modelview_ss;
-                std::stringstream projection_ss;
-                std::stringstream mvp_ss;
-
-                modelview_ss << view * base;
-                projection_ss << projection;
-                mvp_ss << projection * view * base;
 
                 double fpsAvg = 0.0;
+                double frameTotalMs = -1.0;
                 if (auto *vs = opencover::VRViewer::instance()->getViewerStats())
                 {
                     (void)vs->getAveragedAttribute("Frame rate", fpsAvg);
+                    double frameDurationAvg = 0.0;
+                    if (vs->getAveragedAttribute("Frame duration", frameDurationAvg) && frameDurationAvg > 0.0) {
+                        frameTotalMs = frameDurationAvg * 1000.0;
+                    }
                 }
                 if (fpsAvg <= 0.0)
                 {
                     const double fd = std::max(1e-6, opencover::cover->frameDuration());
                     fpsAvg = 1.0 / fd;
+                    frameTotalMs = fd * 1000.0;
+                }
+                if (!isSetMs(frameTotalMs)) {
+                    const double fd = opencover::cover->frameDuration();
+                    if (fd > 0.0) frameTotalMs = fd * 1000.0;
                 }
 
                 const double primMio = static_cast<double>(render_info.rendered_primitives) / 1e6;
                 const double primPerSecMio = primMio * fpsAvg;
+                const auto timing = _renderer->getTimingSnapshot();
+                auto fmtMs = [](double v) -> std::string {
+                    if (!isSetMs(v)) return std::string("-");
+                    std::ostringstream ss;
+                    ss << std::fixed << std::setprecision(2) << v;
+                    return ss.str();
+                };
+                auto fmtRatio = [](double v) -> std::string {
+                    if (!isSetMs(v)) return std::string("-");
+                    std::ostringstream ss;
+                    ss << std::fixed << std::setprecision(2) << v;
+                    return ss.str();
+                };
+                auto fmtPercent = [](double v) -> std::string {
+                    if (!isSetMs(v)) return std::string("-");
+                    std::ostringstream ss;
+                    ss << std::fixed << std::setprecision(1) << (v * 100.0);
+                    return ss.str();
+                };
+                auto fmtM = [](double v) -> std::string {
+                    if (!isSetMs(v)) return std::string("-");
+                    std::ostringstream ss;
+                    ss << std::fixed << std::setprecision(2) << (v / 1e6);
+                    return ss.str();
+                };
+
+                LamureRenderer::ContextTimingSample ctxTiming{};
+                bool hasCtxTiming = false;
+                for (const auto& kv : timing.per_context) {
+                    if (kv.first == ctx) {
+                        ctxTiming = kv.second;
+                        hasCtxTiming = true;
+                        break;
+                    }
+                }
+                if (!hasCtxTiming && !timing.per_context.empty()) {
+                    ctxTiming = timing.per_context.front().second;
+                    hasCtxTiming = true;
+                }
+
                 value_ss << "\n"
                     << std::fixed << std::setprecision(2)
                     << fpsAvg << "\n"
@@ -1291,20 +1906,36 @@ void TextDrawCallback::drawImplementation(osg::RenderInfo &renderInfo, const osg
                     << render_info.rendered_nodes << "\n"
                     << primMio << "\n"
                     << primPerSecMio << "\n"
-                    << render_info.rendered_bounding_boxes << "\n\n\n"
+                    << fmtPercent(timing.coverage) << "\n"
+                    << fmtRatio(timing.overdraw) << "\n"
+                    << fmtM(timing.samples_passed) << "\n"
+                    << fmtM(timing.covered_samples) << "\n"
+                    << render_info.rendered_bounding_boxes << "\n"
+                    << fmtMs(frameTotalMs) << "\n"
+                    << fmtMs(timing.cpu_update_ms) << "\n"
+                    << fmtMs(timing.wait_ms) << "\n"
+                    << fmtMs(timing.dispatch_ms) << "\n"
+                    << fmtMs(timing.context_update_ms) << "\n"
+                    << fmtMs(timing.render_cpu_ms) << "\n"
+                    << fmtMs(timing.gpu_ms) << "\n"
+                    << (hasCtxTiming ? fmtMs(ctxTiming.dispatch_ms) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtMs(ctxTiming.context_update_ms) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtMs(ctxTiming.cpu_cull_ms) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtMs(ctxTiming.cpu_draw_ms) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtMs(ctxTiming.gpu_ms) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtPercent(ctxTiming.coverage) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtRatio(ctxTiming.overdraw) : std::string("-")) << "\n"
+                    << (hasCtxTiming ? fmtMs(ctxTiming.render_cpu_ms) : std::string("-")) << "\n\n\n"
                     << pos.x << "\n"
                     << pos.y << "\n"
-                    << pos.z << "\n\n\n\n"
-                    << modelview_ss.str() << "\n\n\n"
-                    << projection_ss.str() << "\n\n\n"
-                    << mvp_ss.str() << "\n\n\n";
+                    << pos.z << "\n";
 
                 _values->setText(value_ss.str(), osgText::String::ENCODING_UTF8);
                 _lastUpdateTime = now;
             }
             else if (verbose)
             {
-                std::cerr << "[Lamure][WARN] TextDrawCallback: missing renderer state, skip\n";
+                std::cerr << "[Lamure][WARN] StatsDrawCallback: missing renderer state, skip\n";
             }
         }
     }
@@ -1467,6 +2098,7 @@ void LamureRenderer::init()
     if (auto* vs = opencover::VRViewer::instance()->getViewerStats()) {
         vs->collectStats("frame_rate", true);
     }
+    ensureViewerCameraStatsEnabled(opencover::VRViewer::instance());
 
     m_init_geode = new osg::Geode();
     m_init_geode->setName("InitGeode");
@@ -1502,9 +2134,9 @@ void LamureRenderer::init()
     m_dispatch_geometry->setDrawCallback(new DispatchDrawCallback(m_plugin));
     m_dispatch_geode->addDrawable(m_dispatch_geometry);
 
-    if (notifyOn()) { std::cout << "[Lamure] TextGeode()" << std::endl; }
-    m_text_geode = new osg::Geode();
-    m_text_geode->setName("TextGeode");
+    if (notifyOn()) { std::cout << "[Lamure] StatsGeode()" << std::endl; }
+    m_stats_geode = new osg::Geode();
+    m_stats_geode->setName("StatsGeode");
     {
         osg::Vec4 color(1.0f, 1.0f, 1.0f, 1.0f);
         std::string font = opencover::coVRFileManager::instance()->getFontFile(NULL);
@@ -1515,7 +2147,7 @@ void LamureRenderer::init()
         osg::Vec3 pos_label(traits->width - marginX - labelColumnOffset, traits->height - marginY, 0.0f);
         osg::Vec3 pos_value(traits->width - marginX,                      traits->height - marginY, 0.0f);
         osg::ref_ptr<osgText::Text> label = new osgText::Text();
-        label->setName("LabelText");
+        label->setName("LabelStats");
         label->setColor(color);
         label->setFont(font);
         label->setCharacterSizeMode(osgText::TextBase::SCREEN_COORDS);
@@ -1529,18 +2161,34 @@ void LamureRenderer::init()
             << "Nodes:" << "\n"
             << "Primitives (Mio):" << "\n"
             << "Primitives / s (Mio):" << "\n"
-            << "Boxes:" << "\n\n"
+            << "Coverage (%):" << "\n"
+            << "Overdraw (x):" << "\n"
+            << "Samples Passed (M):" << "\n"
+            << "Covered Pixels (M):" << "\n"
+            << "Boxes:" << "\n"
+            << "Frame Total (ms):" << "\n"
+            << "CPU Update (ms):" << "\n"
+            << "Wait (ms):" << "\n"
+            << "Dispatch Submit (ms):" << "\n"
+            << "Context Sum (ms):" << "\n"
+            << "Render CPU Sum (ms):" << "\n"
+            << "GPU Sum (ms):" << "\n"
+            << "Ctx Dispatch (ms):" << "\n"
+            << "Ctx Context (ms):" << "\n"
+            << "Ctx Cull (ms):" << "\n"
+            << "Ctx Draw (ms):" << "\n"
+            << "Ctx GPU (ms):" << "\n"
+            << "Ctx Coverage (%):" << "\n"
+            << "Ctx Overdraw (x):" << "\n"
+            << "Ctx Render CPU (ms):" << "\n\n"
             << "Frustum Position" << "\n"
             << "X:" << "\n"
             << "Y:" << "\n"
-            << "Z:" << "\n\n\n"
-            << "ModelView" << "\n\n\n\n\n\n"
-            << "Projection" << "\n\n\n\n\n\n"
-            << "MVP" << "\n\n\n\n\n\n";
+            << "Z:" << "\n";
         label->setText(label_ss.str(), osgText::String::ENCODING_UTF8);
 
         osg::ref_ptr<osgText::Text> value = new osgText::Text();
-        value->setName("ValueText");
+        value->setName("ValueStats");
         value->setColor(color);
         value->setFont(font);
         value->setCharacterSizeMode(osgText::TextBase::SCREEN_COORDS);
@@ -1555,17 +2203,35 @@ void LamureRenderer::init()
             << "0.00" << "\n"
             << "0.00" << "\n"
             << "0.00" << "\n"
-            << "0.00:" << "\n\n\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "0.00:" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n"
+            << "-" << "\n\n\n"
             << "0.00" << "\n"
             << "0.00" << "\n"
-            << "0.00" << "\n\n\n\n\n"
-            << "0.00" << "\n\n\n\n";
+            << "0.00" << "\n";
         value->setText(value_ss.str(), osgText::String::ENCODING_UTF8);
-        m_text_geode->addDrawable(label.get());
-        m_text_geode->addDrawable(value.get());
-        value->setDrawCallback(new TextDrawCallback(m_plugin, value.get()));
+        m_stats_geode->addDrawable(label.get());
+        m_stats_geode->addDrawable(value.get());
+        value->setDrawCallback(new StatsDrawCallback(m_plugin, value.get()));
     }
-    m_text_geode->setNodeMask(0x0);
+    m_stats_geode->setNodeMask(0x0);
 
     m_frustum_geode      = new osg::Geode();
     m_frustum_geode->setName("FrustumGeode");
@@ -1589,9 +2255,9 @@ void LamureRenderer::init()
     m_edit_brush_geode->setName("EditBrushGeode");
     m_edit_brush_transform->addChild(m_edit_brush_geode.get());
 
-    m_text_stateset = new osg::StateSet();
-    m_text_stateset->setRenderBinDetails(10, "RenderBin");
-    m_text_geode->setStateSet(m_text_stateset.get());
+    m_stats_stateset = new osg::StateSet();
+    m_stats_stateset->setRenderBinDetails(10, "RenderBin");
+    m_stats_geode->setStateSet(m_stats_stateset.get());
 
     m_frustum_stateset = new osg::StateSet();
     m_frustum_stateset->setRenderBinDetails(10, "RenderBin");
@@ -1600,15 +2266,15 @@ void LamureRenderer::init()
     
     auto ui = m_plugin->getUI();
 
-    const bool show_text = m_plugin->getSettings().show_text;
+    const bool show_stats = m_plugin->getSettings().show_stats;
     ui->getPointcloudButton()->setState(   m_plugin->getSettings().show_pointcloud );
     ui->getBoundingboxButton()->setState(  m_plugin->getSettings().show_boundingbox );
     ui->getFrustumButton()->setState(      m_plugin->getSettings().show_frustum );
-    ui->getTextButton()->setState(         show_text );
+    ui->getStatsButton()->setState(         show_stats );
     ui->getSyncButton()->setState(         m_plugin->getSettings().show_sync );
     ui->getNotifyButton()->setState(       m_plugin->getSettings().show_notify );
-    if (m_text_geode.valid()) {
-        m_text_geode->setNodeMask(show_text ? 0xFFFFFFFF : 0x0);
+    if (m_stats_geode.valid()) {
+        m_stats_geode->setNodeMask(show_stats ? 0xFFFFFFFF : 0x0);
     }
 
     ui->getPointcloudButton()->setCallback([this](bool state) {
@@ -1638,11 +2304,11 @@ void LamureRenderer::init()
         }
     });
 
-    ui->getTextButton()->setCallback([this](bool state) {
+    ui->getStatsButton()->setCallback([this](bool state) {
         if (!m_plugin) return;
-        m_plugin->getSettings().show_text = state;
-        if (m_text_geode.valid()) {
-            m_text_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0);
+        m_plugin->getSettings().show_stats = state;
+        if (m_stats_geode.valid()) {
+            m_stats_geode->setNodeMask(state ? 0xFFFFFFFF : 0x0);
         }
     });
     ui->getSyncButton()->setCallback([this](bool state) {
@@ -1667,10 +2333,19 @@ void LamureRenderer::detachCallbacks()
     if (m_init_geometry.valid())        m_init_geometry->setDrawCallback(nullptr);
     if (m_dispatch_geometry.valid())    m_dispatch_geometry->setDrawCallback(nullptr);
     if (m_frustum_geometry.valid())     m_frustum_geometry->setDrawCallback(nullptr);
+    if (m_stats_geode.valid()) {
+        const unsigned int numDrawables = m_stats_geode->getNumDrawables();
+        for (unsigned int i = 0; i < numDrawables; ++i) {
+            if (auto* drawable = m_stats_geode->getDrawable(i))
+                drawable->setDrawCallback(nullptr);
+        }
+    }
 }
 
 void LamureRenderer::shutdown()
 {
+    detachCallbacks();
+
     // Wait for pools to drain before shutdown to avoid races
     if (auto* ctrl = lamure::ren::controller::get_instance()) {
         //if (m_osg_camera.valid() && m_osg_camera->getGraphicsContext() && m_osg_camera->getGraphicsContext()->getState()) {
@@ -1699,20 +2374,35 @@ void LamureRenderer::shutdown()
         if (m_frustum_group.valid())    m_plugin->getGroup()->removeChild(m_frustum_group);
     }
 
-    if (m_osg_camera.valid() && m_hud_camera.valid())
-        m_osg_camera->removeChild(m_hud_camera.get());
+    if (m_hud_camera.valid()) {
+        while (m_hud_camera->getNumParents() > 0) {
+            osg::Group* parent = m_hud_camera->getParent(m_hud_camera->getNumParents() - 1);
+            if (!parent)
+                break;
+            parent->removeChild(m_hud_camera.get());
+        }
+    }
 
     if (m_hud_camera.valid())
         m_hud_camera->removeChildren(0, m_hud_camera->getNumChildren());
 
+    if (m_stats_geode.valid()) {
+        while (m_stats_geode->getNumParents() > 0) {
+            osg::Group* parent = m_stats_geode->getParent(m_stats_geode->getNumParents() - 1);
+            if (!parent)
+                break;
+            parent->removeChild(m_stats_geode.get());
+        }
+    }
+
     m_init_geode = nullptr;
     m_dispatch_geode = nullptr;
-    m_text_geode = nullptr;
+    m_stats_geode = nullptr;
     m_frustum_geode = nullptr;
     m_frustum_group = nullptr;
     m_init_stateset = nullptr;
     m_dispatch_stateset = nullptr;
-    m_text_stateset = nullptr;
+    m_stats_stateset = nullptr;
     m_frustum_stateset = nullptr;
     m_init_geometry = nullptr;
     m_dispatch_geometry = nullptr;
@@ -2768,6 +3458,17 @@ void LamureRenderer::initLamureShader(ContextResources& res)
     res.sh_surfel_pass1.program          = compileAndLinkShaders(vis_surfel_pass1_vs_source, vis_surfel_pass1_gs_source, vis_surfel_pass1_fs_source, res.ctx);
     res.sh_surfel_pass2.program          = compileAndLinkShaders(vis_surfel_pass2_vs_source, vis_surfel_pass2_gs_source, vis_surfel_pass2_fs_source, res.ctx);
     res.sh_surfel_pass3.program          = compileAndLinkShaders(vis_surfel_pass3_vs_source, vis_surfel_pass3_fs_source, res.ctx);
+    {
+        static const std::string coverageVs =
+            "#version 330\n"
+            "layout(location = 0) in vec3 in_position;\n"
+            "void main(){ gl_Position = vec4(in_position, 1.0); }\n";
+        static const std::string coverageFs =
+            "#version 330\n"
+            "out vec4 fragColor;\n"
+            "void main(){ fragColor = vec4(1.0); }\n";
+        res.sh_coverage_query.program = compileAndLinkShaders(coverageVs, coverageFs, res.ctx, "coverage_query");
+    }
 
     res.shaders_initialized = true;
 }
@@ -2879,6 +3580,7 @@ void LamureRenderer::initCamera(ContextResources& res)
 {
     if (notifyOn()) { std::cout << "[Lamure] LamureRenderer::initCamera(" << res.view_id << ")" << std::endl; }
     osg::Camera* osg_camera = opencover::VRViewer::instance()->getCamera();
+    m_osg_camera = osg_camera;
     double look_dist = 1.0;
     double left, right, bottom, top, zNear, zFar;
     osg::Vec3d eye, center, up;
@@ -2915,8 +3617,8 @@ void LamureRenderer::initCamera(ContextResources& res)
     scm::math::vec3f root_min_temp = scm::math::vec3f::zero();
     scm::math::vec3f root_max_temp = scm::math::vec3f::zero();
 
-    if (m_text_geode.valid())
-        m_hud_camera->addChild(m_text_geode.get());
+    if (m_stats_geode.valid())
+        m_hud_camera->addChild(m_stats_geode.get());
     if (m_hud_camera.valid())
     {
         m_hud_camera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
@@ -3399,3 +4101,4 @@ bool LamureRenderer::getModelMatrix(const osg::Node* node, osg::Matrixd& out) co
     out = osg::computeLocalToWorld(paths.front());
     return true;
 }
+

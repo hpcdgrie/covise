@@ -179,6 +179,12 @@ public:
         float wait_ms            = -1.0f;
         float wait_frac_pct      = -1.0f;
 
+        // Renderer-Telemetrie (pro Frame aus Kontext-Snapshots aggregiert)
+        float dispatch_ms        = -1.0f;
+        float context_update_ms  = -1.0f;
+        float render_cpu_ms      = -1.0f;
+        std::string ctx_timing;
+
         std::string boundness;   // "GPU-bound" | "CPU-bound" | "Wait/Sync-bound" | "mixed" | "unknown"
     };
 

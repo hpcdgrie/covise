@@ -33,7 +33,7 @@
       <Headlight value="on" />
       <RenderOnMaster value="on" />
       <Statistics value="off" />
-      <DebugLevel value="0" />
+      <DebugLevel value="3" />
       <ContinuousRendering value="on" />
       <trackedHMD value="off" />
       <HMDMode value="off" />
@@ -174,13 +174,12 @@
             <models value="D:/Forschungsarbeit/Data/myanmar.bvh"/>
             <models value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_bin/naturkundemuseum_School000.bvh"/>
 
-            <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_vis"/>
-            <initial_selection value="0,1"/>
+            
             <models value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_bin/naturkundemuseum_School000.bvh"/>
             
              -->
-
-            <models value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_bin/naturkundemuseum_School000.bvh"/>
+            <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_vis"/>
+            <initial_selection value="0,1,2"/>
             <point_light_intensity value="0.6"/>
             <ambient_intensity value="0.6"/>
             <shininess value="0.1"/>
@@ -201,7 +200,7 @@
             <max_screen_size value="10000.0"/>
             <min_screen_size value="1.0"/>
             <scale_points value="1.0"/>
-            <scale_surfel value="1.0"/>
+            <scale_surfel value="1.5"/>
             <lighting value="off"/>
             <color value="off"/>
             <color_mode value="normals"/> <!-- normals, accuracy, derivation, sensitivity -->
