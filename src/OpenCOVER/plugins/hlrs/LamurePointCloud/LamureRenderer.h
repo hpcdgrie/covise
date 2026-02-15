@@ -559,6 +559,7 @@ private:
         bool pixel_queries_ready{false};
         GLuint pixel_stencil_bit{0};
         uint64_t pixel_current_frame{std::numeric_limits<uint64_t>::max()};
+        bool pixel_stencil_needs_clear{false};
 
         bool pixel_capture_active{false};
         GLuint pixel_total_query_active{0};
@@ -590,6 +591,14 @@ private:
         std::string gpu_renderer;
         std::string gpu_version;
         std::string gpu_key;
+
+        // Batch draw vectors (per-context to avoid thread-unsafe static locals)
+        std::vector<GLint> batch_firsts;
+        std::vector<GLsizei> batch_counts;
+#ifdef _OPENMP
+        std::vector<std::vector<GLint>> tls_firsts;
+        std::vector<std::vector<GLsizei>> tls_counts;
+#endif
     };
 
 
@@ -867,6 +876,7 @@ public:
     void noteContextStats(int ctxId, uint64_t frameNo, double cullMs, double drawMs, double gpuMs);
     void noteContextPixelStats(int ctxId, uint64_t frameNo, double samplesPassed, double coveredSamples, double viewportPixels);
     void noteGlobalStats(uint64_t frameNo, double cpuUpdateMs, double waitMs);
+    void commitFrameTiming(int ctxId, uint64_t frameNo, const ContextTimingSample& sample);
     TimingSnapshot getTimingSnapshot(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
     std::string getTimingCompactString(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
     void updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
@@ -897,6 +907,7 @@ private:
     uint64_t m_timing_global_frame{std::numeric_limits<uint64_t>::max()};
     double m_timing_cpu_update_ms{-1.0};
     double m_timing_wait_ms{-1.0};
+    bool m_stats_initialized{false};
 
 };
 

@@ -18,8 +18,8 @@
 #include <system_error>
 #include <thread>
 #include <ctime>
-#include <cstring>
 #include "Lamure.h"
+#include "LamureUtil.h"
 
 #include <lamure/ren/model_database.h>
 #include <lamure/ren/bvh.h>
@@ -45,38 +45,59 @@
 #ifdef _WIN32  // <--- FEHLTE
 // --- NVML dynamic loader ---
 struct NvmlLoader {
-    HMODULE h = nullptr; bool ok = false; void* dev = nullptr;
-    using nvmlInit_t = int(*)(); using nvmlShutdown_t = int(*)();
+    HMODULE h = nullptr;
+    bool ok = false;
+    void* dev = nullptr;
+
+    using nvmlInit_t = int(*)();
+    using nvmlShutdown_t = int(*)();
     using nvmlDeviceGetHandleByIndex_t = int(*)(unsigned, void**);
     using nvmlDeviceGetUtilizationRates_t = int(*)(void*, void*);
     using nvmlDeviceGetMemoryInfo_t = int(*)(void*, void*);
     using nvmlDeviceGetTemperature_t = int(*)(void*, unsigned, unsigned*);
     using nvmlDeviceGetName_t = int(*)(void*, char*, unsigned);
 
-    nvmlInit_t nvmlInit=nullptr; nvmlShutdown_t nvmlShutdown=nullptr;
-    nvmlDeviceGetHandleByIndex_t nvmlDeviceGetHandleByIndex=nullptr;
-    nvmlDeviceGetUtilizationRates_t nvmlDeviceGetUtilizationRates=nullptr;
-    nvmlDeviceGetMemoryInfo_t nvmlDeviceGetMemoryInfo=nullptr;
-    nvmlDeviceGetTemperature_t nvmlDeviceGetTemperature=nullptr;
-    nvmlDeviceGetName_t nvmlDeviceGetName=nullptr;
+    nvmlInit_t nvmlInit = nullptr;
+    nvmlShutdown_t nvmlShutdown = nullptr;
+    nvmlDeviceGetHandleByIndex_t nvmlDeviceGetHandleByIndex = nullptr;
+    nvmlDeviceGetUtilizationRates_t nvmlDeviceGetUtilizationRates = nullptr;
+    nvmlDeviceGetMemoryInfo_t nvmlDeviceGetMemoryInfo = nullptr;
+    nvmlDeviceGetTemperature_t nvmlDeviceGetTemperature = nullptr;
+    nvmlDeviceGetName_t nvmlDeviceGetName = nullptr;
 
-    bool ensureLoaded(){
+    bool ensureLoaded()
+    {
         if (ok) return true;
-        if (!h) { h = LoadLibraryA("nvml.dll"); if (!h) return false; }
-        nvmlInit = (nvmlInit_t)GetProcAddress(h,"nvmlInit_v2"); if(!nvmlInit) nvmlInit=(nvmlInit_t)GetProcAddress(h,"nvmlInit");
-        nvmlShutdown=(nvmlShutdown_t)GetProcAddress(h,"nvmlShutdown");
-        nvmlDeviceGetHandleByIndex=(nvmlDeviceGetHandleByIndex_t)GetProcAddress(h,"nvmlDeviceGetHandleByIndex_v2");
-        if(!nvmlDeviceGetHandleByIndex) nvmlDeviceGetHandleByIndex=(nvmlDeviceGetHandleByIndex_t)GetProcAddress(h,"nvmlDeviceGetHandleByIndex");
-        nvmlDeviceGetUtilizationRates=(nvmlDeviceGetUtilizationRates_t)GetProcAddress(h,"nvmlDeviceGetUtilizationRates");
-        nvmlDeviceGetMemoryInfo=(nvmlDeviceGetMemoryInfo_t)GetProcAddress(h,"nvmlDeviceGetMemoryInfo");
-        nvmlDeviceGetTemperature=(nvmlDeviceGetTemperature_t)GetProcAddress(h,"nvmlDeviceGetTemperature");
-        nvmlDeviceGetName=(nvmlDeviceGetName_t)GetProcAddress(h,"nvmlDeviceGetName");
-        if(!nvmlInit||!nvmlShutdown||!nvmlDeviceGetHandleByIndex||!nvmlDeviceGetUtilizationRates||!nvmlDeviceGetMemoryInfo) return false;
+        if (!h) {
+            h = LoadLibraryA("nvml.dll");
+            if (!h) return false;
+        }
+        nvmlInit = (nvmlInit_t)GetProcAddress(h, "nvmlInit_v2");
+        if (!nvmlInit) nvmlInit = (nvmlInit_t)GetProcAddress(h, "nvmlInit");
+        nvmlShutdown = (nvmlShutdown_t)GetProcAddress(h, "nvmlShutdown");
+        nvmlDeviceGetHandleByIndex = (nvmlDeviceGetHandleByIndex_t)GetProcAddress(h, "nvmlDeviceGetHandleByIndex_v2");
+        if (!nvmlDeviceGetHandleByIndex) {
+            nvmlDeviceGetHandleByIndex = (nvmlDeviceGetHandleByIndex_t)GetProcAddress(h, "nvmlDeviceGetHandleByIndex");
+        }
+        nvmlDeviceGetUtilizationRates = (nvmlDeviceGetUtilizationRates_t)GetProcAddress(h, "nvmlDeviceGetUtilizationRates");
+        nvmlDeviceGetMemoryInfo = (nvmlDeviceGetMemoryInfo_t)GetProcAddress(h, "nvmlDeviceGetMemoryInfo");
+        nvmlDeviceGetTemperature = (nvmlDeviceGetTemperature_t)GetProcAddress(h, "nvmlDeviceGetTemperature");
+        nvmlDeviceGetName = (nvmlDeviceGetName_t)GetProcAddress(h, "nvmlDeviceGetName");
+        if (!nvmlInit || !nvmlShutdown || !nvmlDeviceGetHandleByIndex ||
+            !nvmlDeviceGetUtilizationRates || !nvmlDeviceGetMemoryInfo) {
+            return false;
+        }
         if (nvmlInit()!=0) return false;
         if (nvmlDeviceGetHandleByIndex(0,&dev)!=0) return false;
-        ok=true; return true;
+        ok = true;
+        return true;
     }
-    ~NvmlLoader(){ if(ok&&nvmlShutdown) nvmlShutdown(); if(h) FreeLibrary(h); }
+
+    ~NvmlLoader()
+    {
+        if (ok && nvmlShutdown) nvmlShutdown();
+        if (h) FreeLibrary(h);
+    }
 };
 
 #ifndef NVML_TEMPERATURE_GPU
@@ -282,17 +303,6 @@ namespace {
 
     static inline double pi() { return 3.14159265358979323846; }
 
-    // ---- NEU: Helper fürs Set/Unset-Handling ----
-    static inline bool is_setD(double v) {
-        // -1.0 (oder allgemein <0) bzw. NaN/Inf => unset
-        return std::isfinite(v) && v >= 0.0;
-    }
-
-    template <class V>
-    static inline void safe_push(std::vector<V>& vec, V v) {
-        if (is_setD(double(v)) && v > 0) vec.push_back(v);
-    }
-
     static double percentile_select(std::vector<double> v, double p) {
         if (v.empty()) return -1.0; // unset statt 0.0
         p = std::clamp(p, 0.0, 1.0);
@@ -305,6 +315,31 @@ namespace {
         return (cnt > 0) ? (sum / double(cnt)) : -1.0;
     }
 
+    struct SegmentTiming {
+        double transDur = 0.0;
+        double rotDur = 0.0;
+        double segDuration = 0.0;
+    };
+
+    static SegmentTiming computeSegmentTiming(const LamureMeasurement::Segment& seg, double sEff)
+    {
+        const float dist = seg.tra.length();
+        const double transSpeedEff = (seg.transSpeed > 0.f ? seg.transSpeed * sEff : 0.0);
+        const double transDur = (transSpeedEff > 0.0 && dist > 0.0) ? (dist / transSpeedEff) : 0.0;
+
+        const double angleMag = std::max({ std::abs((double)seg.rot.x()),
+            std::abs((double)seg.rot.y()),
+            std::abs((double)seg.rot.z()) });
+        const double rotDur = (seg.rotSpeed > 0.f && angleMag > 0.0) ? (angleMag / seg.rotSpeed) : 0.0;
+
+        SegmentTiming timing;
+        timing.transDur = transDur;
+        timing.rotDur = rotDur;
+        timing.segDuration = (transDur > 0.0 && rotDur > 0.0) ? std::max(transDur, rotDur)
+            : ((transDur > 0.0) ? transDur : rotDur);
+        return timing;
+    }
+
     static Synthesis computeSynthesis(
         const std::vector<LamureMeasurement::FrameStats>& stats,
         const std::unordered_map<unsigned,double>& gpuMsByFrame)
@@ -315,81 +350,83 @@ namespace {
 
         std::vector<double> ft_ms; ft_ms.reserve(stats.size());
 
-        // Summen + Zähler nur über gesetzte Werte
-        double sum_cpu_main=0, sum_wait=0, sum_gpu_from_tl=0;
-        int cnt_cpu_main=0, cnt_wait=0, cnt_gpu_from_tl=0;
+        LamureUtil::RunningAvg cpuMainAvg;
+        LamureUtil::RunningAvg waitAvg;
+        LamureUtil::RunningAvg gpuFromTimelineAvg;
+        LamureUtil::RunningAvg cpuBusyAvg;
+        LamureUtil::RunningAvg gpuBusyAvg;
+        LamureUtil::RunningAvg waitFracAvg;
+        LamureUtil::RunningAvg covC1Avg;
+        LamureUtil::RunningAvg covDAvg;
+        LamureUtil::RunningAvg rptsAvg;
 
-        double sum_cpu_bp=0, sum_gpu_bp=0, sum_wait_pct=0;
-        int cnt_cpu_bp=0, cnt_gpu_bp=0, cnt_wait_pct=0;
+        LamureUtil::RunningAvg markDrawImplAvg;
+        LamureUtil::RunningAvg markPass1Avg;
+        LamureUtil::RunningAvg markPass2Avg;
+        LamureUtil::RunningAvg markPass3Avg;
+        LamureUtil::RunningAvg markDispatchAvg;
+        LamureUtil::RunningAvg markContextBindAvg;
+        LamureUtil::RunningAvg markEstimatesAvg;
+        LamureUtil::RunningAvg markSinglePassAvg;
 
-        double sum_covC1=0, sum_covD=0; int cnt_cov=0;
-        double sum_rpts=0; int cnt_rpts=0;
-
-        // Marks/Estimates Summen + Zähler
-        double m_draw_impl=0, m_p1=0, m_p2=0, m_p3=0, m_disp=0, m_bind=0, m_est=0, m_sp=0;
-        int c_draw_impl=0, c_p1=0, c_p2=0, c_p3=0, c_disp=0, c_bind=0, c_est=0, c_sp=0;
-
-        double t_est_screen_px=0, t_est_sum_area_px=0, t_est_density=0, t_est_coverage=0,
-            t_est_coverage_px=0, t_est_overdraw=0, t_avg_area_pp=0;
-        int    c_est_screen_px=0, c_est_sum_area_px=0, c_est_density=0, c_est_coverage=0,
-            c_est_coverage_px=0, c_est_overdraw=0, c_avg_area_pp=0;
+        LamureUtil::RunningAvg estScreenPxAvg;
+        LamureUtil::RunningAvg estSumAreaPxAvg;
+        LamureUtil::RunningAvg estDensityAvg;
+        LamureUtil::RunningAvg estCoverageAvg;
+        LamureUtil::RunningAvg estCoveragePxAvg;
+        LamureUtil::RunningAvg estOverdrawAvg;
+        LamureUtil::RunningAvg avgAreaPxPerPrimAvg;
 
         for (const auto& s : stats) {
-            // Frametime-Kandidat (nur >0 und gesetzt)
-            const double ft_choice = is_setD(s.frame_duration_ms) ? s.frame_duration_ms
-                : is_setD(s.rendering_traversals_ms) ? s.rendering_traversals_ms
+            const auto gpuIt = gpuMsByFrame.find(s.frame_number);
+            const double gpuMs = (gpuIt != gpuMsByFrame.end()) ? gpuIt->second : -1.0;
+
+            // Frametime-Kandidat
+            const double ft_choice = LamureUtil::isValidValue(s.frame_duration_ms) ? s.frame_duration_ms
+                : LamureUtil::isValidValue(s.rendering_traversals_ms) ? s.rendering_traversals_ms
                 : -1.0;
-            safe_push(ft_ms, ft_choice);
-            if (is_setD(ft_choice)) syn.total_duration_ms += ft_choice;
+            if (LamureUtil::isValidValue(ft_choice) && ft_choice > 0.0) {
+                ft_ms.push_back(ft_choice);
+                syn.total_duration_ms += ft_choice;
+            }
 
-            // CPU/GPU/Wait (nur gesetzte Werte addieren)
-            if (is_setD(s.cpu_main_ms)) { sum_cpu_main += s.cpu_main_ms; ++cnt_cpu_main; }
-            if (is_setD(s.wait_ms))     { sum_wait     += s.wait_ms;     ++cnt_wait;     }
+            cpuMainAvg.add(s.cpu_main_ms);
+            waitAvg.add(s.wait_ms);
 
-            // busy/percent
-            if (is_setD(s.cpu_busy_pct_proxy)) { sum_cpu_bp += s.cpu_busy_pct_proxy; ++cnt_cpu_bp; }
-            if (is_setD(s.gpu_busy_pct_proxy)) { sum_gpu_bp += s.gpu_busy_pct_proxy; ++cnt_gpu_bp; }
-            if (is_setD(s.wait_frac_pct))      { sum_wait_pct += s.wait_frac_pct;     ++cnt_wait_pct; }
+            cpuBusyAvg.add(s.cpu_busy_pct_proxy);
+            gpuBusyAvg.add(s.gpu_busy_pct_proxy);
+            waitFracAvg.add(s.wait_frac_pct);
 
-            // Boundness (Stringzählung bleibt wie gehabt)
             if      (s.boundness == "GPU-bound")       ++syn.cnt_gpu;
             else if (s.boundness == "CPU-bound")       ++syn.cnt_cpu;
             else if (s.boundness == "Wait/Sync-bound") ++syn.cnt_wait;
             else if (s.boundness == "mixed")           ++syn.cnt_mixed;
             else                                       ++syn.cnt_unknown;
 
-            // GPU-Zeit pro Frame aus Timeline
-            if (auto it = gpuMsByFrame.find(s.frame_number); it != gpuMsByFrame.end()) {
-                const double gms = it->second;
-                if (is_setD(gms)) { sum_gpu_from_tl += gms; ++cnt_gpu_from_tl; }
-            }
+            gpuFromTimelineAvg.add(gpuMs);
 
-            // Coverage/Effizienz – nur wenn Inputs gesetzt/valide
-            if (is_setD(s.est_density) || is_setD(s.est_coverage)) {
-                const double D  = is_setD(s.est_density) ? std::max(0.0, double(s.est_density)) : 0.0;
-                const double C1 = is_setD(s.est_coverage) ? double(s.est_coverage)
+            if (LamureUtil::isValidValue(s.est_density) || LamureUtil::isValidValue(s.est_coverage)) {
+                const double D  = LamureUtil::isValidValue(s.est_density) ? std::max(0.0, double(s.est_density)) : 0.0;
+                const double C1 = LamureUtil::isValidValue(s.est_coverage) ? double(s.est_coverage)
                     : (D > 0.0 ? 1.0 - std::exp(-D) : 0.0);
-                if (C1 > 0.0 || D > 0.0) { sum_covC1 += C1; sum_covD += D; ++cnt_cov; }
-            }
-
-            // RPTS (points/ms) nur falls GPU>0 und Splats>0
-            if (auto it = gpuMsByFrame.find(s.frame_number); it!=gpuMsByFrame.end()) {
-                const double gms = it->second;
-                if (is_setD(gms) && gms > 0.0 && s.rendered_primitives > 0) {
-                    sum_rpts += double(s.rendered_primitives) / gms; ++cnt_rpts;
+                if (C1 > 0.0 || D > 0.0) {
+                    covC1Avg.add(C1);
+                    covDAvg.add(D);
                 }
             }
 
-            // Renderer-Estimates (avg) – nur gesetzte übernehmen
-            if (is_setD(s.est_screen_px))       { t_est_screen_px   += s.est_screen_px;   ++c_est_screen_px; }
-            if (is_setD(s.est_sum_area_px))     { t_est_sum_area_px += s.est_sum_area_px; ++c_est_sum_area_px; }
-            if (is_setD(s.est_density))         { t_est_density     += s.est_density;     ++c_est_density; }
-            if (is_setD(s.est_coverage))        { t_est_coverage    += s.est_coverage;    ++c_est_coverage; }
-            if (is_setD(s.est_coverage_px))     { t_est_coverage_px += s.est_coverage_px; ++c_est_coverage_px; }
-            if (is_setD(s.est_overdraw))        { t_est_overdraw    += s.est_overdraw;    ++c_est_overdraw; }
-            if (is_setD(s.avg_area_px_per_prim)){ t_avg_area_pp     += double(s.avg_area_px_per_prim); ++c_avg_area_pp; }
+            if (LamureUtil::isValidValue(gpuMs) && gpuMs > 0.0 && s.rendered_primitives > 0) {
+                rptsAvg.add(double(s.rendered_primitives) / gpuMs);
+            }
 
-            // Marks: Heuristik Sekunden→ms, nur übernehmen wenn gesetzt (>=0, finite)
+            estScreenPxAvg.add(s.est_screen_px);
+            estSumAreaPxAvg.add(s.est_sum_area_px);
+            estDensityAvg.add(s.est_density);
+            estCoverageAvg.add(s.est_coverage);
+            estCoveragePxAvg.add(s.est_coverage_px);
+            estOverdrawAvg.add(s.est_overdraw);
+            avgAreaPxPerPrimAvg.add(s.avg_area_px_per_prim);
+
             const float mark_vals[] = {
                 s.mark_draw_impl_ms, s.mark_pass1_ms, s.mark_pass2_ms, s.mark_pass3_ms,
                 s.mark_dispatch_ms, s.mark_context_bind_ms, s.mark_estimates_ms, s.mark_singlepass_ms
@@ -397,30 +434,28 @@ namespace {
             float mx = 0.0f;
             for (float v : mark_vals) mx = std::max(mx, v);
             const bool marks_look_like_seconds = (mx > 0.0f && mx < 0.01f);
-            auto norm = [&](float v)->double {
-                if (!std::isfinite(v) || v < 0.0f) return -1.0;
+            auto normMark = [&](float v)->double {
+                if (!LamureUtil::isValidValue(v)) return -1.0;
                 return marks_look_like_seconds ? (double(v) * 1000.0) : double(v);
-                };
-            auto add_mark = [&](double nv, double& sum, int& cnt){
-                if (is_setD(nv)) { sum += nv; ++cnt; }
-                };
-            add_mark(norm(s.mark_draw_impl_ms),    m_draw_impl, c_draw_impl);
-            add_mark(norm(s.mark_pass1_ms),        m_p1,        c_p1);
-            add_mark(norm(s.mark_pass2_ms),        m_p2,        c_p2);
-            add_mark(norm(s.mark_pass3_ms),        m_p3,        c_p3);
-            add_mark(norm(s.mark_dispatch_ms),     m_disp,      c_disp);
-            add_mark(norm(s.mark_context_bind_ms), m_bind,      c_bind);
-            add_mark(norm(s.mark_estimates_ms),    m_est,       c_est);
-            add_mark(norm(s.mark_singlepass_ms),   m_sp,        c_sp);
+            };
+            markDrawImplAvg.add(normMark(s.mark_draw_impl_ms));
+            markPass1Avg.add(normMark(s.mark_pass1_ms));
+            markPass2Avg.add(normMark(s.mark_pass2_ms));
+            markPass3Avg.add(normMark(s.mark_pass3_ms));
+            markDispatchAvg.add(normMark(s.mark_dispatch_ms));
+            markContextBindAvg.add(normMark(s.mark_context_bind_ms));
+            markEstimatesAvg.add(normMark(s.mark_estimates_ms));
+            markSinglePassAvg.add(normMark(s.mark_singlepass_ms));
         }
 
-        // Perzentile & Stutter
         syn.p50 = percentile_select(ft_ms, 0.50);
         syn.p95 = percentile_select(ft_ms, 0.95);
         syn.p99 = percentile_select(ft_ms, 0.99);
-        syn.jitter_J = (is_setD(syn.p99) && is_setD(syn.p50)) ? std::max(0.0, syn.p99 - syn.p50) : -1.0;
+        syn.jitter_J = (LamureUtil::isValidValue(syn.p99) && LamureUtil::isValidValue(syn.p50))
+            ? std::max(0.0, syn.p99 - syn.p50)
+            : -1.0;
 
-        if (is_setD(syn.p50)) {
+        if (LamureUtil::isValidValue(syn.p50)) {
             for (double ft : ft_ms) {
                 if (ft > 2.0 * syn.p50) ++syn.stutter_count_2xmedian;
                 if (ft > 33.333)        ++syn.stutter_count_33ms;
@@ -430,53 +465,48 @@ namespace {
             syn.stutter_count_33ms     = -1;
         }
 
-        // Mittelwerte (nur über gesetzte Werte)
         syn.avg_frame_time_ms = avg_or_unset(syn.total_duration_ms, int(ft_ms.size()));
-        syn.avg_cpu_main_ms   = avg_or_unset(sum_cpu_main,    cnt_cpu_main);
-        syn.avg_gpu_time_ms   = avg_or_unset(sum_gpu_from_tl, cnt_gpu_from_tl);
-        syn.avg_wait_ms       = avg_or_unset(sum_wait,        cnt_wait);
+        syn.avg_cpu_main_ms = cpuMainAvg.avg();
+        syn.avg_gpu_time_ms = gpuFromTimelineAvg.avg();
+        syn.avg_wait_ms = waitAvg.avg();
 
-        // FPS (nur wenn Basis gesetzt)
-        syn.fps_avg = is_setD(syn.avg_frame_time_ms) ? inv_ms_to_fps(syn.avg_frame_time_ms) : -1.0;
-        syn.fps_p50 = is_setD(syn.p50) ? inv_ms_to_fps(syn.p50) : -1.0;
-        syn.fps_p95 = is_setD(syn.p95) ? inv_ms_to_fps(syn.p95) : -1.0;
-        syn.fps_p99 = is_setD(syn.p99) ? inv_ms_to_fps(syn.p99) : -1.0;
+        syn.fps_avg = LamureUtil::isValidValue(syn.avg_frame_time_ms) ? inv_ms_to_fps(syn.avg_frame_time_ms) : -1.0;
+        syn.fps_p50 = LamureUtil::isValidValue(syn.p50) ? inv_ms_to_fps(syn.p50) : -1.0;
+        syn.fps_p95 = LamureUtil::isValidValue(syn.p95) ? inv_ms_to_fps(syn.p95) : -1.0;
+        syn.fps_p99 = LamureUtil::isValidValue(syn.p99) ? inv_ms_to_fps(syn.p99) : -1.0;
 
-        syn.avg_cpu_busy_pct  = avg_or_unset(sum_cpu_bp,  cnt_cpu_bp);
-        syn.avg_gpu_busy_pct  = avg_or_unset(sum_gpu_bp,  cnt_gpu_bp);
-        syn.avg_wait_frac_pct = avg_or_unset(sum_wait_pct, cnt_wait_pct);
+        syn.avg_cpu_busy_pct = cpuBusyAvg.avg();
+        syn.avg_gpu_busy_pct = gpuBusyAvg.avg();
+        syn.avg_wait_frac_pct = waitFracAvg.avg();
 
-        syn.avg_rpts_points_per_ms = avg_or_unset(sum_rpts, cnt_rpts);
-        syn.avg_covC1 = avg_or_unset(sum_covC1, cnt_cov);
-        syn.avg_covD  = avg_or_unset(sum_covD,  cnt_cov);
+        syn.avg_rpts_points_per_ms = rptsAvg.avg();
+        syn.avg_covC1 = covC1Avg.avg();
+        syn.avg_covD = covDAvg.avg();
 
-        // Primitive/Frame (nur wenn Basis gesetzt)
         auto prod_or_unset = [](double a, double b)->double {
-            return (is_setD(a) && is_setD(b)) ? (a*b) : -1.0;
-            };
+            return (LamureUtil::isValidValue(a) && LamureUtil::isValidValue(b)) ? (a * b) : -1.0;
+        };
         syn.prims_per_frame_avg = prod_or_unset(syn.avg_rpts_points_per_ms, syn.avg_frame_time_ms);
         syn.prims_per_frame_p50 = prod_or_unset(syn.avg_rpts_points_per_ms, syn.p50);
         syn.prims_per_frame_p95 = prod_or_unset(syn.avg_rpts_points_per_ms, syn.p95);
         syn.prims_per_frame_p99 = prod_or_unset(syn.avg_rpts_points_per_ms, syn.p99);
 
-        // Estimates averages
-        syn.est_screen_px        = avg_or_unset(t_est_screen_px,   c_est_screen_px);
-        syn.est_sum_area_px      = avg_or_unset(t_est_sum_area_px, c_est_sum_area_px);
-        syn.est_density          = avg_or_unset(t_est_density,     c_est_density);
-        syn.est_coverage         = avg_or_unset(t_est_coverage,    c_est_coverage);
-        syn.est_coverage_px      = avg_or_unset(t_est_coverage_px, c_est_coverage_px);
-        syn.est_overdraw         = avg_or_unset(t_est_overdraw,    c_est_overdraw);
-        syn.avg_area_px_per_prim = avg_or_unset(t_avg_area_pp,     c_avg_area_pp);
+        syn.est_screen_px = estScreenPxAvg.avg();
+        syn.est_sum_area_px = estSumAreaPxAvg.avg();
+        syn.est_density = estDensityAvg.avg();
+        syn.est_coverage = estCoverageAvg.avg();
+        syn.est_coverage_px = estCoveragePxAvg.avg();
+        syn.est_overdraw = estOverdrawAvg.avg();
+        syn.avg_area_px_per_prim = avgAreaPxPerPrimAvg.avg();
 
-        // Marks averages
-        syn.mark_draw_impl_ms    = avg_or_unset(m_draw_impl, c_draw_impl);
-        syn.mark_pass1_ms        = avg_or_unset(m_p1,        c_p1);
-        syn.mark_pass2_ms        = avg_or_unset(m_p2,        c_p2);
-        syn.mark_pass3_ms        = avg_or_unset(m_p3,        c_p3);
-        syn.mark_dispatch_ms     = avg_or_unset(m_disp,      c_disp);
-        syn.mark_context_bind_ms = avg_or_unset(m_bind,      c_bind);
-        syn.mark_estimates_ms    = avg_or_unset(m_est,       c_est);
-        syn.mark_singlepass_ms   = avg_or_unset(m_sp,        c_sp);
+        syn.mark_draw_impl_ms = markDrawImplAvg.avg();
+        syn.mark_pass1_ms = markPass1Avg.avg();
+        syn.mark_pass2_ms = markPass2Avg.avg();
+        syn.mark_pass3_ms = markPass3Avg.avg();
+        syn.mark_dispatch_ms = markDispatchAvg.avg();
+        syn.mark_context_bind_ms = markContextBindAvg.avg();
+        syn.mark_estimates_ms = markEstimatesAvg.avg();
+        syn.mark_singlepass_ms = markSinglePassAvg.avg();
 
         return syn;
     }
@@ -794,21 +824,16 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
     if (!m_haveSegmentStart) { m_segmentStartRefTime = tNow; m_haveSegmentStart = true; }
 
 
-    // --- (ab hier Deine vorhandene Segment-/Kamera-Logik unverändert) ---
-    auto colLen = [](const osg::Matrix& M, int c){
-        osg::Vec3 v(M(0,c), M(1,c), M(2,c));
-        return std::max(1e-9, (double)v.length());
-        };
     auto computeScale = [&](){
         const osg::Matrix dcsNow  = opencover::cover->getXformMat();
         const osg::Matrix baseM   = opencover::cover->getBaseMat();
-        double sx = colLen(baseM, 0), sy = colLen(baseM, 1), sz = colLen(baseM, 2);
+        double sx = LamureUtil::colLen(baseM, 0), sy = LamureUtil::colLen(baseM, 1), sz = LamureUtil::colLen(baseM, 2);
         const double avgBase = (sx + sy + sz) / 3.0;
         if (avgBase > 0.999 && avgBase < 1.001) {
             const osg::Matrix worldM = baseM * dcsNow;
-            sx = colLen(worldM, 0);
-            sy = colLen(worldM, 1);
-            sz = colLen(worldM, 2);
+            sx = LamureUtil::colLen(worldM, 0);
+            sy = LamureUtil::colLen(worldM, 1);
+            sz = LamureUtil::colLen(worldM, 2);
         }
         return osg::Vec3d(sx, sy, sz);
         };
@@ -824,29 +849,17 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
     while (m_currentSegment < m_segments.size())
     {
         const auto& seg = m_segments[m_currentSegment];
-
-        const float  dist = seg.tra.length();
         const osg::Vec3d S = computeScale();
         const double sEff  = dirScale(seg.tra, S);
-        const double transSpeedEff = (seg.transSpeed > 0.f ? seg.transSpeed * sEff : 0.0);
-        const double transDur = (transSpeedEff > 0.0 && dist > 0.0) ? (dist / transSpeedEff) : 0.0;
-
-        const double angleMag = std::max({ std::abs((double)seg.rot.x()),
-            std::abs((double)seg.rot.y()),
-            std::abs((double)seg.rot.z()) });
-        const double rotDur   = (seg.rotSpeed > 0.f && angleMag > 0.0) ? (angleMag / seg.rotSpeed) : 0.0;
-
-        const double segDuration =
-            (transDur > 0.0 && rotDur > 0.0) ? std::max(transDur, rotDur)
-            : ((transDur > 0.0) ? transDur : rotDur);
+        const SegmentTiming timing = computeSegmentTiming(seg, sEff);
 
         const double elapsed = tNow - m_segmentStartRefTime;
-        if (elapsed < segDuration) break;
+        if (elapsed < timing.segDuration) break;
 
         m_cumulativeTra += seg.tra;
         m_cumulativeRot += seg.rot;
         ++m_currentSegment;
-        m_segmentStartRefTime += segDuration;
+        m_segmentStartRefTime += timing.segDuration;
     }
 
     if (m_currentSegment >= m_segments.size()) { stop(); return; }
@@ -854,23 +867,12 @@ void LamureMeasurement::drawIncrement(bool preDraw, const osg::FrameStamp* frame
     // Aktuelles Segment interpolieren
     const auto& seg = m_segments[m_currentSegment];
 
-    const float  dist = seg.tra.length();
     const osg::Vec3d S = computeScale();
     const double sEff  = dirScale(seg.tra, S);
-    const double transSpeedEff = (seg.transSpeed > 0.f ? seg.transSpeed * sEff : 0.0);
-    const double transDur = (transSpeedEff > 0.0 && dist > 0.0) ? (dist / transSpeedEff) : 0.0;
-
-    const double angleMag = std::max({ std::abs((double)seg.rot.x()),
-        std::abs((double)seg.rot.y()),
-        std::abs((double)seg.rot.z()) });
-    const double rotDur   = (seg.rotSpeed > 0.f && angleMag > 0.0) ? (angleMag / seg.rotSpeed) : 0.0;
-
-    const double segDuration =
-        (transDur > 0.0 && rotDur > 0.0) ? std::max(transDur, rotDur)
-        : ((transDur > 0.0) ? transDur : rotDur);
+    const SegmentTiming timing = computeSegmentTiming(seg, sEff);
 
     const double elapsed = std::max(0.0, tNow - m_segmentStartRefTime);
-    const double frac = (segDuration > 0.0) ? std::clamp(elapsed / segDuration, 0.0, 1.0) : 1.0;
+    const double frac = (timing.segDuration > 0.0) ? std::clamp(elapsed / timing.segDuration, 0.0, 1.0) : 1.0;
 
     const osg::Vec3 tra = m_cumulativeTra + seg.tra * static_cast<float>(frac);
     const osg::Vec3 rot = m_cumulativeRot + seg.rot * static_cast<float>(frac);
@@ -916,20 +918,14 @@ void LamureMeasurement::updateCamera(const osg::Vec3& traAbs, const osg::Vec3& r
     if (std::abs(dRoll)  > 0.0) dcs.postMult(osg::Matrix::rotate(dRoll,  axisY));
     dcs.postMult(osg::Matrix::translate(viewerPos));
 
-    // ---- Translation: Meter -> Welt (Skalierung berücksichtigen, Multiplikations-Variante) ----
-    auto colLen = [](const osg::Matrix& M, int c){
-        osg::Vec3 v(M(0,c), M(1,c), M(2,c));
-        return std::max(1e-9, (double)v.length());
-        };
-
     const osg::Matrix baseM  = opencover::cover->getBaseMat();
-    double sx = colLen(baseM, 0), sy = colLen(baseM, 1), sz = colLen(baseM, 2);
+    double sx = LamureUtil::colLen(baseM, 0), sy = LamureUtil::colLen(baseM, 1), sz = LamureUtil::colLen(baseM, 2);
     const double avgBase = (sx + sy + sz) / 3.0;
     if (avgBase > 0.999 && avgBase < 1.001) {
         const osg::Matrix worldM = baseM * dcs;
-        sx = colLen(worldM, 0);
-        sy = colLen(worldM, 1);
-        sz = colLen(worldM, 2);
+        sx = LamureUtil::colLen(worldM, 0);
+        sy = LamureUtil::colLen(worldM, 1);
+        sz = LamureUtil::colLen(worldM, 2);
     }
 
     const osg::Vec3 dTraLocal(
@@ -959,6 +955,8 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
         stats.frame_number = f;
     }
 
+    std::vector<TimeBlock> blocks;
+
     // --- Viewer
     if (viewerStats) {
         double hz=0, ft=0, rtv=0; unsigned rtoff=0;
@@ -982,32 +980,26 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
         if (stats.frame_rate <= 0.f && stats.frame_duration_ms > 0.f)
             stats.frame_rate = static_cast<float>(inv_ms_to_fps(stats.frame_duration_ms));
 
-        auto addViewer = [&](const std::string& prefix, const char* name){
+        auto addViewer = [&](const std::string& prefix, float& target){
             double ms=0; unsigned off=0;
             if (getTimeTakenMsBacksearch(viewerStats, f, m_gpuBackSearch,
                 prefix + " time taken", prefix + " begin time", prefix + " end time",
                 ms, off))
             {
-                if      (std::strcmp(name, "Update traversal")==0) stats.cpu_update_ms = static_cast<float>(ms);
-                else if (std::strcmp(name, "sync")==0)             stats.sync_time_ms  = static_cast<float>(ms);
-                else if (std::strcmp(name, "swap")==0)             stats.swap_time_ms  = static_cast<float>(ms);
-                else if (std::strcmp(name, "finish")==0)           stats.finish_ms     = static_cast<float>(ms);
-                else if (std::strcmp(name, "Plugin")==0)           stats.plugin_ms     = static_cast<float>(ms);
-                else if (std::strcmp(name, "Isect")==0)            stats.isect_ms      = static_cast<float>(ms);
-                else if (std::strcmp(name, "opencover")==0)        stats.opencover_ms  = static_cast<float>(ms);
+                target = static_cast<float>(ms);
             }
             if (m_measure_timeline) {
-                (void)tryAddBlock(viewerStats, f, m_gpuBackSearch, prefix, name, "viewer", -1, m_timeline);
+                (void)tryAddBlock(viewerStats, f, m_gpuBackSearch, prefix, prefix, "viewer", -1, blocks);
             }
-            };
+        };
 
-        addViewer("Update traversal", "Update traversal");
-        addViewer("sync",            "sync");
-        addViewer("swap",            "swap");
-        addViewer("finish",          "finish");
-        addViewer("Plugin",          "Plugin");
-        addViewer("Isect",           "Isect");
-        addViewer("opencover",       "opencover");
+        addViewer("Update traversal", stats.cpu_update_ms);
+        addViewer("sync",             stats.sync_time_ms);
+        addViewer("swap",             stats.swap_time_ms);
+        addViewer("finish",           stats.finish_ms);
+        addViewer("Plugin",           stats.plugin_ms);
+        addViewer("Isect",            stats.isect_ms);
+        addViewer("opencover",        stats.opencover_ms);
 
         double v=0.0;
         if (viewerStats->getAttribute(f, "GPU Clock MHz", v))     stats.gpu_clock     = static_cast<float>(v);
@@ -1018,7 +1010,6 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
 
     // --- Kamera-Aggregate (akkumulieren in double, 1x cast)
     double sumCull=0, sumDraw=0, sumGpu=0;
-    std::vector<TimeBlock> blocks;
     for (size_t i=0; i<cams.size(); ++i) {
         osg::Camera* cam = cams[i];
         osg::Stats*  cs  = cam ? cam->getStats() : nullptr;
@@ -1151,10 +1142,6 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
         ? stats.frame_duration_ms
         : stats.rendering_traversals_ms;
 
-    auto add_if_set = [](float acc, float v)->float {
-        return (std::isfinite(v) && v >= 0.0f) ? (acc + v) : acc;
-        };
-
     // cpu_main_ms: Summe nur über gesetzte Komponenten
     bool any_cpu_known = false;
     float cpu_main = 0.0f;
@@ -1242,7 +1229,14 @@ static inline std::string csvQuote(const std::string& s) {
     if (s.find_first_of(",;\t\" \n\r") == std::string::npos) return s;
     std::string r; r.reserve(s.size()+8);
     r.push_back('"');
-    for (char c : s) r += (c=='"') ? std::string("\"\"") : std::string(1,c);
+    for (char c : s) {
+        if (c == '"') {
+            r.push_back('"');
+            r.push_back('"');
+        } else {
+            r.push_back(c);
+        }
+    }
     r.push_back('"');
     return r;
 }

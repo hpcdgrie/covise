@@ -51,7 +51,9 @@
 #include <thread>
 #include <stdexcept>
 #include <unordered_set>
+#include <unordered_map>
 #include <iostream>
+#include <cstdio>
 #include <gl_state.h>
 #include <config/CoviseConfig.h>
 
@@ -73,15 +75,11 @@ namespace {
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     }
 
-    inline bool isSetMs(double v)
-    {
-        return std::isfinite(v) && v >= 0.0;
-    }
 
     inline void accumulateMs(double& dst, double v)
     {
-        if (!isSetMs(v)) return;
-        if (!isSetMs(dst)) dst = 0.0;
+        if (!LamureUtil::isValidValue(v)) return;
+        if (!LamureUtil::isValidValue(dst)) dst = 0.0;
         dst += v;
     }
 
@@ -90,7 +88,7 @@ namespace {
         double sum = 0.0;
         bool any = false;
         for (double v : vals) {
-            if (isSetMs(v)) {
+            if (LamureUtil::isValidValue(v)) {
                 sum += v;
                 any = true;
             }
@@ -98,23 +96,60 @@ namespace {
         return any ? sum : -1.0;
     }
 
+    // Prebuilt stat key triplets for hot paths.
+    struct StatKeys {
+        std::string taken, begin, end;
+    };
+
+    static const StatKeys kUpdateTraversalKeys{
+        "Update traversal time taken",
+        "Update traversal begin time",
+        "Update traversal end time"
+    };
+    static const StatKeys kSyncKeys{
+        "sync time taken",
+        "sync begin time",
+        "sync end time"
+    };
+    static const StatKeys kSwapKeys{
+        "swap time taken",
+        "swap begin time",
+        "swap end time"
+    };
+    static const StatKeys kFinishKeys{
+        "finish time taken",
+        "finish begin time",
+        "finish end time"
+    };
+    static const StatKeys kCullTraversalKeys{
+        "Cull traversal time taken",
+        "Cull traversal begin time",
+        "Cull traversal end time"
+    };
+    static const StatKeys kDrawTraversalKeys{
+        "Draw traversal time taken",
+        "Draw traversal begin time",
+        "Draw traversal end time"
+    };
+    static const StatKeys kGpuDrawKeys{
+        "GPU draw time taken",
+        "GPU draw begin time",
+        "GPU draw end time"
+    };
+
     inline bool queryTimeTakenMsBacksearch(
         osg::Stats* stats,
         unsigned baseFrame,
         unsigned backsearch,
-        const char* prefix,
+        const StatKeys& keys,
         double& outMs)
     {
         outMs = -1.0;
-        if (!stats || !prefix) return false;
+        if (!stats) return false;
 
         const unsigned earliest = stats->getEarliestFrameNumber();
         const unsigned latest = stats->getLatestFrameNumber();
         if (baseFrame > latest) baseFrame = latest;
-
-        const std::string takenKey = std::string(prefix) + " time taken";
-        const std::string beginKey = std::string(prefix) + " begin time";
-        const std::string endKey = std::string(prefix) + " end time";
 
         for (unsigned off = 0; off <= backsearch; ++off) {
             if (baseFrame < off) break;
@@ -122,13 +157,13 @@ namespace {
             if (f < earliest) break;
 
             double vTaken = 0.0;
-            if (stats->getAttribute(f, takenKey, vTaken)) {
+            if (stats->getAttribute(f, keys.taken, vTaken)) {
                 outMs = vTaken * 1000.0;
                 return true;
             }
 
             double b = 0.0, e = 0.0;
-            if (stats->getAttribute(f, beginKey, b) && stats->getAttribute(f, endKey, e) && e >= b) {
+            if (stats->getAttribute(f, keys.begin, b) && stats->getAttribute(f, keys.end, e) && e >= b) {
                 outMs = (e - b) * 1000.0;
                 return true;
             }
@@ -261,8 +296,8 @@ namespace {
                 overdraw_raw = sd.sum_area_px / coverage_px_raw;
         }
 
-        const double cap = std::max(0.0, 50.0);
-        const double density_cap   = (cap > eps) ? std::min(density_raw, cap) : density_raw;
+        constexpr double kDensityCap = 50.0;
+        const double density_cap   = (kDensityCap > eps) ? std::min(density_raw, kDensityCap) : density_raw;
         const double coverage_cap  = 1.0 - std::exp(-density_cap);
         const double coverage_px_cap = coverage_cap * sd.screen_px;
         double overdraw_cap = 0.0;
@@ -673,6 +708,102 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
     // Check if we need per-node uniforms
     const bool needNodeUniforms = (showRadiusDeviationDebug || showAccuracyDebug);
 
+    auto cullAndBatch = [&](bool useOpenMP, bool updateCounters) {
+        auto& firsts = res.batch_firsts;
+        auto& counts = res.batch_counts;
+        firsts.clear();
+        counts.clear();
+
+#ifdef _OPENMP
+        if (useOpenMP) {
+            int max_threads = omp_get_max_threads();
+            auto& tls_firsts = res.tls_firsts;
+            auto& tls_counts = res.tls_counts;
+
+            if (tls_firsts.size() < static_cast<size_t>(max_threads)) {
+                tls_firsts.resize(max_threads);
+                tls_counts.resize(max_threads);
+            }
+            for (int t = 0; t < max_threads; ++t) {
+                tls_firsts[t].clear();
+                tls_counts[t].clear();
+                tls_firsts[t].reserve((renderable.size() / max_threads) + 1);
+                tls_counts[t].reserve((renderable.size() / max_threads) + 1);
+            }
+
+            if (updateCounters) {
+                uint64_t local_rendered_primitives = 0;
+                uint64_t local_rendered_nodes = 0;
+                #pragma omp parallel
+                {
+                    int t = omp_get_thread_num();
+                    auto& local_firsts = tls_firsts[t];
+                    auto& local_counts = tls_counts[t];
+
+                    #pragma omp for schedule(dynamic, 64) reduction(+:local_rendered_primitives, local_rendered_nodes)
+                    for (int i = 0; i < (int)renderable.size(); ++i) {
+                        const auto& node_slot = renderable[i];
+                        if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
+                            local_firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
+                            local_counts.push_back((GLsizei)surfels_per_node);
+                            local_rendered_primitives += surfels_per_node;
+                            ++local_rendered_nodes;
+                        }
+                    }
+                }
+                rendered_primitives += local_rendered_primitives;
+                rendered_nodes += local_rendered_nodes;
+            } else {
+                #pragma omp parallel
+                {
+                    int t = omp_get_thread_num();
+                    auto& local_firsts = tls_firsts[t];
+                    auto& local_counts = tls_counts[t];
+
+                    #pragma omp for schedule(dynamic, 64)
+                    for (int i = 0; i < (int)renderable.size(); ++i) {
+                        const auto& node_slot = renderable[i];
+                        if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
+                            local_firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
+                            local_counts.push_back((GLsizei)surfels_per_node);
+                        }
+                    }
+                }
+            }
+
+            size_t total_size = 0;
+            for (int t = 0; t < max_threads; ++t) total_size += tls_firsts[t].size();
+            firsts.reserve(total_size);
+            counts.reserve(total_size);
+            for (int t = 0; t < max_threads; ++t) {
+                firsts.insert(firsts.end(), tls_firsts[t].begin(), tls_firsts[t].end());
+                counts.insert(counts.end(), tls_counts[t].begin(), tls_counts[t].end());
+            }
+
+            if (!firsts.empty()) {
+                glMultiDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, firsts.data(), counts.data(), (GLsizei)firsts.size());
+            }
+            return;
+        }
+#endif
+
+        firsts.reserve(renderable.size());
+        counts.reserve(renderable.size());
+        for (const auto& node_slot : renderable) {
+            if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
+                firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
+                counts.push_back((GLsizei)surfels_per_node);
+                if (updateCounters) {
+                    rendered_primitives += surfels_per_node;
+                    ++rendered_nodes;
+                }
+            }
+        }
+        if (!firsts.empty()) {
+            glMultiDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, firsts.data(), counts.data(), (GLsizei)firsts.size());
+        }
+    };
+
     if (settings.shader_type == LamureRenderer::ShaderType::SurfelMultipass && res.vao_initialized) {
         const int vpWidth  = static_cast<int>(vpW);
         const int vpHeight = static_cast<int>(vpH);
@@ -729,83 +860,11 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
         if (res.sh_surfel_pass1.use_aniso_loc          >= 0) glUniform1i(res.sh_surfel_pass1.use_aniso_loc, useAnisoThisPass ? 1 : 0);
 
         const scm::math::mat4 model_view_matrix = view * model_matrix;
-        const scm::gl::frustum frustum = res.scm_camera->get_frustum_by_model(model_matrix);
         if (res.sh_surfel_pass1.model_view_matrix_loc >= 0)
             glUniformMatrix4fv(res.sh_surfel_pass1.model_view_matrix_loc, 1, GL_FALSE, model_view_matrix.data_array);
 
         // Batch Rendering for Pass 1 (no node uniforms here)
-        {
-            static std::vector<GLint> firsts;
-            static std::vector<GLsizei> counts;
-            firsts.clear();
-            counts.clear();
-
-#ifdef _OPENMP
-            // Thread-local storage
-            int max_threads = omp_get_max_threads();
-            static std::vector<std::vector<GLint>> tls_firsts;
-            static std::vector<std::vector<GLsizei>> tls_counts;
-
-            if (tls_firsts.size() < max_threads) {
-                tls_firsts.resize(max_threads);
-                tls_counts.resize(max_threads);
-            }
-            // Clear TLS vectors
-            for(int t=0; t<max_threads; ++t) {
-                tls_firsts[t].clear();
-                tls_counts[t].clear();
-                 // Heuristic reservation
-                tls_firsts[t].reserve(renderable.size() / max_threads);
-                tls_counts[t].reserve(renderable.size() / max_threads);
-            }
-
-            #pragma omp parallel
-            {
-                int t = omp_get_thread_num();
-                auto& local_firsts = tls_firsts[t];
-                auto& local_counts = tls_counts[t];
-                
-                #pragma omp for schedule(dynamic, 64) reduction(+:rendered_primitives, rendered_nodes)
-                for (int i = 0; i < (int)renderable.size(); ++i) {
-                    const auto& node_slot = renderable[i];
-                    if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
-                        local_firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
-                        local_counts.push_back((GLsizei)surfels_per_node);
-                        rendered_primitives += surfels_per_node;
-                        ++rendered_nodes;
-                    }
-                }
-            }
-
-            // Merge TLS results
-            size_t total_size = 0;
-            for(int t=0; t<max_threads; ++t) total_size += tls_firsts[t].size();
-            
-            firsts.reserve(total_size);
-            counts.reserve(total_size);
-            for(int t=0; t<max_threads; ++t) {
-                firsts.insert(firsts.end(), tls_firsts[t].begin(), tls_firsts[t].end());
-                counts.insert(counts.end(), tls_counts[t].begin(), tls_counts[t].end());
-            }
-
-#else
-            firsts.reserve(renderable.size());
-            counts.reserve(renderable.size());
-
-            for (const auto& node_slot : renderable) {
-                if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
-                    firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
-                    counts.push_back((GLsizei)surfels_per_node);
-                    rendered_primitives += surfels_per_node;
-                    ++rendered_nodes;
-                }
-            }
-#endif
-
-            if (!firsts.empty()) {
-                glMultiDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, firsts.data(), counts.data(), (GLsizei)firsts.size());
-            }
-        }
+        cullAndBatch(true, true);
 
         // --- PASS 2: Accumulation
         GLenum accumBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
@@ -857,20 +916,9 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
                 }
             }
         } else {
-             // Batch Rendering for Pass 2
-             static std::vector<GLint> firsts;
-             static std::vector<GLsizei> counts;
-             firsts.clear();
-             counts.clear();
-             firsts.reserve(renderable.size());
-             counts.reserve(renderable.size());
-
-             for (const auto& node_slot : renderable) {
-                 if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
-                     firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
-                     counts.push_back((GLsizei)surfels_per_node);
-                 }
-             }
+             // Reuse Pass-1 cull+batch result: same renderable/frustum in this frame.
+             auto& firsts = res.batch_firsts;
+             auto& counts = res.batch_counts;
              if (!firsts.empty()) {
                  glMultiDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, firsts.data(), counts.data(), (GLsizei)firsts.size());
              }
@@ -928,10 +976,6 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
         }
 
         before.restore();
-        if (m_renderer->notifyOn()) {
-            GLState after = GLState::capture(); // Keep full capture for debug comparison
-            GLState::compare(GLState::capture(), after, "[Lamure] PointsDrawCallback::drawImplementation()");
-        }
         return;
     }
 
@@ -946,78 +990,7 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
         }
     } else {
         // Optimized Batch Rendering
-        static std::vector<GLint> firsts;
-        static std::vector<GLsizei> counts;
-        firsts.clear();
-        counts.clear();
-        firsts.reserve(renderable.size());
-        counts.reserve(renderable.size());
-
-        // Batch Rendering for Default Pass
-#ifdef _OPENMP
-        // Thread-local storage
-        int max_threads = omp_get_max_threads();
-        static std::vector<std::vector<GLint>> tls_firsts;
-        static std::vector<std::vector<GLsizei>> tls_counts;
-
-        if (tls_firsts.size() < max_threads) {
-            tls_firsts.resize(max_threads);
-            tls_counts.resize(max_threads);
-        }
-        // Clear TLS vectors
-        for(int t=0; t<max_threads; ++t) {
-            tls_firsts[t].clear();
-            tls_counts[t].clear();
-             // Heuristic reservation
-            tls_firsts[t].reserve(renderable.size() / max_threads);
-            tls_counts[t].reserve(renderable.size() / max_threads);
-        }
-
-            #pragma omp parallel
-            {
-                int t = omp_get_thread_num();
-                auto& local_firsts = tls_firsts[t];
-                auto& local_counts = tls_counts[t];
-                
-                #pragma omp for schedule(dynamic, 64) reduction(+:rendered_primitives, rendered_nodes)
-                for (int i = 0; i < (int)renderable.size(); ++i) {
-                    const auto& node_slot = renderable[i];
-                    if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
-                        local_firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
-                        local_counts.push_back((GLsizei)surfels_per_node);
-                        rendered_primitives += surfels_per_node;
-                        ++rendered_nodes;
-                    }
-                }
-            }
-
-            // Merge TLS results
-        size_t total_size = 0;
-        for(int t=0; t<max_threads; ++t) total_size += tls_firsts[t].size();
-        
-        firsts.reserve(total_size);
-        counts.reserve(total_size);
-        for(int t=0; t<max_threads; ++t) {
-            firsts.insert(firsts.end(), tls_firsts[t].begin(), tls_firsts[t].end());
-            counts.insert(counts.end(), tls_counts[t].begin(), tls_counts[t].end());
-        }
-
-#else
-        for (const auto& node_slot : renderable) {
-            if (res.scm_camera->cull_against_frustum(frustum, bbv[node_slot.node_id_]) != 1) {
-                firsts.push_back((GLint)(node_slot.slot_id_ * surfels_per_node));
-                counts.push_back((GLsizei)surfels_per_node);
-                rendered_primitives += surfels_per_node;
-                ++rendered_nodes;
-            }
-        }
-#endif
-        
-        if (!firsts.empty()) {
-            glMultiDrawArrays(scm::gl::PRIMITIVE_POINT_LIST, firsts.data(), counts.data(), (GLsizei)firsts.size());
-            // Check for errors in debug mode
-            // if (m_renderer->notifyOn()) { auto err = glGetError(); if (err) std::cerr << "MDI Error: " << err << "\n"; }
-        }
+        cullAndBatch(true, true);
     }
 
     plugin->getRenderInfo().rendered_primitives += rendered_primitives;
@@ -1039,14 +1012,6 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
     }
 
     before.restore();
-    if (m_renderer->notifyOn()) {
-        // GLState::capture() is expensive, so we only do it if notifyOn is true
-        GLState after = GLState::capture();
-        // We can't compare 'before' (FastState) with 'after' (GLState) directly, 
-        // but existing debugging code expected GLState. 
-        // For now, we skip the rigorous comparison or would need to cast/convert.
-        // GLState::compare(before_full, after, ...); 
-    }
 }
 void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const
 {
@@ -1071,14 +1036,6 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
     
     osg::State* state = renderInfo.getState();
     state->setCheckForGLErrors(osg::State::ONCE_PER_FRAME);
-
-    GLint prevVAO = 0, prevProg = 0;
-    // FastState already captures VAO and Program, but we keep these local vars if logic depends on them?
-    // The original code used glGetIntegerv. FastState has them.
-    // But original code might have used them differently.
-    // Let's rely on FastState's capture which gets them.
-    prevVAO = before.vao; 
-    prevProg = before.program;
 
     lamure::ren::model_database* database = lamure::ren::model_database::get_instance();
     lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -1236,7 +1193,7 @@ bool LamureRenderer::isTimingModeActive() const
 
 void LamureRenderer::noteContextUpdateMs(int ctxId, uint64_t frameNo, double ms)
 {
-    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame) return;
+    if (frameNo == kInvalidTimingFrame) return;
     std::lock_guard<std::mutex> lock(m_timing_mutex);
     auto& t = m_timing_by_ctx[ctxId];
     if (t.frame_number != frameNo) {
@@ -1248,7 +1205,7 @@ void LamureRenderer::noteContextUpdateMs(int ctxId, uint64_t frameNo, double ms)
 
 void LamureRenderer::noteDispatchMs(int ctxId, uint64_t frameNo, double ms)
 {
-    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame) return;
+    if (frameNo == kInvalidTimingFrame) return;
     std::lock_guard<std::mutex> lock(m_timing_mutex);
     auto& t = m_timing_by_ctx[ctxId];
     if (t.frame_number != frameNo) {
@@ -1260,7 +1217,7 @@ void LamureRenderer::noteDispatchMs(int ctxId, uint64_t frameNo, double ms)
 
 void LamureRenderer::noteContextStats(int ctxId, uint64_t frameNo, double cullMs, double drawMs, double gpuMs)
 {
-    if (!isTimingModeActive() || ctxId < 0 || frameNo == kInvalidTimingFrame) return;
+    if (ctxId < 0 || frameNo == kInvalidTimingFrame) return;
     std::lock_guard<std::mutex> lock(m_timing_mutex);
     auto& t = m_timing_by_ctx[ctxId];
     if (t.frame_number != frameNo) {
@@ -1275,7 +1232,7 @@ void LamureRenderer::noteContextStats(int ctxId, uint64_t frameNo, double cullMs
 
 void LamureRenderer::noteContextPixelStats(int ctxId, uint64_t frameNo, double samplesPassed, double coveredSamples, double viewportPixels)
 {
-    if (!isTimingModeActive() || ctxId < 0 || frameNo == kInvalidTimingFrame) return;
+    if (ctxId < 0 || frameNo == kInvalidTimingFrame) return;
     std::lock_guard<std::mutex> lock(m_timing_mutex);
     auto& t = m_timing_by_ctx[ctxId];
     if (t.frame_number != kInvalidTimingFrame && frameNo < t.frame_number) {
@@ -1285,35 +1242,73 @@ void LamureRenderer::noteContextPixelStats(int ctxId, uint64_t frameNo, double s
         t = ContextTimingSample{};
         t.frame_number = frameNo;
     }
-    if (isSetMs(samplesPassed)) {
+    if (LamureUtil::isValidValue(samplesPassed)) {
         accumulateMs(t.samples_passed, samplesPassed);
     }
-    if (isSetMs(coveredSamples)) {
-        if (!isSetMs(t.covered_samples)) t.covered_samples = coveredSamples;
+    if (LamureUtil::isValidValue(coveredSamples)) {
+        if (!LamureUtil::isValidValue(t.covered_samples)) t.covered_samples = coveredSamples;
         else t.covered_samples = std::max(t.covered_samples, coveredSamples);
     }
-    if (isSetMs(viewportPixels)) {
+    if (LamureUtil::isValidValue(viewportPixels)) {
         t.viewport_pixels = viewportPixels;
     }
-    if (isSetMs(t.covered_samples) && isSetMs(t.viewport_pixels) && t.viewport_pixels > 0.0) {
+    if (LamureUtil::isValidValue(t.covered_samples) && LamureUtil::isValidValue(t.viewport_pixels) && t.viewport_pixels > 0.0) {
         t.coverage = std::clamp(t.covered_samples / t.viewport_pixels, 0.0, 1.0);
     }
-    if (isSetMs(t.samples_passed) && isSetMs(t.covered_samples) && t.covered_samples > 0.0) {
+    if (LamureUtil::isValidValue(t.samples_passed) && LamureUtil::isValidValue(t.covered_samples) && t.covered_samples > 0.0) {
         t.overdraw = t.samples_passed / t.covered_samples;
     }
 }
 
 void LamureRenderer::noteGlobalStats(uint64_t frameNo, double cpuUpdateMs, double waitMs)
 {
-    if (!isTimingModeActive() || frameNo == kInvalidTimingFrame) return;
+    if (frameNo == kInvalidTimingFrame) return;
     std::lock_guard<std::mutex> lock(m_timing_mutex);
     if (m_timing_global_frame != frameNo) {
         m_timing_global_frame = frameNo;
         m_timing_cpu_update_ms = -1.0;
         m_timing_wait_ms = -1.0;
     }
-    if (isSetMs(cpuUpdateMs)) m_timing_cpu_update_ms = cpuUpdateMs;
-    if (isSetMs(waitMs))      m_timing_wait_ms = waitMs;
+    if (LamureUtil::isValidValue(cpuUpdateMs)) m_timing_cpu_update_ms = cpuUpdateMs;
+    if (LamureUtil::isValidValue(waitMs))      m_timing_wait_ms = waitMs;
+}
+
+void LamureRenderer::commitFrameTiming(int ctxId, uint64_t frameNo, const ContextTimingSample& sample)
+{
+    if (ctxId < 0 || frameNo == kInvalidTimingFrame) return;
+    std::lock_guard<std::mutex> lock(m_timing_mutex);
+    auto& t = m_timing_by_ctx[ctxId];
+    if (t.frame_number != frameNo) {
+        t = ContextTimingSample{};
+        t.frame_number = frameNo;
+    }
+
+    accumulateMs(t.dispatch_ms, sample.dispatch_ms);
+    accumulateMs(t.context_update_ms, sample.context_update_ms);
+    accumulateMs(t.cpu_cull_ms, sample.cpu_cull_ms);
+    accumulateMs(t.cpu_draw_ms, sample.cpu_draw_ms);
+    accumulateMs(t.gpu_ms, sample.gpu_ms);
+    accumulateMs(t.samples_passed, sample.samples_passed);
+
+    if (LamureUtil::isValidValue(sample.covered_samples)) {
+        if (!LamureUtil::isValidValue(t.covered_samples)) t.covered_samples = sample.covered_samples;
+        else t.covered_samples = std::max(t.covered_samples, sample.covered_samples);
+    }
+    if (LamureUtil::isValidValue(sample.viewport_pixels)) {
+        t.viewport_pixels = sample.viewport_pixels;
+    }
+    if (LamureUtil::isValidValue(sample.coverage)) {
+        t.coverage = sample.coverage;
+    } else if (LamureUtil::isValidValue(t.covered_samples) && LamureUtil::isValidValue(t.viewport_pixels) && t.viewport_pixels > 0.0) {
+        t.coverage = std::clamp(t.covered_samples / t.viewport_pixels, 0.0, 1.0);
+    }
+    if (LamureUtil::isValidValue(sample.overdraw)) {
+        t.overdraw = sample.overdraw;
+    } else if (LamureUtil::isValidValue(t.samples_passed) && LamureUtil::isValidValue(t.covered_samples) && t.covered_samples > 0.0) {
+        t.overdraw = t.samples_passed / t.covered_samples;
+    }
+
+    t.render_cpu_ms = sumKnownMs({t.context_update_ms, t.dispatch_ms, t.cpu_cull_ms, t.cpu_draw_ms});
 }
 
 void LamureRenderer::releasePixelMetricsQueries(ContextResources& res)
@@ -1332,6 +1327,7 @@ void LamureRenderer::releasePixelMetricsQueries(ContextResources& res)
     res.pixel_metrics_supported = false;
     res.pixel_capture_active = false;
     res.pixel_total_query_active = 0;
+    res.pixel_stencil_needs_clear = false;
 }
 
 void LamureRenderer::pollPixelMetricsQueries(int ctxId)
@@ -1388,27 +1384,7 @@ bool LamureRenderer::beginPixelMetricsCapture(int ctxId, uint64_t frameNo, doubl
 
     if (res.pixel_current_frame != frameNo) {
         res.pixel_current_frame = frameNo;
-
-        const GLboolean prevStencilTest = glIsEnabled(GL_STENCIL_TEST);
-        GLint prevFunc = GL_ALWAYS, prevRef = 0, prevValMask = ~0, prevWriteMask = ~0;
-        GLint prevFail = GL_KEEP, prevZFail = GL_KEEP, prevZPass = GL_KEEP;
-        glGetIntegerv(GL_STENCIL_FUNC, &prevFunc);
-        glGetIntegerv(GL_STENCIL_REF, &prevRef);
-        glGetIntegerv(GL_STENCIL_VALUE_MASK, &prevValMask);
-        glGetIntegerv(GL_STENCIL_WRITEMASK, &prevWriteMask);
-        glGetIntegerv(GL_STENCIL_FAIL, &prevFail);
-        glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &prevZFail);
-        glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &prevZPass);
-
-        glEnable(GL_STENCIL_TEST);
-        glStencilMask(static_cast<GLuint>(res.pixel_stencil_bit));
-        glClearStencil(0);
-        glClear(GL_STENCIL_BUFFER_BIT);
-
-        if (prevStencilTest) glEnable(GL_STENCIL_TEST); else glDisable(GL_STENCIL_TEST);
-        glStencilFunc(prevFunc, prevRef, static_cast<GLuint>(prevValMask));
-        glStencilMask(static_cast<GLuint>(prevWriteMask));
-        glStencilOp(prevFail, prevZFail, prevZPass);
+        res.pixel_stencil_needs_clear = true;
     }
 
     if (res.pixel_capture_active) return false;
@@ -1432,6 +1408,14 @@ bool LamureRenderer::beginPixelMetricsCapture(int ctxId, uint64_t frameNo, doubl
     glGetIntegerv(GL_STENCIL_FAIL, &res.pixel_prev_stencil_fail);
     glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &res.pixel_prev_stencil_zfail);
     glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &res.pixel_prev_stencil_zpass);
+
+    if (res.pixel_stencil_needs_clear) {
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(static_cast<GLuint>(res.pixel_stencil_bit));
+        glClearStencil(0);
+        glClear(GL_STENCIL_BUFFER_BIT);
+        res.pixel_stencil_needs_clear = false;
+    }
 
     glEnable(GL_STENCIL_TEST);
     glStencilFunc(GL_ALWAYS, static_cast<GLint>(res.pixel_stencil_bit), static_cast<GLuint>(res.pixel_stencil_bit));
@@ -1583,10 +1567,10 @@ LamureRenderer::TimingSnapshot LamureRenderer::getTimingSnapshot(uint64_t prefer
         accumulateMs(snap.viewport_pixels, per.viewport_pixels);
     }
 
-    if (isSetMs(snap.covered_samples) && isSetMs(snap.viewport_pixels) && snap.viewport_pixels > 0.0) {
+    if (LamureUtil::isValidValue(snap.covered_samples) && LamureUtil::isValidValue(snap.viewport_pixels) && snap.viewport_pixels > 0.0) {
         snap.coverage = std::clamp(snap.covered_samples / snap.viewport_pixels, 0.0, 1.0);
     }
-    if (isSetMs(snap.samples_passed) && isSetMs(snap.covered_samples) && snap.covered_samples > 0.0) {
+    if (LamureUtil::isValidValue(snap.samples_passed) && LamureUtil::isValidValue(snap.covered_samples) && snap.covered_samples > 0.0) {
         snap.overdraw = snap.samples_passed / snap.covered_samples;
     }
 
@@ -1608,12 +1592,12 @@ std::string LamureRenderer::getTimingCompactString(uint64_t preferredFrame) cons
         first = false;
         const auto& t = kv.second;
         os << "ctx" << kv.first
-           << "(disp=" << (isSetMs(t.dispatch_ms) ? t.dispatch_ms : -1.0)
-           << ",ctx=" << (isSetMs(t.context_update_ms) ? t.context_update_ms : -1.0)
-           << ",cull=" << (isSetMs(t.cpu_cull_ms) ? t.cpu_cull_ms : -1.0)
-           << ",draw=" << (isSetMs(t.cpu_draw_ms) ? t.cpu_draw_ms : -1.0)
-           << ",gpu=" << (isSetMs(t.gpu_ms) ? t.gpu_ms : -1.0)
-           << ",rcpu=" << (isSetMs(t.render_cpu_ms) ? t.render_cpu_ms : -1.0)
+           << "(disp=" << (LamureUtil::isValidValue(t.dispatch_ms) ? t.dispatch_ms : -1.0)
+           << ",ctx=" << (LamureUtil::isValidValue(t.context_update_ms) ? t.context_update_ms : -1.0)
+           << ",cull=" << (LamureUtil::isValidValue(t.cpu_cull_ms) ? t.cpu_cull_ms : -1.0)
+           << ",draw=" << (LamureUtil::isValidValue(t.cpu_draw_ms) ? t.cpu_draw_ms : -1.0)
+           << ",gpu=" << (LamureUtil::isValidValue(t.gpu_ms) ? t.gpu_ms : -1.0)
+           << ",rcpu=" << (LamureUtil::isValidValue(t.render_cpu_ms) ? t.render_cpu_ms : -1.0)
            << ')';
     }
     return os.str();
@@ -1629,20 +1613,24 @@ void LamureRenderer::updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo,
 
     auto* viewer = opencover::VRViewer::instance();
     if (!viewer) return;
-    ensureViewerCameraStatsEnabled(viewer);
+    if (!m_stats_initialized) {
+        ensureViewerCameraStatsEnabled(viewer);
+    }
 
     osg::Stats* viewerStats = viewer->getViewerStats();
     if (viewerStats) {
-        viewerStats->collectStats("update", true);
-        viewerStats->collectStats("sync", true);
-        viewerStats->collectStats("swap", true);
-        viewerStats->collectStats("finish", true);
+        if (!m_stats_initialized) {
+            viewerStats->collectStats("update", true);
+            viewerStats->collectStats("sync", true);
+            viewerStats->collectStats("swap", true);
+            viewerStats->collectStats("finish", true);
+        }
 
         double updMs = -1.0, syncMs = -1.0, swapMs = -1.0, finishMs = -1.0;
-        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "Update traversal", updMs);
-        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "sync", syncMs);
-        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "swap", swapMs);
-        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, "finish", finishMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, kUpdateTraversalKeys, updMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, kSyncKeys, syncMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, kSwapKeys, swapMs);
+        (void)queryTimeTakenMsBacksearch(viewerStats, static_cast<unsigned>(frameNo), 8, kFinishKeys, finishMs);
 
         const double waitMs = sumKnownMs({syncMs, swapMs, finishMs});
         noteGlobalStats(frameNo, updMs, waitMs);
@@ -1652,12 +1640,14 @@ void LamureRenderer::updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo,
     viewer->getCameras(cams);
     for (osg::Camera* cam : cams) {
         if (!cam) continue;
-        ensureCameraStatsEnabled(cam);
+        if (!m_stats_initialized) ensureCameraStatsEnabled(cam);
         osg::Stats* camStats = cam->getStats();
         if (!camStats) continue;
 
-        camStats->collectStats("rendering", true);
-        camStats->collectStats("gpu", true);
+        if (!m_stats_initialized) {
+            camStats->collectStats("rendering", true);
+            camStats->collectStats("gpu", true);
+        }
 
         unsigned base = static_cast<unsigned>(frameNo);
         if (auto* rnd = dynamic_cast<osgViewer::Renderer*>(cam->getRenderer())) {
@@ -1665,9 +1655,9 @@ void LamureRenderer::updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo,
         }
 
         double cullMs = -1.0, drawMs = -1.0, gpuMs = -1.0;
-        (void)queryTimeTakenMsBacksearch(camStats, base, 8, "Cull traversal", cullMs);
-        (void)queryTimeTakenMsBacksearch(camStats, base, 8, "Draw traversal", drawMs);
-        (void)queryTimeTakenMsBacksearch(camStats, base, 8, "GPU draw", gpuMs);
+        (void)queryTimeTakenMsBacksearch(camStats, base, 8, kCullTraversalKeys, cullMs);
+        (void)queryTimeTakenMsBacksearch(camStats, base, 8, kDrawTraversalKeys, drawMs);
+        (void)queryTimeTakenMsBacksearch(camStats, base, 8, kGpuDrawKeys, gpuMs);
 
         int camCtxId = ctxId;
         if (auto* gc = cam->getGraphicsContext()) {
@@ -1675,8 +1665,14 @@ void LamureRenderer::updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo,
                 camCtxId = static_cast<int>(gs->getContextID());
             }
         }
-        noteContextStats(camCtxId, frameNo, cullMs, drawMs, gpuMs);
+        ContextTimingSample sample{};
+        sample.frame_number = frameNo;
+        sample.cpu_cull_ms = cullMs;
+        sample.cpu_draw_ms = drawMs;
+        sample.gpu_ms = gpuMs;
+        commitFrameTiming(camCtxId, frameNo, sample);
     }
+    m_stats_initialized = true;
 }
 
 void LamureRenderer::updateActiveClipPlanes()
@@ -1852,7 +1848,7 @@ void StatsDrawCallback::drawImplementation(osg::RenderInfo &renderInfo, const os
                     fpsAvg = 1.0 / fd;
                     frameTotalMs = fd * 1000.0;
                 }
-                if (!isSetMs(frameTotalMs)) {
+                if (!LamureUtil::isValidValue(frameTotalMs)) {
                     const double fd = opencover::cover->frameDuration();
                     if (fd > 0.0) frameTotalMs = fd * 1000.0;
                 }
@@ -1860,30 +1856,16 @@ void StatsDrawCallback::drawImplementation(osg::RenderInfo &renderInfo, const os
                 const double primMio = static_cast<double>(render_info.rendered_primitives) / 1e6;
                 const double primPerSecMio = primMio * fpsAvg;
                 const auto timing = _renderer->getTimingSnapshot();
-                auto fmtMs = [](double v) -> std::string {
-                    if (!isSetMs(v)) return std::string("-");
-                    std::ostringstream ss;
-                    ss << std::fixed << std::setprecision(2) << v;
-                    return ss.str();
+                auto fmt = [](double v, int prec, double scale = 1.0) -> std::string {
+                    if (!LamureUtil::isValidValue(v)) return std::string("-");
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "%.*f", prec, v * scale);
+                    return buf;
                 };
-                auto fmtRatio = [](double v) -> std::string {
-                    if (!isSetMs(v)) return std::string("-");
-                    std::ostringstream ss;
-                    ss << std::fixed << std::setprecision(2) << v;
-                    return ss.str();
-                };
-                auto fmtPercent = [](double v) -> std::string {
-                    if (!isSetMs(v)) return std::string("-");
-                    std::ostringstream ss;
-                    ss << std::fixed << std::setprecision(1) << (v * 100.0);
-                    return ss.str();
-                };
-                auto fmtM = [](double v) -> std::string {
-                    if (!isSetMs(v)) return std::string("-");
-                    std::ostringstream ss;
-                    ss << std::fixed << std::setprecision(2) << (v / 1e6);
-                    return ss.str();
-                };
+                auto fmtMs      = [&](double v) { return fmt(v, 2); };
+                auto fmtRatio   = [&](double v) { return fmt(v, 2); };
+                auto fmtPercent = [&](double v) { return fmt(v, 1, 100.0); };
+                auto fmtM       = [&](double v) { return fmt(v, 2, 1.0 / 1e6); };
 
                 LamureRenderer::ContextTimingSample ctxTiming{};
                 bool hasCtxTiming = false;
@@ -2148,7 +2130,9 @@ void LamureRenderer::init()
         osg::Vec3 pos_value(traits->width - marginX,                      traits->height - marginY, 0.0f);
         osg::ref_ptr<osgText::Text> label = new osgText::Text();
         label->setName("LabelStats");
-        label->setColor(color);
+        label->setColor(osg::Vec4(1.f, 1.f, 1.f, 0.95f));
+        label->setBackdropType(osgText::Text::OUTLINE);
+        label->setBackdropColor(osg::Vec4(0.f, 0.f, 0.f, 0.9f));
         label->setFont(font);
         label->setCharacterSizeMode(osgText::TextBase::SCREEN_COORDS);
         label->setCharacterSize(characterSize);
@@ -2189,7 +2173,9 @@ void LamureRenderer::init()
 
         osg::ref_ptr<osgText::Text> value = new osgText::Text();
         value->setName("ValueStats");
-        value->setColor(color);
+        value->setColor(osg::Vec4(1.f, 1.f, 1.f, 0.95f));
+        value->setBackdropType(osgText::Text::OUTLINE);
+        value->setBackdropColor(osg::Vec4(0.f, 0.f, 0.f, 0.9f));
         value->setFont(font);
         value->setCharacterSizeMode(osgText::TextBase::SCREEN_COORDS);
         value->setCharacterSize(characterSize);
