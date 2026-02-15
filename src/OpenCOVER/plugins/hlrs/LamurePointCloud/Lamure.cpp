@@ -1441,24 +1441,6 @@ void Lamure::stopMeasurement() {
     if (vsync_modified_) { osg::DisplaySettings::instance()->setSyncSwapBuffers(prev_vsync_frames_); }
 }
 
-void Lamure::addMarkMs(MarkField f, double ms) noexcept
-{
-    if (!m_measurement) return; // only accumulate when measurement is active
-
-    switch (f) {
-    case MarkField::DrawCB_Total: m_marks.draw_cb_ms      = ms; break;
-    case MarkField::Dispatch:     m_marks.dispatch_ms     = ms; break;
-    case MarkField::ContextBind:  m_marks.context_bind_ms = ms; break;
-    case MarkField::Estimates:    m_marks.estimates_ms    = ms; break;
-    case MarkField::Pass1:        m_marks.pass1_ms        = ms; break;
-    case MarkField::Pass2:        m_marks.pass2_ms        = ms; break;
-    case MarkField::Pass3:        m_marks.pass3_ms        = ms; break;
-    case MarkField::SinglePass:   m_marks.singlepass_ms   = ms; break;
-    default: break;
-    }
-}
-
-
 void Lamure::applyShaderToRendererFromSettings() {
     if (!m_renderer) return;
     // Ensure shader type is determined consistently even if s.shader_type is overridden later:
@@ -1805,7 +1787,6 @@ bool Lamure::writeSettingsJson(const Lamure::Settings& s, const std::string& out
     add_bool("show_boundingbox", s.show_boundingbox);
     add_bool("show_frustum",     s.show_frustum);
     add_bool("show_stats",       s.show_stats);
-    add_bool("show_text",        s.show_stats);
     add_bool("show_sync",        s.show_sync);
     add_bool("show_notify",      s.show_notify);
 

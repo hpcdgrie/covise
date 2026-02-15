@@ -101,15 +101,14 @@ private:
 class StatsDrawCallback : public osg::Drawable::DrawCallback
 {
 public:
-    StatsDrawCallback(Lamure* plugin, osgText::Text* values);
+    StatsDrawCallback(Lamure* plugin, osgText::Text* label, osgText::Text* values);
     void drawImplementation(osg::RenderInfo &renderInfo, const osg::Drawable *drawable) const override;
 
 private:
     Lamure *_plugin{nullptr};
+    osg::observer_ptr<osgText::Text> _label;
     osg::observer_ptr<osgText::Text> _values;
     LamureRenderer *_renderer{nullptr};
-    mutable std::chrono::steady_clock::time_point _lastUpdateTime;
-    std::chrono::milliseconds _minInterval;
 };
 
 class FrustumDrawCallback : public osg::Drawable::DrawCallback
@@ -152,6 +151,7 @@ private:
     bool m_pauseRequested{false};
     mutable std::mutex m_sceneMutex;
     mutable std::mutex m_shader_mutex;
+    bool m_shader_sources_loaded{false};
 
     // Private methods
     bool readShader(const std::string& pathString, std::string& shaderString, bool keepOptionalShaderCode);
@@ -746,9 +746,9 @@ public:
     bool getModelViewProjectionFromRenderInfo(osg::RenderInfo& renderInfo, const osg::Node* node, osg::Matrixd& outModel, osg::Matrixd& outView, osg::Matrixd& outProj) const;
     void updateScmCameraFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
 
-    void initCamera(ContextResources& res);
+    bool initCamera(ContextResources& res, osg::Camera* contextCamera);
     void initFrustumResources(ContextResources& res);
-    void initLamureShader(ContextResources& res);
+    bool initLamureShader(ContextResources& res);
     void initSchismObjects(ContextResources& res);
     bool initGpus(ContextResources& res);
     void initUniforms(ContextResources& res);
@@ -834,6 +834,9 @@ public:
 
     struct ContextTimingSample {
         uint64_t frame_number{std::numeric_limits<uint64_t>::max()};
+        uint64_t rendered_primitives{0};
+        uint64_t rendered_nodes{0};
+        uint64_t rendered_bounding_boxes{0};
         double dispatch_ms{-1.0};
         double context_update_ms{-1.0};
         double cpu_cull_ms{-1.0};
@@ -849,6 +852,9 @@ public:
 
     struct TimingSnapshot {
         uint64_t frame_number{0};
+        uint64_t rendered_primitives{0};
+        uint64_t rendered_nodes{0};
+        uint64_t rendered_bounding_boxes{0};
         double cpu_update_ms{-1.0};
         double wait_ms{-1.0};
         double dispatch_ms{-1.0};
@@ -875,14 +881,15 @@ public:
     void noteDispatchMs(int ctxId, uint64_t frameNo, double ms);
     void noteContextStats(int ctxId, uint64_t frameNo, double cullMs, double drawMs, double gpuMs);
     void noteContextPixelStats(int ctxId, uint64_t frameNo, double samplesPassed, double coveredSamples, double viewportPixels);
+    void noteContextRenderCounts(int ctxId, uint64_t frameNo, uint64_t renderedPrimitives, uint64_t renderedNodes, uint64_t renderedBoundingBoxes);
     void noteGlobalStats(uint64_t frameNo, double cpuUpdateMs, double waitMs);
     void commitFrameTiming(int ctxId, uint64_t frameNo, const ContextTimingSample& sample);
+    bool getDisplayTimingData(int ctxId, uint64_t currentFrameNo, ContextTimingSample& outContext, TimingSnapshot& outSummed) const;
     TimingSnapshot getTimingSnapshot(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
     std::string getTimingCompactString(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
     void updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
     bool beginPixelMetricsCapture(int ctxId, uint64_t frameNo, double viewportPixels);
     void endPixelMetricsCapture(int ctxId);
-    void pollPixelMetricsQueries(int ctxId);
     void releasePixelMetricsQueries(ContextResources& res);
 
     const PointShader&                  getPointShader(int ctxId)                const { return getResources(ctxId).sh_point; }
@@ -902,11 +909,21 @@ public:
     const LineShader&                   getLineShader(int ctxId)                 const { return getResources(ctxId).sh_line; }
 
 private:
-    std::unordered_map<int, ContextTimingSample> m_timing_by_ctx;
+    struct GlobalTimingSample {
+        double cpu_update_ms{-1.0};
+        double wait_ms{-1.0};
+    };
+
+    ContextTimingSample& upsertTimingSampleLocked(int ctxId, uint64_t frameNo);
+    void trimTimingHistoryLocked();
+
+    std::map<uint64_t, std::unordered_map<int, ContextTimingSample>> m_timing_frames;
+    std::map<uint64_t, GlobalTimingSample> m_timing_global_by_frame;
+    std::unordered_map<int, uint64_t> m_timing_latest_frame_by_ctx;
     mutable std::mutex m_timing_mutex;
-    uint64_t m_timing_global_frame{std::numeric_limits<uint64_t>::max()};
-    double m_timing_cpu_update_ms{-1.0};
-    double m_timing_wait_ms{-1.0};
+    mutable uint64_t m_last_complete_timing_frame{std::numeric_limits<uint64_t>::max()};
+    uint64_t m_live_timing_last_scanned_frame{std::numeric_limits<uint64_t>::max()};
+    static constexpr size_t kTimingHistoryLimit = 256;
     bool m_stats_initialized{false};
 
 };

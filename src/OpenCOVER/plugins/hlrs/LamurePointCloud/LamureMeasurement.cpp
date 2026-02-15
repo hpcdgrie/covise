@@ -360,15 +360,6 @@ namespace {
         LamureUtil::RunningAvg covDAvg;
         LamureUtil::RunningAvg rptsAvg;
 
-        LamureUtil::RunningAvg markDrawImplAvg;
-        LamureUtil::RunningAvg markPass1Avg;
-        LamureUtil::RunningAvg markPass2Avg;
-        LamureUtil::RunningAvg markPass3Avg;
-        LamureUtil::RunningAvg markDispatchAvg;
-        LamureUtil::RunningAvg markContextBindAvg;
-        LamureUtil::RunningAvg markEstimatesAvg;
-        LamureUtil::RunningAvg markSinglePassAvg;
-
         LamureUtil::RunningAvg estScreenPxAvg;
         LamureUtil::RunningAvg estSumAreaPxAvg;
         LamureUtil::RunningAvg estDensityAvg;
@@ -405,14 +396,11 @@ namespace {
 
             gpuFromTimelineAvg.add(gpuMs);
 
-            if (LamureUtil::isValidValue(s.est_density) || LamureUtil::isValidValue(s.est_coverage)) {
-                const double D  = LamureUtil::isValidValue(s.est_density) ? std::max(0.0, double(s.est_density)) : 0.0;
-                const double C1 = LamureUtil::isValidValue(s.est_coverage) ? double(s.est_coverage)
-                    : (D > 0.0 ? 1.0 - std::exp(-D) : 0.0);
-                if (C1 > 0.0 || D > 0.0) {
-                    covC1Avg.add(C1);
-                    covDAvg.add(D);
-                }
+            if (LamureUtil::isValidValue(s.est_coverage) && s.est_coverage >= 0.0f) {
+                covC1Avg.add(double(s.est_coverage));
+            }
+            if (LamureUtil::isValidValue(s.est_density) && s.est_density >= 0.0f) {
+                covDAvg.add(double(s.est_density));
             }
 
             if (LamureUtil::isValidValue(gpuMs) && gpuMs > 0.0 && s.rendered_primitives > 0) {
@@ -427,25 +415,6 @@ namespace {
             estOverdrawAvg.add(s.est_overdraw);
             avgAreaPxPerPrimAvg.add(s.avg_area_px_per_prim);
 
-            const float mark_vals[] = {
-                s.mark_draw_impl_ms, s.mark_pass1_ms, s.mark_pass2_ms, s.mark_pass3_ms,
-                s.mark_dispatch_ms, s.mark_context_bind_ms, s.mark_estimates_ms, s.mark_singlepass_ms
-            };
-            float mx = 0.0f;
-            for (float v : mark_vals) mx = std::max(mx, v);
-            const bool marks_look_like_seconds = (mx > 0.0f && mx < 0.01f);
-            auto normMark = [&](float v)->double {
-                if (!LamureUtil::isValidValue(v)) return -1.0;
-                return marks_look_like_seconds ? (double(v) * 1000.0) : double(v);
-            };
-            markDrawImplAvg.add(normMark(s.mark_draw_impl_ms));
-            markPass1Avg.add(normMark(s.mark_pass1_ms));
-            markPass2Avg.add(normMark(s.mark_pass2_ms));
-            markPass3Avg.add(normMark(s.mark_pass3_ms));
-            markDispatchAvg.add(normMark(s.mark_dispatch_ms));
-            markContextBindAvg.add(normMark(s.mark_context_bind_ms));
-            markEstimatesAvg.add(normMark(s.mark_estimates_ms));
-            markSinglePassAvg.add(normMark(s.mark_singlepass_ms));
         }
 
         syn.p50 = percentile_select(ft_ms, 0.50);
@@ -498,15 +467,6 @@ namespace {
         syn.est_coverage_px = estCoveragePxAvg.avg();
         syn.est_overdraw = estOverdrawAvg.avg();
         syn.avg_area_px_per_prim = avgAreaPxPerPrimAvg.avg();
-
-        syn.mark_draw_impl_ms = markDrawImplAvg.avg();
-        syn.mark_pass1_ms = markPass1Avg.avg();
-        syn.mark_pass2_ms = markPass2Avg.avg();
-        syn.mark_pass3_ms = markPass3Avg.avg();
-        syn.mark_dispatch_ms = markDispatchAvg.avg();
-        syn.mark_context_bind_ms = markContextBindAvg.avg();
-        syn.mark_estimates_ms = markEstimatesAvg.avg();
-        syn.mark_singlepass_ms = markSinglePassAvg.avg();
 
         return syn;
     }
@@ -1091,35 +1051,16 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
         }
     }
 
-    // --- Renderer-Estimates (capped + raw)
-    const auto ri = m_plugin->getRenderInfo();
-    stats.rendered_primitives         = ri.rendered_primitives;
-    stats.rendered_nodes              = ri.rendered_nodes;
-    stats.rendered_bounding_boxes     = ri.rendered_bounding_boxes;
-
-    stats.est_screen_px    = ri.est_screen_px;
-    stats.est_sum_area_px  = ri.est_sum_area_px;
-    stats.est_density      = ri.est_density;
-    stats.est_coverage     = ri.est_coverage;
-    stats.est_coverage_px  = ri.est_coverage_px;
-    stats.est_overdraw     = ri.est_overdraw;
-    stats.avg_area_px_per_prim = ri.avg_area_px_per_prim;
-
-    stats.est_density_raw      = ri.est_density_raw;
-    stats.est_coverage_raw     = ri.est_coverage_raw;
-    stats.est_coverage_px_raw  = ri.est_coverage_px_raw;
-    stats.est_overdraw_raw     = ri.est_overdraw_raw;
-
-    // Fallback, falls nur Fläche/Screen bekannt (capped)
-    if ((stats.est_density <= 0.0f || stats.est_coverage <= 0.0f) &&
-        (stats.est_sum_area_px > 0.0f && stats.est_screen_px > 0.0f))
-    {
-        const float D = stats.est_sum_area_px / std::max(1.0f, stats.est_screen_px);
-        stats.est_density     = std::max(0.0f, D);
-        stats.est_coverage    = 1.0f - static_cast<float>(std::exp(-D));
-        stats.est_coverage_px = stats.est_coverage * stats.est_screen_px;
-        stats.est_overdraw    = (stats.est_coverage_px > 0.0f) ? (stats.est_sum_area_px / stats.est_coverage_px) : 0.0f;
+    // --- Renderer-Counter / Timing-Snapshot (frame-genau)
+    LamureRenderer::TimingSnapshot timing{};
+    bool hasTimingSnapshot = false;
+    if (auto* renderer = m_plugin->getRenderer()) {
+        timing = renderer->getTimingSnapshot(stats.frame_number);
+        hasTimingSnapshot = (timing.frame_number == stats.frame_number);
     }
+    stats.rendered_primitives = hasTimingSnapshot ? timing.rendered_primitives : 0;
+    stats.rendered_nodes = hasTimingSnapshot ? timing.rendered_nodes : 0;
+    stats.rendered_bounding_boxes = hasTimingSnapshot ? timing.rendered_bounding_boxes : 0;
 
     // --- Debug
     if (debugPrint || (m_verbose && ((stats.frame_number % m_logEveryN) == 0))) {
@@ -1198,26 +1139,41 @@ bool LamureMeasurement::collectFrameStats(osgViewer::ViewerBase* viewer,
         stats.boundness = "mixed";
 
     if (auto* renderer = m_plugin->getRenderer()) {
-        const auto timing = renderer->getTimingSnapshot(stats.frame_number);
-        if (timing.frame_number == stats.frame_number) {
+        if (hasTimingSnapshot) {
             stats.dispatch_ms       = static_cast<float>(timing.dispatch_ms);
             stats.context_update_ms = static_cast<float>(timing.context_update_ms);
             stats.render_cpu_ms     = static_cast<float>(timing.render_cpu_ms);
             stats.ctx_timing        = renderer->getTimingCompactString(stats.frame_number);
-        }
-    }
 
-    // --- FrameMarks (nur in Full)
-    if (m_plugin->getSettings().measure_full) {
-        const FrameMarks& fm = m_plugin->getFrameMarks();
-        stats.mark_draw_impl_ms     = fm.draw_cb_ms;
-        stats.mark_pass1_ms         = fm.pass1_ms;
-        stats.mark_pass2_ms         = fm.pass2_ms;
-        stats.mark_pass3_ms         = fm.pass3_ms;
-        stats.mark_singlepass_ms    = fm.singlepass_ms;
-        stats.mark_dispatch_ms      = fm.dispatch_ms;
-        stats.mark_context_bind_ms  = fm.context_bind_ms;
-        stats.mark_estimates_ms     = fm.estimates_ms;
+            if (LamureUtil::isValidValue(timing.viewport_pixels) && timing.viewport_pixels >= 0.0) {
+                stats.est_screen_px = static_cast<float>(timing.viewport_pixels);
+            }
+            if (LamureUtil::isValidValue(timing.samples_passed) && timing.samples_passed >= 0.0) {
+                stats.est_sum_area_px = static_cast<float>(timing.samples_passed);
+            }
+            if (LamureUtil::isValidValue(timing.covered_samples) && timing.covered_samples >= 0.0) {
+                stats.est_coverage_px = static_cast<float>(timing.covered_samples);
+            }
+            if (LamureUtil::isValidValue(timing.coverage) && timing.coverage >= 0.0) {
+                stats.est_coverage = static_cast<float>(timing.coverage);
+            }
+            if (LamureUtil::isValidValue(timing.overdraw) && timing.overdraw >= 0.0) {
+                stats.est_overdraw = static_cast<float>(timing.overdraw);
+            }
+
+            if (stats.est_sum_area_px >= 0.0f && stats.est_screen_px > 0.0f) {
+                stats.est_density = stats.est_sum_area_px / stats.est_screen_px;
+            }
+
+            stats.est_density_raw = stats.est_density;
+            stats.est_coverage_raw = stats.est_coverage;
+            stats.est_coverage_px_raw = stats.est_coverage_px;
+            stats.est_overdraw_raw = stats.est_overdraw;
+
+            if (stats.rendered_primitives > 0 && stats.est_sum_area_px >= 0.0f) {
+                stats.avg_area_px_per_prim = stats.est_sum_area_px / static_cast<float>(stats.rendered_primitives);
+            }
+        }
     }
 
     stats.segment_index = static_cast<int>(m_currentSegment);
@@ -1503,27 +1459,17 @@ bool LamureMeasurement::writeReportMarkdown(
     lineD("Avg Rpts (points/ms)", syn.avg_rpts_points_per_ms);
     lineD("Avg avg_area_px_per_prim", syn.avg_area_px_per_prim);
 
-    md << "\n## Coverage (aus Estimates)\n";
+    md << "\n## Coverage (aus Pixelmetriken)\n";
     lineD("Avg Coverage C1",      syn.avg_covC1);
     lineD("Avg Screen Density D", syn.avg_covD);
 
-    md << "\n## Renderer Estimates (avg)\n";
+    md << "\n## Renderer Pixelmetriken (avg)\n";
     lineD("est_screen_px",   syn.est_screen_px);
     lineD("est_sum_area_px", syn.est_sum_area_px);
     lineD("est_density",     syn.est_density);
     lineD("est_coverage",    syn.est_coverage);
     lineD("est_coverage_px", syn.est_coverage_px);
     lineD("est_overdraw",    syn.est_overdraw);
-
-    md << "\n## Renderer-Zeitmarken (Durchschnitt pro Frame)\n";
-    lineD("draw_impl_ms",     syn.mark_draw_impl_ms);
-    lineD("pass1_ms",         syn.mark_pass1_ms);
-    lineD("pass2_ms",         syn.mark_pass2_ms);
-    lineD("pass3_ms",         syn.mark_pass3_ms);
-    lineD("dispatch_ms",      syn.mark_dispatch_ms);
-    lineD("context_bind_ms",  syn.mark_context_bind_ms);
-    lineD("estimates_ms",     syn.mark_estimates_ms);
-    lineD("singlepass_ms",    syn.mark_singlepass_ms);
 
     md << "## Boundness Verteilung\n";
     // Diese Zähler sind nie -1 (sie werden aus Strings hochgezählt)
@@ -1607,20 +1553,12 @@ bool LamureMeasurement::writeFramesCSV(
             "est_screen_px;est_sum_area_px;est_density;est_coverage;est_coverage_px;est_overdraw;"
             "est_density_raw;est_coverage_raw;est_coverage_px_raw;est_overdraw_raw;"
             "pos_x;pos_y;pos_z;quat_x;quat_y;quat_z;quat_w;backoff_cull;backoff_draw;backoff_gpu;"
-            "segment_index;rpts_points_per_ms;avg_area_px_per_prim;k_orient_used;"
-            "mark_draw_impl_ms;mark_pass1_ms;mark_pass2_ms;mark_pass3_ms;mark_singlepass_ms;"
-            "mark_dispatch_ms;mark_context_bind_ms;mark_estimates_ms\n";
+            "segment_index;rpts_points_per_ms;avg_area_px_per_prim\n";
     }
 
     // Wir schreiben **nur** Frames, für die echte FrameStats existieren
     std::map<unsigned, FrameStats> statsByFrame;
     for (const auto& ms : m_stats) statsByFrame.emplace(ms.frame_number, ms);
-
-    // Settings einmal bestimmen (für k_orient_used)
-    float k_orient_used = 0.70f;
-    const auto& st = m_plugin->getSettings();
-    if (st.point) k_orient_used = 1.0f;
-    else if (st.surfel || st.splatting) k_orient_used = 0.70f;
 
     for (const auto& kv : statsByFrame) {
         const unsigned fid = kv.first;
@@ -1726,16 +1664,7 @@ bool LamureMeasurement::writeFramesCSV(
         emitI(s.backoff_gpu);  emitSep();
         emitI(s.segment_index); emitSep();
         emitD(rpts_points_per_ms); emitSep();
-        emitD(s.avg_area_px_per_prim); emitSep();
-        emitD(k_orient_used); emitSep();
-        emitD(s.mark_draw_impl_ms);    emitSep();
-        emitD(s.mark_pass1_ms);        emitSep();
-        emitD(s.mark_pass2_ms);        emitSep();
-        emitD(s.mark_pass3_ms);        emitSep();
-        emitD(s.mark_singlepass_ms);   emitSep();
-        emitD(s.mark_dispatch_ms);     emitSep();
-        emitD(s.mark_context_bind_ms); emitSep();
-        emitD(s.mark_estimates_ms);
+        emitD(s.avg_area_px_per_prim);
         out << "\n";
     }
 

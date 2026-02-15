@@ -179,7 +179,7 @@
             
              -->
             <data_dir value="C:/Users/Daniel/Documents/Studium/Forschungsarbeit/Data/Data_vis"/>
-            <initial_selection value="0,1,2"/>
+            <initial_selection value="0"/>
             <point_light_intensity value="0.6"/>
             <ambient_intensity value="0.6"/>
             <shininess value="0.1"/>
