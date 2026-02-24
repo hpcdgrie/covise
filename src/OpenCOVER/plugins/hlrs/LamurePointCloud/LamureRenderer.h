@@ -34,6 +34,7 @@
 #include <osg/Geode>
 #include <osg/MatrixTransform>
 #include <osg/Camera>
+#include <osg/GraphicsContext>
 #include <osg/State>
 #include <osg/Matrix>
 #include <osg/Group>
@@ -494,7 +495,6 @@ private:
 
     struct ContextResources {
         uint8_t ctx = -1;
-        int view_id = -1;
         bool rendering = false;
         bool rendering_allowed = true;
         uint32_t frames_pending_drain = 0;
@@ -508,8 +508,6 @@ private:
         GLGeo geo_frustum;
         GLGeo geo_screen_quad;
         GLGeo geo_text;
-        GLuint vao_pointcloud{0};
-        bool vao_initialized{false};
         std::array<unsigned short, 24> box_idx = {{
             0, 1, 2, 3, 4, 5, 6, 7,
             0, 2, 1, 3, 4, 6, 5, 7,
@@ -565,6 +563,13 @@ private:
         GLuint pixel_total_query_active{0};
         double pixel_capture_viewport_pixels{-1.0};
         uint64_t pixel_capture_frame{std::numeric_limits<uint64_t>::max()};
+        int pixel_capture_view_id{-1};
+        bool pixel_capture_used_stencil{false};
+        bool pixel_warned_no_stencil{false};
+        uint64_t pixel_aggregate_frame{std::numeric_limits<uint64_t>::max()};
+        double pixel_viewport_sum{0.0};
+        std::unordered_set<int> pixel_viewport_accounted;
+        std::unordered_map<int, double> pixel_view_covered_samples;
 
         GLboolean pixel_prev_stencil_test{GL_FALSE};
         GLint pixel_prev_stencil_func{GL_ALWAYS};
@@ -579,10 +584,14 @@ private:
         std::unordered_map<MultipassTargetKey, MultipassTarget, MultipassTargetKeyHash> multipass_targets;
         scm::gl::render_device_ptr  scm_device;
         scm::gl::render_context_ptr scm_context;
-
-        std::unique_ptr<lamure::ren::camera> scm_camera;
-        bool dump_done = false;
-        uint64_t last_camera_frame{std::numeric_limits<uint64_t>::max()};
+        std::unordered_map<const osg::Camera*, std::shared_ptr<lamure::ren::camera>> scm_cameras;
+        std::unordered_map<const osg::Camera*, int> view_ids;
+        std::mutex callback_mutex;
+        std::unordered_map<const osg::GraphicsContext*, GLuint> point_vaos;
+        std::unordered_map<const osg::GraphicsContext*, GLuint> box_vaos;
+        uint64_t dispatch_frame{std::numeric_limits<uint64_t>::max()};
+        bool dispatch_done{false};
+        std::unordered_map<const osg::Camera*, osg::ref_ptr<osg::Camera>> hud_cameras;
         bool gpu_info_logged{false};
         bool gpu_consistency_checked{false};
         std::string gpu_uuid;
@@ -611,7 +620,6 @@ private:
     std::unordered_set<const void*> m_initialized_context_ptrs;
 
     osg::ref_ptr<osg::Camera>   m_osg_camera;
-    osg::ref_ptr<osg::Camera>   m_hud_camera;
 
 
     osg::ref_ptr<osg::Group> m_frustum_group;
@@ -736,6 +744,7 @@ public:
     void init();
     void shutdown();
     void detachCallbacks();
+    void syncHudCameras();
 
     bool beginFrame(int ctxId);
     void endFrame(int ctxId);
@@ -746,7 +755,7 @@ public:
     bool getModelViewProjectionFromRenderInfo(osg::RenderInfo& renderInfo, const osg::Node* node, osg::Matrixd& outModel, osg::Matrixd& outView, osg::Matrixd& outProj) const;
     void updateScmCameraFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
 
-    bool initCamera(ContextResources& res, osg::Camera* contextCamera);
+    bool initCamera(ContextResources& res, osg::Camera* contextCamera, int viewId);
     void initFrustumResources(ContextResources& res);
     bool initLamureShader(ContextResources& res);
     void initSchismObjects(ContextResources& res);
@@ -758,11 +767,19 @@ public:
     void initializeMultipassTarget(MultipassTarget& target, int width, int height);
     void destroyMultipassTarget(MultipassTarget& target);
 
-    lamure::ren::camera* getScmCamera(int ctxId) {
-        return getResources(ctxId).scm_camera.get();
+    lamure::ren::camera* getScmCamera(int ctxId, const osg::Camera* camera) {
+        if (!camera) return nullptr;
+        auto& res = getResources(ctxId);
+        auto it = res.scm_cameras.find(camera);
+        return (it != res.scm_cameras.end() && it->second) ? it->second.get() : nullptr;
     }
 
-    const lamure::ren::camera* getScmCamera(int ctxId) const { return getResources(ctxId).scm_camera.get(); }
+    const lamure::ren::camera* getScmCamera(int ctxId, const osg::Camera* camera) const {
+        if (!camera) return nullptr;
+        const auto& res = getResources(ctxId);
+        auto it = res.scm_cameras.find(camera);
+        return (it != res.scm_cameras.end() && it->second) ? it->second.get() : nullptr;
+    }
 
     MultipassTarget& acquireMultipassTarget(lamure::context_t contextID, const osg::Camera* camera, int width, int height);
     osg::ref_ptr<osg::Geode> getStatsGeode() { return m_stats_geode; }
@@ -825,6 +842,7 @@ public:
     bool isModelVisible(std::size_t modelIndex) const;
     
     void getMatricesFromRenderInfo(osg::RenderInfo& renderInfo, osg::Matrixd& outView, osg::Matrixd& outProj);
+    int resolveViewId(osg::RenderInfo& renderInfo) const;
 
     void updateActiveClipPlanes();
     void enableClipDistances();
@@ -888,7 +906,7 @@ public:
     TimingSnapshot getTimingSnapshot(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
     std::string getTimingCompactString(uint64_t preferredFrame = std::numeric_limits<uint64_t>::max()) const;
     void updateLiveTimingFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
-    bool beginPixelMetricsCapture(int ctxId, uint64_t frameNo, double viewportPixels);
+    bool beginPixelMetricsCapture(int ctxId, uint64_t frameNo, int viewId, double viewportPixels);
     void endPixelMetricsCapture(int ctxId);
     void releasePixelMetricsQueries(ContextResources& res);
 
@@ -909,6 +927,7 @@ public:
     const LineShader&                   getLineShader(int ctxId)                 const { return getResources(ctxId).sh_line; }
 
 private:
+
     struct GlobalTimingSample {
         double cpu_update_ms{-1.0};
         double wait_ms{-1.0};

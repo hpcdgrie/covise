@@ -696,6 +696,7 @@ void Lamure::preFrame() {
                 }
             }
         }
+
         m_prev_lod_error_for_sensitivity = m_settings.lod_error;
         m_prev_smoothed_fps_for_sensitivity = m_smoothed_fps_;
 
@@ -775,6 +776,10 @@ void Lamure::preFrame() {
         m_pid_integral = 0.0f;
         m_pid_prev_error = 0.0f;
         m_pid_output_bias = m_settings.lod_error;
+    }
+
+    if (m_renderer) {
+        m_renderer->syncHudCameras();
     }
 
 #ifdef _WIN32
@@ -1108,6 +1113,7 @@ void Lamure::rebuildRenderer()
                                                   (global_min.z + global_max.z) * 0.5 );
 
     if (m_renderer) {
+        m_renderer->updateSharedBoxData();
         m_renderer->init();
         
         // Unfreeze and force update to apply correct transform to the new renderer node
