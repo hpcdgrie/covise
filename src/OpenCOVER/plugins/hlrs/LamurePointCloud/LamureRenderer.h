@@ -840,6 +840,9 @@ public:
     void setModelUniforms(const scm::math::mat4& mvp_matrix, const scm::math::mat4& model_matrix, ContextResources& ctx);
     void setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_id, ContextResources& ctx);
     bool isModelVisible(std::size_t modelIndex) const;
+    inline osg::GraphicsContext* getGC(osg::RenderInfo& ri) const {
+        return ri.getState() ? ri.getState()->getGraphicsContext() : nullptr;
+    }
     
     void getMatricesFromRenderInfo(osg::RenderInfo& renderInfo, osg::Matrixd& outView, osg::Matrixd& outProj);
     int resolveViewId(osg::RenderInfo& renderInfo) const;
