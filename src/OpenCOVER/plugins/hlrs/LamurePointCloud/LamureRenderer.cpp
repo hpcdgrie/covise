@@ -337,35 +337,57 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
     int viewId = -1;
     if (!camera) return;
     const bool timingEnabled = _renderer->isTimingModeActive();
+    const bool allowLodUpdate = _plugin->getSettings().lod_update && !_plugin->isRebuildInProgress();
     auto& res = _renderer->getResources(ctx);
-    std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
-    auto viewIdIt = res.view_ids.find(camera);
-    if (viewIdIt == res.view_ids.end()) return;
-    viewId = viewIdIt->second;
-    if (viewId < 0) return;
-    lamure::ren::camera* scmCamera = _renderer->getScmCamera(ctx, camera);
+    bool initialized = false;
+    bool dispatchReserved = false;
+    std::shared_ptr<lamure::ren::camera> scmCameraHolder;
+    {
+        std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
+        auto viewIdIt = res.view_ids.find(camera);
+        if (viewIdIt == res.view_ids.end()) return;
+        viewId = viewIdIt->second;
+        if (viewId < 0) return;
+
+        initialized = res.initialized;
+        auto cameraIt = res.scm_cameras.find(camera);
+        if (cameraIt != res.scm_cameras.end()) {
+            scmCameraHolder = cameraIt->second;
+        }
+
+        if (allowLodUpdate && initialized && scmCameraHolder) {
+            int lastViewIdInContext = viewId;
+            for (const auto& kv : res.view_ids) {
+                if (kv.second >= 0) {
+                    lastViewIdInContext = std::max(lastViewIdInContext, kv.second);
+                }
+            }
+            const bool isDispatchView = (viewId == lastViewIdInContext);
+            if (res.dispatch_frame != frameNo) {
+                res.dispatch_frame = frameNo;
+                res.dispatch_done = false;
+            }
+            if (!_plugin->getSettings().models.empty() &&
+                isDispatchView &&
+                !res.dispatch_done) {
+                // Reserve dispatch for this frame before leaving the lock.
+                res.dispatch_done = true;
+                dispatchReserved = true;
+            }
+        }
+    }
+    lamure::ren::camera* scmCamera = scmCameraHolder.get();
 
     // Ensure initialization happened
-    if (!res.initialized || !scmCamera) return;
+    if (!initialized || !scmCamera) return;
     if (!_renderer->gpuOrganizationReady()) return;
 
-    if (_plugin->getSettings().lod_update && !_plugin->isRebuildInProgress()) {
+    if (allowLodUpdate) {
         lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
         lamure::ren::controller* controller = lamure::ren::controller::get_instance();
 
         lamure::context_t context_id = controller->deduce_context_id(ctx);
         lamure::view_t view_id = static_cast<lamure::view_t>(viewId);
-        int lastViewIdInContext = viewId;
-        for (const auto& kv : res.view_ids) {
-            if (kv.second >= 0) {
-                lastViewIdInContext = std::max(lastViewIdInContext, kv.second);
-            }
-        }
-        const bool isDispatchView = (viewId == lastViewIdInContext);
-        if (res.dispatch_frame != frameNo) {
-            res.dispatch_frame = frameNo;
-            res.dispatch_done = false;
-        }
 
         const auto tContextStart = std::chrono::steady_clock::now();
         cuts->send_camera(context_id, view_id, *scmCamera);
@@ -404,8 +426,9 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
             _renderer->noteContextUpdateMs(ctx, frameNo, elapsedMs(tContextStart));
         }
 
-        if (!_plugin->getSettings().models.empty() && !res.dispatch_done && isDispatchView) {
+        if (dispatchReserved) {
             const auto tDispatchStart = std::chrono::steady_clock::now();
+            bool dispatchSucceeded = false;
             try {
                 if (lamure::ren::policy::get_instance()->size_of_provenance() > 0) {
                     controller->dispatch(context_id, _renderer->getDevice(ctx), _plugin->getDataProvenance());
@@ -413,10 +436,19 @@ void DispatchDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const
                 else {
                     controller->dispatch(context_id, _renderer->getDevice(ctx));
                 }
-                res.dispatch_done = true;
+                dispatchSucceeded = true;
             }
             catch (const std::exception& e) {
                 if (_renderer->notifyOn()) std::cerr << "[Lamure][WARN] dispatch skipped: " << e.what() << "\n";
+            }
+            {
+                std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
+                if (res.dispatch_frame == frameNo) {
+                    // Keep reserved state on success, allow retry on failure.
+                    if (!dispatchSucceeded) {
+                        res.dispatch_done = false;
+                    }
+                }
             }
             if (timingEnabled) {
                 _renderer->noteDispatchMs(ctx, frameNo, elapsedMs(tDispatchStart));
@@ -445,11 +477,13 @@ void CutsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const osg
     int viewId = -1;
     if (!camera) return;
     auto& res = m_renderer->getResources(ctx);
-    std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
-    auto viewIdIt = res.view_ids.find(camera);
-    if (viewIdIt == res.view_ids.end()) return;
-    viewId = viewIdIt->second;
-    if (viewId < 0) return;
+    {
+        std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
+        auto viewIdIt = res.view_ids.find(camera);
+        if (viewIdIt == res.view_ids.end()) return;
+        viewId = viewIdIt->second;
+        if (viewId < 0) return;
+    }
     const bool timingEnabled = m_renderer->isTimingModeActive();
     
     lamure::ren::cut_database* cuts = lamure::ren::cut_database::get_instance();
@@ -1074,17 +1108,39 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
     if (!camera)
         return;
     auto& res = m_renderer->getResources(ctx);
-    std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
-    auto viewIdIt = res.view_ids.find(camera);
-    if (viewIdIt == res.view_ids.end()) {
-        return;
-    }
-    viewId = viewIdIt->second;
-    if (viewId < 0) {
-        return;
+    std::shared_ptr<lamure::ren::camera> scmCameraHolder;
+    GLuint boxVbo = 0;
+    GLuint boxIbo = 0;
+    GLuint lineProgram = 0;
+    GLint mvpLocation = -1;
+    GLint colorLocation = -1;
+    GLsizei boxIndexCount = 0;
+
+    {
+        std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
+        auto viewIdIt = res.view_ids.find(camera);
+        if (viewIdIt == res.view_ids.end()) {
+            return;
+        }
+        viewId = viewIdIt->second;
+        if (viewId < 0) {
+            return;
+        }
+
+        auto cameraIt = res.scm_cameras.find(camera);
+        if (cameraIt != res.scm_cameras.end()) {
+            scmCameraHolder = cameraIt->second;
+        }
+
+        lineProgram = res.sh_line.program;
+        mvpLocation = res.sh_line.mvp_matrix_location;
+        colorLocation = res.sh_line.in_color_location;
+        boxVbo = res.geo_box.vbo;
+        boxIbo = res.geo_box.ibo;
+        boxIndexCount = static_cast<GLsizei>(res.box_idx.size());
     }
 
-    lamure::ren::camera* scmCamera = m_renderer->getScmCamera(ctx, camera);
+    lamure::ren::camera* scmCamera = scmCameraHolder.get();
     if (!m_renderer->gpuOrganizationReady())
         return;
     const osg::GraphicsContext* currentGc = camera->getGraphicsContext();
@@ -1094,29 +1150,32 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
     if (!currentGc)
         return;
 
-    if (!scmCamera || res.sh_line.program == 0 ||
-        res.geo_box.vbo == 0 || res.geo_box.ibo == 0 ||
-        glIsBuffer(res.geo_box.vbo) != GL_TRUE ||
-        glIsBuffer(res.geo_box.ibo) != GL_TRUE) {
+    if (!scmCamera || lineProgram == 0 ||
+        boxVbo == 0 || boxIbo == 0 ||
+        glIsBuffer(boxVbo) != GL_TRUE ||
+        glIsBuffer(boxIbo) != GL_TRUE) {
         return;
     }
 
     GLuint boxVao = 0;
-    auto vaoIt = res.box_vaos.find(currentGc);
-    if (vaoIt != res.box_vaos.end() &&
-        vaoIt->second != 0 &&
-        glIsVertexArray(vaoIt->second) == GL_TRUE) {
-        boxVao = vaoIt->second;
-    } else {
-        glGenVertexArrays(1, &boxVao);
-        glBindVertexArray(boxVao);
-        glBindBuffer(GL_ARRAY_BUFFER, res.geo_box.vbo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res.geo_box.ibo);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-        glBindVertexArray(0);
-        if (boxVao != 0) {
-            res.box_vaos[currentGc] = boxVao;
+    {
+        std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
+        auto vaoIt = res.box_vaos.find(currentGc);
+        if (vaoIt != res.box_vaos.end() &&
+            vaoIt->second != 0 &&
+            glIsVertexArray(vaoIt->second) == GL_TRUE) {
+            boxVao = vaoIt->second;
+        } else {
+            glGenVertexArrays(1, &boxVao);
+            glBindVertexArray(boxVao);
+            glBindBuffer(GL_ARRAY_BUFFER, boxVbo);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boxIbo);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+            glBindVertexArray(0);
+            if (boxVao != 0) {
+                res.box_vaos[currentGc] = boxVao;
+            }
         }
     }
     if (boxVao == 0 || glIsVertexArray(boxVao) != GL_TRUE) {
@@ -1166,17 +1225,17 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
     FastState before = FastState::capture();
 
     glBindVertexArray(boxVao);
-    glUseProgram(res.sh_line.program);
-    glUniformMatrix4fv(res.sh_line.mvp_matrix_location, 1, GL_FALSE, mvp_matrix.data_array);
-    glUniform4f(res.sh_line.in_color_location, 
+    glUseProgram(lineProgram);
+    glUniformMatrix4fv(mvpLocation, 1, GL_FALSE, mvp_matrix.data_array);
+    glUniform4f(colorLocation,
         plugin->getSettings().bvh_color[0], 
         plugin->getSettings().bvh_color[1],
         plugin->getSettings().bvh_color[2],
         plugin->getSettings().bvh_color[3]);
 
     GLint prevArrayBuffer = before.arrayBuffer; // Use captured state
-    glBindBuffer(GL_ARRAY_BUFFER, res.geo_box.vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, res.geo_box.ibo);
+    glBindBuffer(GL_ARRAY_BUFFER, boxVbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boxIbo);
 
     GLint boxVboSize = 0;
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &boxVboSize);
@@ -1194,7 +1253,7 @@ void BoundingBoxDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, co
         const auto corners = LamureUtil::getBoxCorners(bbv[node_id]);
         if (corners.size() >= 8 * 3) {
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * (8 * 3), corners.data());
-            glDrawElements(GL_LINES, static_cast<GLsizei>(res.box_idx.size()), GL_UNSIGNED_SHORT, nullptr);
+            glDrawElements(GL_LINES, boxIndexCount, GL_UNSIGNED_SHORT, nullptr);
             ++rendered_bounding_boxes;
         }
     }
@@ -2351,29 +2410,51 @@ void FrustumDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const 
     const osg::Camera* camera = renderInfo.getCurrentCamera();
     if (!camera) return;
     auto& res = _renderer->getResources(ctx);
-    std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
-    auto viewIdIt = res.view_ids.find(camera);
-    if (viewIdIt == res.view_ids.end()) {
-        return;
-    }
-    const int viewId = viewIdIt->second;
-    if (viewId < 0) {
-        return;
+    std::shared_ptr<lamure::ren::camera> scmCameraHolder;
+    GLuint frustumVao = 0;
+    GLuint frustumVbo = 0;
+    GLuint lineProgram = 0;
+    GLint mvpLocation = -1;
+    GLint colorLocation = -1;
+    GLsizei frustumIndexCount = 0;
+    {
+        std::lock_guard<std::mutex> callbackLock(res.callback_mutex);
+        auto viewIdIt = res.view_ids.find(camera);
+        if (viewIdIt == res.view_ids.end()) {
+            return;
+        }
+        const int viewId = viewIdIt->second;
+        if (viewId < 0) {
+            return;
+        }
+
+        auto cameraIt = res.scm_cameras.find(camera);
+        if (cameraIt != res.scm_cameras.end()) {
+            scmCameraHolder = cameraIt->second;
+        }
+
+        frustumVao = res.geo_frustum.vao;
+        frustumVbo = res.geo_frustum.vbo;
+        lineProgram = res.sh_line.program;
+        mvpLocation = res.sh_line.mvp_matrix_location;
+        colorLocation = res.sh_line.in_color_location;
+        frustumIndexCount = static_cast<GLsizei>(res.frustum_idx.size());
     }
 
-    lamure::ren::camera* scmCamera = _renderer->getScmCamera(ctx, camera);
-    if (!scmCamera || res.geo_frustum.vao == 0)
+    lamure::ren::camera* scmCamera = scmCameraHolder.get();
+    if (!scmCamera || frustumVao == 0)
         return;
 
     FastState before = FastState::capture();
 
     const auto corner_values = scmCamera->get_frustum_corners();
-    const size_t corner_count = (std::min)(corner_values.size(), res.frustum_vertices.size() / 3);
+    std::array<float, 24> frustumVertices{};
+    const size_t corner_count = (std::min)(corner_values.size(), frustumVertices.size() / 3);
     for (size_t i = 0; i < corner_count; ++i) {
         const auto vv = scm::math::vec3f(corner_values[i]);
-        res.frustum_vertices[i * 3 + 0] = vv.x;
-        res.frustum_vertices[i * 3 + 1] = vv.y;
-        res.frustum_vertices[i * 3 + 2] = vv.z;
+        frustumVertices[i * 3 + 0] = vv.x;
+        frustumVertices[i * 3 + 1] = vv.y;
+        frustumVertices[i * 3 + 2] = vv.z;
     }
 
     osg::Matrixd view_osg, proj_osg;
@@ -2384,18 +2465,18 @@ void FrustumDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const 
     const scm::math::mat4f mvp_matrix = proj * view;
 
     glLineWidth(1);
-    glBindVertexArray(res.geo_frustum.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, res.geo_frustum.vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * res.frustum_vertices.size(), res.frustum_vertices.data());
+    glBindVertexArray(frustumVao);
+    glBindBuffer(GL_ARRAY_BUFFER, frustumVbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * frustumVertices.size(), frustumVertices.data());
 
-    glUseProgram(res.sh_line.program);
-    glUniformMatrix4fv(res.sh_line.mvp_matrix_location, 1, GL_FALSE, mvp_matrix.data_array);
-    glUniform4f(res.sh_line.in_color_location,
+    glUseProgram(lineProgram);
+    glUniformMatrix4fv(mvpLocation, 1, GL_FALSE, mvp_matrix.data_array);
+    glUniform4f(colorLocation,
         _plugin->getSettings().frustum_color[0],
         _plugin->getSettings().frustum_color[1],
         _plugin->getSettings().frustum_color[2],
         _plugin->getSettings().frustum_color[3]);
-    glDrawElements(GL_LINES, static_cast<GLsizei>(res.frustum_idx.size()), GL_UNSIGNED_SHORT, nullptr);
+    glDrawElements(GL_LINES, frustumIndexCount, GL_UNSIGNED_SHORT, nullptr);
 
     before.restore();
 }
