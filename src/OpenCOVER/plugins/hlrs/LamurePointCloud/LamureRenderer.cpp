@@ -786,6 +786,31 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
         return it->second;
     };
 
+    auto setScreenQuadVaoForCurrentGraphicsContext = [&]() -> GLuint {
+        if (!currentGc || res.geo_screen_quad.vbo == 0) {
+            return 0;
+        }
+        auto it = res.screen_quad_vaos.find(currentGc);
+        if (it != res.screen_quad_vaos.end() && it->second != 0) {
+            glBindVertexArray(it->second);
+            return it->second;
+        }
+
+        GLuint vao = 0;
+        glGenVertexArrays(1, &vao);
+        if (vao == 0) {
+            return 0;
+        }
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, res.geo_screen_quad.vbo);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glBindVertexArray(0);
+        res.screen_quad_vaos[currentGc] = vao;
+        glBindVertexArray(vao);
+        return vao;
+    };
+
     if (!initPointVaoForCurrentGraphicsContext()) {
         cleanup();
         return;
@@ -795,7 +820,8 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
         cleanup();
         return;
     }
-    const bool isMultipass = wantsMultipass && (cachedPointVao != 0);
+
+    const bool isMultipass = wantsMultipass;
     pixelMetricsActive =
         (!isMultipass) && m_renderer->beginPixelMetricsCapture(ctx, frameNo, viewId, static_cast<double>(vpW * vpH));
 
@@ -910,17 +936,21 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
     };
 
     if (isMultipass) {
-        const int vpWidth  = static_cast<int>(vpW);
-        const int vpHeight = static_cast<int>(vpH);
-        auto& target = m_renderer->acquireMultipassTarget(context_id, cam, vpWidth, vpHeight);
         GLint prev_fbo = 0;
         GLint prev_draw_buffer = 0;
         GLint prev_read_buffer = 0;
         GLint prev_viewport[4] = {0,0,0,0};
+        GLint prev_scissor_box[4] = {0,0,0,0};
+        const GLboolean prev_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev_fbo);
         glGetIntegerv(GL_DRAW_BUFFER, &prev_draw_buffer);
         glGetIntegerv(GL_READ_BUFFER, &prev_read_buffer);
         glGetIntegerv(GL_VIEWPORT, prev_viewport);
+        glGetIntegerv(GL_SCISSOR_BOX, prev_scissor_box);
+        const int vpWidth  = std::max(1, prev_viewport[2]);
+        const int vpHeight = std::max(1, prev_viewport[3]);
+        auto& target = m_renderer->acquireMultipassTarget(ctx, viewId, vpWidth, vpHeight);
+        const scm::math::vec2 passViewport(static_cast<float>(vpWidth), static_cast<float>(vpHeight));
         const float scale_radius_combined = settings.scale_radius * settings.scale_element;
         const float scale_proj_pass = opencover::cover->getScale() * static_cast<float>(vpHeight) * 0.5f * proj.data_array[5];
         const auto bindTexture2DToUnit = [](GLuint unit, GLuint texture) {
@@ -943,6 +973,7 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
         // --- PASS 1: Depth pre-pass
         glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
         glViewport(0, 0, vpWidth, vpHeight);
+        glDisable(GL_SCISSOR_TEST);
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -987,7 +1018,7 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
         glViewport(0, 0, vpWidth, vpHeight);
         bindTexture2DToUnit(0, target.depth_texture);
 
-        if (res.sh_surfel_pass2.viewport_loc            >= 0) glUniform2f(res.sh_surfel_pass2.viewport_loc, viewport.x, viewport.y);
+        if (res.sh_surfel_pass2.viewport_loc            >= 0) glUniform2f(res.sh_surfel_pass2.viewport_loc, passViewport.x, passViewport.y);
         if (res.sh_surfel_pass2.max_radius_loc          >= 0) glUniform1f(res.sh_surfel_pass2.max_radius_loc, settings.max_radius);
         if (res.sh_surfel_pass2.min_radius_loc          >= 0) glUniform1f(res.sh_surfel_pass2.min_radius_loc, settings.min_radius);
         if (res.sh_surfel_pass2.scale_radius_loc        >= 0) glUniform1f(res.sh_surfel_pass2.scale_radius_loc, scale_radius_combined);
@@ -1034,6 +1065,12 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
         glDrawBuffer(prev_draw_buffer);
         glReadBuffer(prev_read_buffer);
         glViewport(prev_viewport[0], prev_viewport[1], prev_viewport[2], prev_viewport[3]);
+        if (prev_scissor_test) {
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(prev_scissor_box[0], prev_scissor_box[1], prev_scissor_box[2], prev_scissor_box[3]);
+        } else {
+            glDisable(GL_SCISSOR_TEST);
+        }
 
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_TRUE);
@@ -1059,7 +1096,10 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
         if (res.sh_surfel_pass3.use_tone_mapping_loc        >= 0) glUniform1i(res.sh_surfel_pass3.use_tone_mapping_loc, settings.use_tone_mapping ? 1 : 0);
         if (res.sh_surfel_pass3.lighting_loc                >= 0) glUniform1f(res.sh_surfel_pass3.lighting_loc, settings.lighting);
 
-        glBindVertexArray(res.geo_screen_quad.vao);
+        if (setScreenQuadVaoForCurrentGraphicsContext() == 0) {
+            cleanup();
+            return;
+        }
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
         glActiveTexture(GL_TEXTURE0);
@@ -4442,19 +4482,29 @@ void LamureRenderer::initPclResources(ContextResources& res){
         }
     }
     res.point_vaos.clear();
+    for (const auto& kv : res.screen_quad_vaos) {
+        const GLuint vao = kv.second;
+        if (vao != 0 && glIsVertexArray(vao) == GL_TRUE) {
+            glDeleteVertexArrays(1, &vao);
+        }
+    }
+    res.screen_quad_vaos.clear();
 
-    // Screen-Quad einmalig anlegen
-    if(res.geo_screen_quad.vao==0){
-        GLuint vao=0,vbo=0;
-        glGenVertexArrays(1,&vao);
-        glBindVertexArray(vao);
-        glGenBuffers(1,&vbo);
-        glBindBuffer(GL_ARRAY_BUFFER,vbo);
-        glBufferData(GL_ARRAY_BUFFER,sizeof(float)*res.screen_quad_vertex.size(),res.screen_quad_vertex.data(),GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
-        res.geo_screen_quad.vao=vao; res.geo_screen_quad.vbo=vbo;
-        glBindVertexArray(0);
+    if (res.geo_screen_quad.vao != 0 && glIsVertexArray(res.geo_screen_quad.vao) == GL_TRUE) {
+        glDeleteVertexArrays(1, &res.geo_screen_quad.vao);
+    }
+    res.geo_screen_quad.vao = 0;
+    if (res.geo_screen_quad.vbo != 0 && glIsBuffer(res.geo_screen_quad.vbo) == GL_TRUE) {
+        glDeleteBuffers(1, &res.geo_screen_quad.vbo);
+    }
+    res.geo_screen_quad.vbo = 0;
+
+    GLuint vbo = 0;
+    glGenBuffers(1, &vbo);
+    if (vbo != 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * res.screen_quad_vertex.size(), res.screen_quad_vertex.data(), GL_STATIC_DRAW);
+        res.geo_screen_quad.vbo = vbo;
     }
 }
 
@@ -4540,8 +4590,6 @@ void LamureRenderer::initializeMultipassTarget(MultipassTarget& target, int widt
     if(status!=GL_FRAMEBUFFER_COMPLETE){
         std::cerr << "[Lamure][ERR] Framebuffer incomplete (" << std::hex << status << std::dec << ") "
                   << width << "x" << height << "\n";
-    } else if (notifyOn()) {
-        std::cout<<"[Lamure] FBO ready "<<width<<"x"<<height<<"\n";
     }
 
     glBindTexture(GL_TEXTURE_2D,0);
@@ -4553,30 +4601,15 @@ void LamureRenderer::initializeMultipassTarget(MultipassTarget& target, int widt
     target.height = height;
 }
 
-LamureRenderer::MultipassTarget& LamureRenderer::acquireMultipassTarget(lamure::context_t contextID, const osg::Camera* camera, int width, int height){
-    if(width <= 0 || height <= 0){
-        const osg::GraphicsContext::Traits* traits = nullptr;
-        if(camera && camera->getGraphicsContext()){
-            traits = camera->getGraphicsContext()->getTraits();
-        }
-        if(traits){
-            width = traits->width;
-            height = traits->height;
-        }else{
-            width = std::max(width, 1);
-            height = std::max(height, 1);
-        }
-    }
+LamureRenderer::MultipassTarget& LamureRenderer::acquireMultipassTarget(int ctxId, int viewId, int width, int height){
+    width = std::max(width, 1);
+    height = std::max(height, 1);
 
-    auto& res = getResources(static_cast<int>(contextID));
-    MultipassTargetKey key{contextID, camera};
-    auto [it, inserted] = res.multipass_targets.try_emplace(key);
+    auto& res = getResources(ctxId);
+    auto [it, inserted] = res.multipass_targets.try_emplace(viewId);
     if(inserted){
         initializeMultipassTarget(it->second, width, height);
     } else if(it->second.width != width || it->second.height != height){
-        if (notifyOn()) {
-            std::cout<<"[Lamure] FBO resize "<<it->second.width<<"x"<<it->second.height<<" -> "<<width<<"x"<<height<<"\n";
-        }
         initializeMultipassTarget(it->second, width, height);
     }
     return it->second;

@@ -477,22 +477,6 @@ private:
         int height = 0;
     };
 
-    struct MultipassTargetKey {
-        lamure::context_t context = 0;
-        const osg::Camera* camera = nullptr;
-        bool operator==(const MultipassTargetKey& other) const noexcept {
-            return context == other.context && camera == other.camera;
-        }
-    };
-
-    struct MultipassTargetKeyHash {
-        std::size_t operator()(const MultipassTargetKey& key) const noexcept {
-            std::size_t h1 = static_cast<std::size_t>(key.context);
-            std::size_t h2 = std::hash<const void*>{}(static_cast<const void*>(key.camera));
-            return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
-        }
-    };
-
     struct ContextResources {
         uint8_t ctx = -1;
         bool rendering = false;
@@ -581,7 +565,7 @@ private:
         GLint pixel_prev_stencil_zpass{GL_KEEP};
 
         // FBOs
-        std::unordered_map<MultipassTargetKey, MultipassTarget, MultipassTargetKeyHash> multipass_targets;
+        std::unordered_map<int, MultipassTarget> multipass_targets;
         scm::gl::render_device_ptr  scm_device;
         scm::gl::render_context_ptr scm_context;
         std::unordered_map<const osg::Camera*, std::shared_ptr<lamure::ren::camera>> scm_cameras;
@@ -589,6 +573,7 @@ private:
         std::mutex callback_mutex;
         std::unordered_map<const osg::GraphicsContext*, GLuint> point_vaos;
         std::unordered_map<const osg::GraphicsContext*, GLuint> box_vaos;
+        std::unordered_map<const osg::GraphicsContext*, GLuint> screen_quad_vaos;
         uint64_t dispatch_frame{std::numeric_limits<uint64_t>::max()};
         bool dispatch_done{false};
         std::unordered_map<const osg::Camera*, osg::ref_ptr<osg::Camera>> hud_cameras;
@@ -781,7 +766,7 @@ public:
         return (it != res.scm_cameras.end() && it->second) ? it->second.get() : nullptr;
     }
 
-    MultipassTarget& acquireMultipassTarget(lamure::context_t contextID, const osg::Camera* camera, int width, int height);
+    MultipassTarget& acquireMultipassTarget(int ctxId, int viewId, int width, int height);
     osg::ref_ptr<osg::Geode> getStatsGeode() { return m_stats_geode; }
     osg::ref_ptr<osg::Geode> getFrustumGeode() { return m_frustum_geode; }
     osg::ref_ptr<osg::MatrixTransform> getEditBrushTransform() { return m_edit_brush_transform; }
