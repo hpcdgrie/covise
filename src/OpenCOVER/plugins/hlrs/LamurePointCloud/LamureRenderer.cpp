@@ -828,6 +828,7 @@ void PointsDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const o
                 tls_firsts.resize(max_threads);
                 tls_counts.resize(max_threads);
             }
+
             for (int t = 0; t < max_threads; ++t) {
                 tls_firsts[t].clear();
                 tls_counts[t].clear();
@@ -2381,6 +2382,7 @@ void FrustumDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const 
     std::shared_ptr<lamure::ren::camera> scmCameraHolder;
     GLuint frustumVao = 0;
     GLuint frustumVbo = 0;
+    GLuint frustumIbo = 0;
     GLuint lineProgram = 0;
     GLint mvpLocation = -1;
     GLint colorLocation = -1;
@@ -2390,6 +2392,7 @@ void FrustumDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const 
         if (!resolveMappedCamera(camera, res.view_ids, res.scm_cameras, scmCameraHolder)) return;
         frustumVao = res.geo_frustum.vao;
         frustumVbo = res.geo_frustum.vbo;
+        frustumIbo = res.geo_frustum.ibo;
         lineProgram = res.sh_line.program;
         mvpLocation = res.sh_line.mvp_matrix_location;
         colorLocation = res.sh_line.in_color_location;
@@ -2397,10 +2400,19 @@ void FrustumDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const 
     }
 
     lamure::ren::camera* scmCamera = scmCameraHolder.get();
-    if (!scmCamera || frustumVao == 0)
+    if (!_renderer->gpuOrganizationReady() || !renderInfo.getState())
+        return;
+    if (!scmCamera || lineProgram == 0 || frustumVao == 0 || frustumVbo == 0 || frustumIbo == 0 || frustumIndexCount <= 0)
         return;
 
-    FastState before = FastState::capture();
+    GLint prevProgram = 0;
+    GLint prevVao = 0;
+    GLint prevArrayBuffer = 0;
+    GLint prevElementBuffer = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevArrayBuffer);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &prevElementBuffer);
 
     const auto corner_values = scmCamera->get_frustum_corners();
     std::array<float, 24> frustumVertices{};
@@ -2422,18 +2434,22 @@ void FrustumDrawCallback::drawImplementation(osg::RenderInfo& renderInfo, const 
     glLineWidth(1);
     glBindVertexArray(frustumVao);
     glBindBuffer(GL_ARRAY_BUFFER, frustumVbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, frustumIbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * frustumVertices.size(), frustumVertices.data());
 
     glUseProgram(lineProgram);
-    glUniformMatrix4fv(mvpLocation, 1, GL_FALSE, mvp_matrix.data_array);
-    glUniform4f(colorLocation,
-        _plugin->getSettings().frustum_color[0],
-        _plugin->getSettings().frustum_color[1],
-        _plugin->getSettings().frustum_color[2],
-        _plugin->getSettings().frustum_color[3]);
+    if (mvpLocation >= 0)
+        glUniformMatrix4fv(mvpLocation, 1, GL_FALSE, mvp_matrix.data_array);
+    const auto& frustumColor = _plugin->getSettings().frustum_color;
+    if (colorLocation >= 0 && frustumColor.size() >= 4) {
+        glUniform4f(colorLocation, frustumColor[0], frustumColor[1], frustumColor[2], frustumColor[3]);
+    }
     glDrawElements(GL_LINES, frustumIndexCount, GL_UNSIGNED_SHORT, nullptr);
 
-    before.restore();
+    glUseProgram(static_cast<GLuint>(prevProgram));
+    glBindVertexArray(static_cast<GLuint>(prevVao));
+    glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(prevArrayBuffer));
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint>(prevElementBuffer));
 }
 
 void LamureRenderer::syncEditBrushGeometry()
