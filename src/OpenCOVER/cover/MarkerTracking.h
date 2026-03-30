@@ -7,15 +7,9 @@
 
 /*! \file
 \brief MarkerTracking optical tracking system interface classes
-
-\author Uwe Woessner <woessner@hlrs.de>
-\author (C) 2002
-Computer Centre University of Stuttgart,
-Allmandring 30,
-D-70550 Stuttgart,
-Germany
-
-\date    July 2002
+Object Markers are used to transform the scene. Only one Objet Marker should be visible at a time.
+Patterns of multiple markers in a fixed configuration can be used to increase consitency and accuracy. 
+The transform of the first marker in such a group is used as an offset for the scene, the other markers transform must be relative to this marker.
 */
 
 #ifndef MarkerTracking_H
@@ -47,6 +41,7 @@ class coTUIEditFloatField;
 class coTUITab;
 class coTUIElement;
 class coTUIGroupBox;
+class coVR3DTransformInteractor;
 }
 
 #include <net/covise_connect.h>
@@ -129,6 +124,14 @@ public:
     }
 };
 
+struct GroupTransform
+{
+    int groupId;
+    std::unique_ptr<covTUIEditFloatFieldVec3> m_xyz; 
+    std::unique_ptr<covTUIEditFloatFieldVec3> m_hpr;
+    osg::Matrix m_offset; 
+};
+
 class COVEREXPORT MarkerTracking : public coTUIListener
 {
 public:
@@ -138,7 +141,6 @@ public:
     MarkerTrackingMarker *getMarker(const std::string &name);
     MarkerTrackingMarker *getOrCreateMarker(const std::string &name, const std::string &pattern, double size, const osg::Matrix &offset, bool vrml, bool isObjectMarker = false);
     
-    coTUITab *artTab;
     bool flipH;
     MarkerTrackingInterface *arInterface = nullptr;
     RemoteARInterface *remoteAR = nullptr;
@@ -159,25 +161,41 @@ public:
     std::string m_MarkerTrackingVariant = "MarkerTracking";
     std::map<std::string, std::unique_ptr<MarkerTrackingMarker>> markers;
     bool testImage = false;
-    coTUIFrame* m_trackingFrame = nullptr;
+    int getGuiFrameID() const;
 private:
     static MarkerTracking *art;
     MarkerTracking();
     void tabletPressEvent(coTUIElement* tUIItem) override;
-
+    
     std::string m_configPath;
     covise::Message msg;
-
+    
     bool objTracking = false;
-    int numObjectMarkers;
     std::vector<MarkerTrackingMarker *> objectMarkers;
     std::unique_ptr<opencover::config::File> m_markerDatabase;
+    
+    coTUITab *artTab;
+    coTUIFrame* m_buttonsFrame = nullptr;
     coTUIButton* m_configureMarkerBtn = nullptr;
     coTUIButton* m_saveBtn = nullptr;
-    coTUIFrame* m_buttonsFrame = nullptr;
+
+    coTUIFrame* m_trackingFrame = nullptr;
+    struct ObjectMarkerTransformGui
+    {
+        std::array<coTUIEditFloatField*, 3> m_xyz; 
+        std::array<coTUIEditFloatField*, 3> m_hpr;
+        coTUIButton* apply = nullptr;
+        coTUIButton* reset = nullptr;
+        coTUIToggleButton* interactorBtn = nullptr;
+        std::unique_ptr<coVR3DTransformInteractor> interactor;
+    } m_objectMarkerTransformGui; 
+
+
 };
 
 constexpr int noMarkerGroup = -1;
+
+
 
 class COVEREXPORT MarkerTrackingMarker : public coTUIListener
 {
@@ -188,7 +206,7 @@ private:
     float m_oldpattGroup = -1;
     double m_pattCenter[2] = {0.0, 0.0};
     double m_pattTrans[3][4];
-    osg::Matrix m_offset;
+    osg::Matrix m_offset, m_initialOffset;
     osg::Matrix m_cameraTransform;
 
     coTUIButton *m_toggleConfigOff = nullptr;
@@ -229,7 +247,7 @@ public:
     void tabletEvent(coTUIElement *tUIItem) override;
     double getSize() const;
     std::string getPattern() const;
-    bool isVisible() const;
+    bool isVisible();
     bool isObjectMarker() const;
     void setObjectMarker(bool o);
     void setColor(float r, float g, float b);
@@ -240,10 +258,14 @@ public:
     osg::Geometry *geom = nullptr;
     coTUIToggleButton *displayQuad = nullptr;
     coTUIToggleButton *calibrate = nullptr;
+    coTUIButton *resetBtn = nullptr;
     int numCalibSamples = 0;
     osg::Matrix matrixSumm;
     bool lastVisible = false;
+    bool hasBeenVisible = false;
+
     void setOffset(const osg::Matrix &mat);
+    void resetOffset();
     void stopCalibration();
 };
 }

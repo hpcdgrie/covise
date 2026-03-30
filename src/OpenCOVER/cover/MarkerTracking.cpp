@@ -21,6 +21,7 @@
 #include "VRViewer.h"
 #include "coVRConfig.h"
 #include "coVRPluginSupport.h"
+#include <PluginUtil/coVR3DTransformInteractor.h>
 #include "coVRPluginList.h"
 #include "coVRMSController.h"
 #include "coVRCollaboration.h"
@@ -58,8 +59,6 @@ MarkerTracking::MarkerTracking()
     // auto g = new coTUIGroupBox("configure new marker", artTab->getID());
     m_buttonsFrame = new coTUIFrame("config", artTab->getID());
     m_buttonsFrame->setPos(0, 0);
-    m_trackingFrame = new coTUIFrame("tracking", artTab->getID());
-    m_trackingFrame->setPos(1, 0);
     
     m_configureMarkerBtn = new coTUIButton("add new markers", m_buttonsFrame->getID());
     m_configureMarkerBtn->setEventListener(this);
@@ -68,6 +67,93 @@ MarkerTracking::MarkerTracking()
     m_saveBtn->setEventListener(this);
     m_saveBtn->setPos(1, 0);
 
+    auto objectMarkerTransformFrame = new coTUIFrame("object marker transform", artTab->getID());
+    objectMarkerTransformFrame->setPos(0, 1);
+
+    int row = 0;
+    auto descriptionLabel = new coTUILabel("add a transform to all used markers", objectMarkerTransformFrame->getID());
+    descriptionLabel->setPos(0, row++);
+    auto xyzLabel = new coTUILabel("xyz", objectMarkerTransformFrame->getID());
+    xyzLabel->setPos(0, row++);
+    m_objectMarkerTransformGui.m_xyz[0] = new coTUIEditFloatField("x", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.m_xyz[0]->setPos(0, row);
+    m_objectMarkerTransformGui.m_xyz[1] = new coTUIEditFloatField("y", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.m_xyz[1]->setPos(1, row);
+    m_objectMarkerTransformGui.m_xyz[2] = new coTUIEditFloatField("z", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.m_xyz[2]->setPos(2, row);
+    ++row;
+    auto hprLabel = new coTUILabel("hpr", objectMarkerTransformFrame->getID());
+    hprLabel->setPos(0, row++);
+    m_objectMarkerTransformGui.m_hpr[0] = new coTUIEditFloatField("h", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.m_hpr[0]->setPos(0, row);
+    m_objectMarkerTransformGui.m_hpr[1] = new coTUIEditFloatField("p", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.m_hpr[1]->setPos(1, row);
+    m_objectMarkerTransformGui.m_hpr[2] = new coTUIEditFloatField("r", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.m_hpr[2]->setPos(2, row);
+    ++row;
+
+    m_objectMarkerTransformGui.interactorBtn = new coTUIToggleButton("showInteractor", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.interactorBtn->setPos(0, row);
+    m_objectMarkerTransformGui.interactorBtn->setEventListener(this);
+
+    m_objectMarkerTransformGui.apply = new coTUIButton("apply", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.apply->setPos(1, row);
+    m_objectMarkerTransformGui.apply->setEventListener(this);
+
+    m_objectMarkerTransformGui.reset = new coTUIButton("reset", objectMarkerTransformFrame->getID());
+    m_objectMarkerTransformGui.reset->setPos(2, row);
+    m_objectMarkerTransformGui.reset->setEventListener(this);
+
+    m_trackingFrame = new coTUIFrame("tracking", artTab->getID());
+    m_trackingFrame->setPos(0, 2);
+
+}
+
+osg::Matrix eulerToMat(const std::array<double, 3> &xyz, const std::array<double, 3> &hpr)
+{
+    coCoord offsetCoord;
+    for (size_t i = 0; i < 3; i++)
+    {
+        offsetCoord.xyz[i] = xyz[i];
+        offsetCoord.hpr[i] = hpr[i];
+    }
+    osg::Matrix offMat;
+    offsetCoord.makeMat(offMat);
+    return offMat;
+}
+
+void matToEuler(const osg::Matrix &mat, std::array<double, 3> &xyz, std::array<double, 3> &hpr)
+{
+    coCoord offsetCoord(mat);
+    for (size_t i = 0; i < 3; i++)
+    {
+        xyz[i] = offsetCoord.xyz[i];
+        hpr[i] = offsetCoord.hpr[i];
+    }
+}
+
+// return all markersthat have ben visible or are in a group with a marker that has been visible
+std::vector<MarkerTrackingMarker *> getUsedMarkers(const std::vector<MarkerTrackingMarker *> &markers)
+{
+    std::vector<MarkerTrackingMarker *> result;
+    for (auto m: markers)
+    {
+        if (m->hasBeenVisible)
+        {
+            result.push_back(m);
+            if(m->getMarkerGroup() != -1)
+            {
+                for(auto m2: markers)
+                {
+                    if(m2->getMarkerGroup() == m->getMarkerGroup() && std::find(result.begin(), result.end(), m2) == result.end())
+                    {
+                        result.push_back(m2);
+                    }
+                }
+            }
+        } 
+    }
+    return result;
 }
 
 void MarkerTracking::tabletPressEvent(coTUIElement *tUIItem)
@@ -79,6 +165,36 @@ void MarkerTracking::tabletPressEvent(coTUIElement *tUIItem)
     if (tUIItem == m_saveBtn)
     {
         m_markerDatabase->save();
+    }
+    if (tUIItem == m_objectMarkerTransformGui.apply)
+    {
+        auto xyzGui = m_objectMarkerTransformGui.m_xyz;
+        auto hprGui = m_objectMarkerTransformGui.m_hpr;
+        auto globalMat = eulerToMat({xyzGui[0]->getValue(), xyzGui[1]->getValue(), xyzGui[2]->getValue()}, {hprGui[0]->getValue(), hprGui[1]->getValue(), hprGui[2]->getValue()});
+
+        for(auto m: getUsedMarkers(objectMarkers))
+        {
+            std::array<double, 3> oldXyz, oldHpr, newXyz, newHpr;
+            auto offset = m->getOffset();
+            matToEuler(offset, oldXyz, oldHpr);
+            offset.postMult(globalMat);
+            matToEuler(offset, newXyz, newHpr);
+            assert(std::abs(newXyz[0] - (oldXyz[0] + xyzGui[0]->getValue())) < 0.01);
+            m->setOffset(offset);
+        }
+        for (size_t i = 0; i < 3; i++)
+        {
+            m_objectMarkerTransformGui.m_xyz[i]->setValue(0);
+            m_objectMarkerTransformGui.m_hpr[i]->setValue(0);
+        }
+        
+    }
+    if(tUIItem == m_objectMarkerTransformGui.reset)
+    {
+        for(auto m: getUsedMarkers(objectMarkers))
+        {
+            m->resetOffset();
+        }
     }
 }
 
@@ -534,6 +650,11 @@ void MarkerTracking::update()
                     numVisible++;
                     osg::Matrix MarkerPos; // marker position in camera coordinate system
                     MarkerPos = currentMarker->getMarkerTrans();
+                    auto xyzGui = m_objectMarkerTransformGui.m_xyz;
+                    auto hprGui = m_objectMarkerTransformGui.m_hpr;
+                    auto globalMat = eulerToMat({xyzGui[0]->getValue(), xyzGui[1]->getValue(), xyzGui[2]->getValue()}, {hprGui[0]->getValue(), hprGui[1]->getValue(), hprGui[2]->getValue()});
+                    MarkerPos.postMult(globalMat);
+
                     osg::Matrix tmpMat2, leftCameraTrans;
                     leftCameraTrans = VRViewer::instance()->getViewerMat();
                     int factor = 0;
@@ -683,6 +804,11 @@ bool MarkerTracking::isRunning()
     return running;
 }
 
+int MarkerTracking::getGuiFrameID() const
+{
+    return m_trackingFrame->getID();
+}
+
 opencover::config::File &MarkerTracking::markerDatabase()
 {
     return *m_markerDatabase;
@@ -691,30 +817,15 @@ opencover::config::File &MarkerTracking::markerDatabase()
 void MarkerTrackingMarker::matToEuler(const osg::Matrix &mat)
 {
     m_offset = mat;
-    coCoord offsetCoord(m_offset);
     std::array<double, 3> xyz, hpr;
-    for (size_t i = 0; i < 3; i++)
-    {
-            xyz[i] = offsetCoord.xyz[i];
-            hpr[i] = offsetCoord.hpr[i];
-    }
+    ::matToEuler(mat, xyz, hpr);
     m_xyz->setValue(xyz);
     m_hpr->setValue(hpr);
 }
 
 osg::Matrix MarkerTrackingMarker::eulerToMat() const
 {
-    osg::Matrix offMat;
-    coCoord offsetCoord;
-    auto xyz = m_xyz->getValue();
-    auto hpr = m_hpr->getValue();
-    for (size_t i = 0; i < 3; i++)
-    {
-        offsetCoord.xyz[i] = xyz[i];
-        offsetCoord.hpr[i] = hpr[i];
-    }
-    offsetCoord.makeMat(offMat);
-    return offMat;
+    return ::eulerToMat(m_xyz->getValue(), m_hpr->getValue());
 }
 
 void MarkerTrackingMarker::setOffset(const osg::Matrix &mat)
@@ -725,6 +836,11 @@ void MarkerTrackingMarker::setOffset(const osg::Matrix &mat)
     osg::Matrix tmpMat;
     tmpMat.makeScale(getSize(), getSize(), getSize());
     posSize->setMatrix(tmpMat * m_offset);
+}
+
+void MarkerTrackingMarker::resetOffset()
+{
+    setOffset(m_initialOffset);
 }
 
 void MarkerTrackingMarker::stopCalibration()
@@ -760,6 +876,7 @@ MarkerTrackingMarker::MarkerTrackingMarker(const std::string &configName, const 
     m_size->setValue(markerSize);
     m_vrmlToPf->setValue(vrmlToOsg);
     matToEuler(m);
+    m_initialOffset = m_offset;
     init();
 }
 
@@ -767,6 +884,7 @@ MarkerTrackingMarker::MarkerTrackingMarker(const std::string &name)
 {
     createUiandConfigValues(name);
     m_offset = eulerToMat();
+    m_initialOffset = m_offset;
     init();
 }
 
@@ -842,11 +960,11 @@ void MarkerTrackingMarker::createUiandConfigValues(const std::string &configName
 {
     int pos = MarkerTracking::instance()->markers.size() + 1;
     
-    m_toggleConfigOff = new coTUIButton(configName,  MarkerTracking::instance()->artTab->getID());
+    m_toggleConfigOff = new coTUIButton(configName,  MarkerTracking::instance()->getGuiFrameID());
     m_toggleConfigOff->setPos(0, pos);
     m_toggleConfigOff->setEventListener(this);
 
-    m_layoutGroup = new coTUIFrame(configName,  MarkerTracking::instance()->artTab->getID());
+    m_layoutGroup = new coTUIFrame(configName,  MarkerTracking::instance()->getGuiFrameID());
     m_layoutGroup->setPos(1, pos+1);
     m_layoutGroup->setHidden(true);
     m_configLabel = std::make_unique<coTUILabel>(configName,m_layoutGroup->getID());
@@ -897,7 +1015,12 @@ void MarkerTrackingMarker::createUiandConfigValues(const std::string &configName
     calibrate->setEventListener(this);
     calibrate->setState(false);
 
+    resetBtn = new coTUIButton("resetTransform", line2->getID());
+    resetBtn->setPos(4, 0);
+    resetBtn->setEventListener(this);     
+
     m_xyz = std::make_unique<covTUIEditFloatFieldVec3>(MarkerTracking::instance()->markerDatabase(), configName, "xyz", m_layoutGroup, std::array<double, 3>{0.0, 0.0, 0.0});
+    std::cerr << m_xyz->getValue()[0] << " " << m_xyz->getValue()[1] << " " << m_xyz->getValue()[2] << std::endl;
     m_xyz->box()->setPos(0, 4);
     m_xyz->setUpdater([this](){
             updateMatrices();
@@ -974,6 +1097,9 @@ void MarkerTrackingMarker::tabletEvent(coTUIElement *tUIItem)
         else{
            m_pattGroup->setValue(m_oldpattGroup);
         }
+    } else if (tUIItem == resetBtn)
+    {
+        resetOffset();
     }
     updateMatrices();
 }
@@ -1035,10 +1161,14 @@ int MarkerTrackingMarker::getMarkerGroup() const
     return m_pattGroup->getValue();
 }
 
-bool MarkerTrackingMarker::isVisible() const
+bool MarkerTrackingMarker::isVisible()
 {
     if (MarkerTracking::instance()->isRunning() && MarkerTracking::instance()->arInterface)
-        return MarkerTracking::instance()->arInterface->isVisible(this);
+    {
+        auto visible = MarkerTracking::instance()->arInterface->isVisible(this);
+        hasBeenVisible = hasBeenVisible || visible;
+        return visible;
+    }
     return false;
 }
 
