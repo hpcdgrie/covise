@@ -1,0 +1,15 @@
+USING(OpenCV)
+
+INCLUDE_DIRECTORIES(
+)
+
+SET(SOURCES
+  getWebcamId.cpp
+)
+
+
+ADD_COVISE_EXECUTABLE(getWebcamId)
+
+TARGET_LINK_LIBRARIES(getWebcamId coUtil ${EXTRA_LIBS})
+
+COVISE_INSTALL_TARGET(getWebcamId)
