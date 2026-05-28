@@ -667,17 +667,7 @@ bool OpenCOVER::init()
     VRSceneGraph::instance()->init();
     coVRShaderList::instance()->update();
     VRViewer::instance()->setSceneData(cover->getScene());
-
-    coVRPluginList::instance()->loadDefault(); // vive and other tracking system plugins have to be loaded before Input is initialized
-
-    Input::instance()->update(); // requires scenegraph
-
-    bool haveWindows = VRWindow::instance()->config();
-    haveWindows = coVRMSController::instance()->allReduceOr(haveWindows);
-    if (!haveWindows)
-        return false;
-
-    // initialize communication
+// initialize communication
     bool loadCovisePlugin = false;
     if (!m_loadVistlePlugin && loadFiles == false && coVRConfig::instance()->collaborativeOptionsFile.empty() && coCommandLine::argc() > 3 && m_vrbCredentials == NULL)
     {
@@ -697,20 +687,6 @@ bool OpenCOVER::init()
     {
         //fprintf(stderr, "no covise connection\n");
     }
-
-    cover->vruiView = new ui::VruiView;
-    cover->ui->addView(cover->vruiView);
-
-    
-    VRViewer::instance()->config();
-    hud = coHud::instance();
-    coVRShaderList::instance()->init(VRViewer::instance()->getExtensions());
-
-    hud->setText2("loading plugins");
-    hud->redraw();
-
-    coVRNavigationManager::instance();
-    cover->setScale(coCoviseConfig::getFloat("COVER.DefaultScaleFactor", 1.f));
 
     if (m_loadVistlePlugin)
     {
@@ -742,6 +718,30 @@ bool OpenCOVER::init()
             cover->ui->addView(new ui::TabletView("mapeditor", tab));
         }
     }
+    coVRPluginList::instance()->loadDefault(); // vive and other tracking system plugins have to be loaded before Input is initialized
+    Input::instance()->update(); // requires scenegraph
+
+    bool haveWindows = VRWindow::instance()->config();
+    haveWindows = coVRMSController::instance()->allReduceOr(haveWindows);
+    if (!haveWindows)
+        return false;
+
+    
+    cover->vruiView = new ui::VruiView;
+    cover->ui->addView(cover->vruiView);
+
+    
+    VRViewer::instance()->config();
+    hud = coHud::instance();
+    coVRShaderList::instance()->init(VRViewer::instance()->getExtensions());
+
+    hud->setText2("loading plugins");
+    hud->redraw();
+
+    coVRNavigationManager::instance();
+    cover->setScale(coCoviseConfig::getFloat("COVER.DefaultScaleFactor", 1.f));
+
+    
 
     string welcomeMessage = coCoviseConfig::getEntry("value", "COVER.WelcomeMessage", "Welcome to OpenCOVER at HLRS");
     hud->setText1(welcomeMessage.c_str());
